@@ -2,7 +2,7 @@
 // a halftone sea that is the only animated part, and a pannable camera.
 // It only draws. All game rules stay in game.js; the UI passes in what to highlight.
 import { TERRAIN_RES, pips } from './board.js';
-import { PORT_ATLAS, PORT_SCALE, PORT_SHEET } from './ports-atlas.js?v=7';
+import { PORT_ATLAS, PORT_SCALE, PORT_SHEET } from './ports-atlas.js?v=8';
 
 const SQ3 = Math.sqrt(3);
 const U = 96; // hex radius in world pixels
@@ -44,7 +44,7 @@ const hexPoints = (k) => [0, 1, 2, 3, 4, 5].map((i) => { const a = (Math.PI / 18
 export class BoardView {
   constructor(el) {
     this.el = el;
-    this.el.innerHTML = `<div class="world"><canvas class="sea" width="${SEA_W}" height="${SEA_H}" aria-hidden="true"></canvas><div class="tiles"></div><div class="layer"></div></div>`;
+    this.el.innerHTML = `<div class="world"><canvas class="sea" width="${SEA_W}" height="${SEA_H}" aria-hidden="true"></canvas><div class="island-shadow" aria-hidden="true"></div><div class="tiles"></div><div class="layer"></div></div>`;
     this.world = el.querySelector('.world');
     this.sea = el.querySelector('.sea');
     this.tilesEl = el.querySelector('.tiles');

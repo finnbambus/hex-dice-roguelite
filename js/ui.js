@@ -6,8 +6,8 @@
 import { Game, COSTS, BLINDS } from './game.js';
 import { RES, TERRAIN_RES, pips } from './board.js';
 import { ITEMS, ITEM_LIST, BOSS_BY_ID, ROLLS_PER_ROUND, LOADING, START_SETTLEMENTS, ECHO_BREAK } from './content.js';
-import { BoardView } from './board-view.js?v=7';
-import { figure } from './figures.js?v=7';
+import { BoardView } from './board-view.js?v=8';
+import { figure } from './figures.js?v=8';
 
 const TERRAIN_COLOR = { hills: '#c8734a', forest: '#3f7d4a', pasture: '#9ccf6a', fields: '#e8c547', mountains: '#8e939c', desert: '#e3d3a4' };
 const RES_ICON = { brick: 'B', lumber: 'L', wool: 'W', grain: 'G', ore: 'O' };
@@ -86,6 +86,8 @@ export class UI {
     this.$overlay = document.getElementById('overlay');
     this.$panel = document.getElementById('panel');
     this.$hand = document.getElementById('hand');
+    this.$stage = document.getElementById('stage');
+    this.$tray = document.getElementById('tray');
     this.$drawer = document.getElementById('drawer');
     this.$modal = document.getElementById('modal-root');
     this.bindEvents();
@@ -322,6 +324,8 @@ export class UI {
     this.renderOverlay();
     this.renderPanel();
     this.renderHand();
+    this.renderTray();
+    this.renderMood();
     this.renderDrawer();
     this.renderModal();
     this.refreshTip();
@@ -466,8 +470,6 @@ export class UI {
     // boss
     out.push(`<div class="rcard-box" ${this.tipAttr('boss', { kind: bossNow ? 'Boss · active' : 'Boss', title: boss.name, desc: boss.desc })}><div class="eyebrow">${bossNow ? 'Boss this round' : g.phase === 'shop' && g.blind === 2 ? 'Next boss' : 'Boss of this ante'}</div><div class="name">${boss.name}</div><p>${boss.desc}</p></div>`);
 
-    // dice
-    out.push(`<div class="rcard-box"><div class="eyebrow">Your dice <b class="muted" style="font-weight:400">hover for details</b></div><div class="mini-dice">${[0, 1].map((i) => `<div class="mini-die">${this.facesHtml(i, null)}${this.dieTags(i)}</div>`).join('')}</div></div>`);
     this.$status.innerHTML = out.join('');
   }
 
@@ -968,6 +970,33 @@ export class UI {
     };
   }
 
+  // ---------------------------------------------------------------- the table: dice tray and lamp
+  renderTray() {
+    const g = this.game;
+    if (!g || !g.board) return;
+    this.$tray.innerHTML = `<div class="zone-h">Dice <b class="muted">hover for details</b></div><div class="tray-dice">${[0, 1].map((i) => `<div class="mini-die">${this.facesHtml(i, null)}${this.dieTags(i)}</div>`).join('')}</div>`;
+    this.applyHighlights();
+  }
+
+  // One lamp over the board. Its colour drifts from amber toward ember over the antes, and the boss round turns it vermilion.
+  renderMood() {
+    const g = this.game;
+    if (!g || !g.board) return;
+    const t = Math.min(Math.max(g.ante - 1, 0) / 7, 1);
+    const mix = (a, b) => a.map((v, i) => Math.round(v + (b[i] - v) * t)).join(',');
+    const boss = g.blind === 2 && g.phase !== 'shop' && g.phase !== 'gameover';
+    let rgb = mix([255, 168, 92], [236, 116, 66]), k = 1, vig = '12,13,15', va = (0.78 + t * 0.1).toFixed(2);
+    if (g.phase === 'shop') { rgb = mix([255, 188, 110], [244, 150, 84]); k = 0.9; }
+    if (g.phase === 'gameover') { rgb = '150,160,175'; k = 0.7; }
+    if (boss) { rgb = '255,74,28'; k = 1.45; vig = '30,6,3'; va = '0.9'; }
+    const s = this.$stage.style;
+    s.setProperty('--lamp-rgb', rgb);
+    s.setProperty('--lamp-k', k);
+    s.setProperty('--vig-rgb', vig);
+    s.setProperty('--vig-a', va);
+    this.$stage.dataset.mood = boss ? 'boss' : g.phase;
+  }
+
   // ---------------------------------------------------------------- hand
   renderHand() {
     const g = this.game;
@@ -1028,6 +1057,8 @@ export class UI {
     this.$hand.innerHTML = `
       <section class="zone"><div class="zone-h">Hand <b>${total} card${total === 1 ? '' : 's'}${countable > 7 ? ' · <span class="bad">over 7: a 7 makes you discard</span>' : ' · safe from the robber up to 7'}</b></div><div class="res-row">${stacks}</div></section>
       <section class="zone"><div class="zone-h">Cards <b>${g.cards.length} of ${g.limits.handSlots}</b></div><div class="slots" style="--n:${g.limits.handSlots}">${cardSlots}</div></section>`;
+    const lz = this.$hand.firstElementChild;
+    this.$stage.style.setProperty('--hand-l', `${lz ? lz.offsetHeight : 160}px`);
     if (this.view && this.$hand.offsetHeight !== this._handH) { this._handH = this.$hand.offsetHeight; this.view.fit(); }
     this.applyHighlights();
   }
