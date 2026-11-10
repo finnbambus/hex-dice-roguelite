@@ -1,8 +1,8 @@
 // The island view: isometric printed tiles, 3D-rendered pieces, number tokens drawn in perspective,
-// a halftone sea that is the only animated part, and a pannable camera.
+// lying on a halftone wooden tabletop, and a pannable camera.
 // It only draws. All game rules stay in game.js; the UI passes in what to highlight.
 import { TERRAIN_RES, pips } from './board.js';
-import { PORT_ATLAS, PORT_SCALE, PORT_SHEET } from './ports-atlas.js?v=8';
+import { PORT_ATLAS, PORT_SCALE, PORT_SHEET } from './ports-atlas.js?v=9';
 
 const SQ3 = Math.sqrt(3);
 const U = 96; // hex radius in world pixels
@@ -10,7 +10,6 @@ const K = 0.766; // vertical squash of the fixed tilted camera
 const CX = 520, CY = 385; // world position of the board centre
 const S = 250; // size of a tile sprite box
 const WORLD_W = 1140, WORLD_H = 900;
-const SEA_W = 1940, SEA_H = 1500, SEA_X = -400, SEA_Y = -300;
 const TERR = { forest: 0, pasture: 1, fields: 2, hills: 3, mountains: 4, desert: 5 };
 const ROAD_CELL = { v: 10, up: 11, down: 12 }; // vertical, "/" and "\" roads
 const RES_NAME = { brick: 'Brick', lumber: 'Lumber', wool: 'Wool', grain: 'Grain', ore: 'Ore' };
@@ -44,15 +43,13 @@ const hexPoints = (k) => [0, 1, 2, 3, 4, 5].map((i) => { const a = (Math.PI / 18
 export class BoardView {
   constructor(el) {
     this.el = el;
-    this.el.innerHTML = `<div class="world"><canvas class="sea" width="${SEA_W}" height="${SEA_H}" aria-hidden="true"></canvas><div class="island-shadow" aria-hidden="true"></div><div class="tiles"></div><div class="layer"></div></div>`;
+    this.el.innerHTML = `<div class="world"><div class="table" aria-hidden="true"></div><div class="island-shadow" aria-hidden="true"></div><div class="tiles"></div><div class="layer"></div></div>`;
     this.world = el.querySelector('.world');
-    this.sea = el.querySelector('.sea');
     this.tilesEl = el.querySelector('.tiles');
     this.layer = el.querySelector('.layer');
     this.pan = { x: 0, y: 0 };
     this.insets = { top: 64, right: 16, bottom: 190, left: 16 };
     this.tileKey = '';
-    this.seaOn = false;
     this.moved = false;
     this.bindPan();
     if (window.ResizeObserver) new ResizeObserver(() => this.fit()).observe(el);
@@ -116,70 +113,6 @@ export class BoardView {
   zRow(h) { return 100 + (this.rowOf(h) + 3) * 10; }
   zAt(y) { return 100 + (Math.ceil((y - CY) / (U * 1.5 * K)) + 3) * 10 + 5; }
 
-  // ------------------------------------------------------------ the sea (a fine halftone print; only the coast rings move)
-  startSea(B) {
-    if (this.seaOn) return;
-    this.seaOn = true;
-    const cv = this.sea;
-    const ctx = cv.getContext('2d');
-    const land = B.hexes.map((h) => ({ x: this.hx(h), y: this.hy(h) }));
-    const P = 4.6, c = Math.cos(Math.PI / 6), sn = Math.sin(Math.PI / 6);
-    const N = 270, far = [], near = [];
-    for (let a = -N; a < 2 * N; a++) {
-      for (let b = -N; b < 2 * N; b++) {
-        const x = (a * c - b * sn) * P, y = (a * sn + b * c) * P;
-        if (x < 0 || y < 0 || x > SEA_W || y > SEA_H) continue;
-        const wx = x + SEA_X, wy = y + SEA_Y;
-        let d = 1e9;
-        for (let i = 0; i < land.length; i++) {
-          const dx = (wx - land[i].x) / U, dy = (wy - land[i].y - 22) / (U * K);
-          const q = dx * dx + dy * dy;
-          if (q < d) d = q;
-        }
-        d = Math.sqrt(d);
-        if (d < 0.8) continue;
-        const fade = Math.pow(Math.max(0, 1 - (d - 0.9) / 2.9), 1.5);
-        if (fade <= 0.001) far.push(x, y); else near.push(x, y, d, fade);
-      }
-    }
-    // the open sea never moves: it lives on its own still layer
-    const still = document.createElement('canvas');
-    still.width = SEA_W; still.height = SEA_H;
-    const sx = still.getContext('2d');
-    sx.fillStyle = '#1f5565';
-    sx.beginPath();
-    const r0 = P * 0.62 * Math.sqrt(0.045);
-    for (let i = 0; i < far.length; i += 2) { sx.moveTo(far[i] + r0, far[i + 1]); sx.arc(far[i], far[i + 1], r0, 0, 6.283); }
-    sx.fill();
-    cv.style.backgroundImage = `url(${still.toDataURL()})`;
-    const reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
-    let last = -1000;
-    const draw = (ts) => {
-      const t = ts / 1000;
-      ctx.clearRect(0, 0, SEA_W, SEA_H);
-      ctx.fillStyle = '#1f5565';
-      ctx.beginPath();
-      for (let i = 0; i < near.length; i += 4) {
-        const d = near[i + 2], fade = near[i + 3];
-        const rings = 0.5 + 0.5 * Math.sin(d * 6.2 + t * 0.55 - 0.6);
-        const v = 0.045 + fade * (0.14 + 0.36 * Math.pow(rings, 1.6)) + (d < 1.2 ? 0.2 + 0.08 * Math.sin(t * 0.9 + near[i] * 0.02) : 0);
-        const r = P * 0.62 * Math.sqrt(v > 0.85 ? 0.85 : v);
-        const e = r * 1.78;
-        ctx.rect(near[i] - e / 2, near[i + 1] - e / 2, e, e);
-      }
-      ctx.fill();
-    };
-    draw(0);
-    if (reduce) return;
-    const loop = (ts) => {
-      requestAnimationFrame(loop);
-      if (document.hidden || ts - last < 90) return;
-      last = ts;
-      draw(ts);
-    };
-    requestAnimationFrame(loop);
-  }
-
   // ------------------------------------------------------------ tiles (only rebuilt when terrain changes)
   renderTiles(B, dimSet) {
     const key = B.hexes.map((h) => h.terrain).join(',') + '|' + (dimSet ? [...dimSet].join(',') : '');
@@ -196,7 +129,6 @@ export class BoardView {
   render(g, opts) {
     const B = g.board;
     const { req, paid, rolled } = opts;
-    this.startSea(B);
     const isT = (k, id) => req && req.kind === k && req.ids.has(id);
     const resultMode = paid && paid.size > 0;
     this.renderTiles(B, resultMode ? paid : req && req.kind === 'hex' ? req.ids : null);
