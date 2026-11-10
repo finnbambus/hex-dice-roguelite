@@ -39,6 +39,31 @@ const TOKEN_FX = {
 const cellPos = (i) => `${((i % 4) * 100) / 3}% ${(Math.floor(i / 4) * 100) / 3}%`;
 const hexPoints = (k) => [0, 1, 2, 3, 4, 5].map((i) => { const a = (Math.PI / 180) * (60 * i - 30); return `${f1(k * U * Math.cos(a))},${f1(k * U * K * Math.sin(a))}`; }).join(' ');
 
+// ---- half-hex port pieces
+const HEXV = [0, 1, 2, 3, 4, 5].map((i) => { const a = (Math.PI / 180) * (60 * i - 30); return [Math.cos(a), Math.sin(a)]; });
+const PORT_TERR = { brick: 'hills', lumber: 'forest', wool: 'pasture', grain: 'fields', ore: 'mountains', generic: 'desert' };
+const PORT_WALL = { forest: '#294c2f', pasture: '#42591f', fields: '#75520e', hills: '#6f2c1a', mountains: '#3a4456', desert: '#694f2a' };
+const PIECE_T = 20; // thickness of a printed tile, in world px
+function hull(pts) {
+  const P = pts.map((q) => [q[0], q[1]]).sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  const cr = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+  const lo = [], up = [];
+  for (const q of P) { while (lo.length >= 2 && cr(lo[lo.length - 2], lo[lo.length - 1], q) <= 0) lo.pop(); lo.push(q); }
+  for (const q of P.slice().reverse()) { while (up.length >= 2 && cr(up[up.length - 2], up[up.length - 1], q) <= 0) up.pop(); up.push(q); }
+  return lo.slice(0, -1).concat(up.slice(0, -1));
+}
+// keep the part of a convex polygon where sg * side(q) >= 0
+function clipPlane(poly, side, sg) {
+  const out = [];
+  for (let i = 0; i < poly.length; i++) {
+    const a = poly[i], b = poly[(i + 1) % poly.length];
+    const sa = sg * side(a), sb = sg * side(b);
+    if (sa >= 0) out.push(a);
+    if ((sa >= 0) !== (sb >= 0)) { const t = sa / (sa - sb); out.push([a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]); }
+  }
+  return out;
+}
+
 export class BoardView {
   constructor(el) {
     this.el = el;
@@ -65,7 +90,7 @@ export class BoardView {
     const { top, right, left } = this.insets;
     const bottom = Math.max(this.insets.bottom, hand ? hand.offsetHeight + 14 : 0);
     const aw = Math.max(200, r.width - left - right), ah = Math.max(200, r.height - top - bottom);
-    this.scale = Math.min(aw / 1075, ah / 700);
+    this.scale = Math.min(aw / 1075, ah / 730);
     this.cx = left + aw / 2;
     this.cy = top + ah / 2 + 8;
     this.applyCamera();
@@ -291,22 +316,50 @@ export class BoardView {
     return `${h.terrain}${res ? ' → ' + res : ''}`;
   }
 
+  // A port is a half hex of printed terrain sitting on the sea against its coast edge, with a ratio token on it.
   port(out, B, p, target) {
-    // sit the plate a little further out than the engine's anchor so it clears the coast
-    const va = B.vertices[p.vertices[0]], vb = B.vertices[p.vertices[1]];
-    const mx = (va.x + vb.x) / 2, my = (va.y + vb.y) / 2, ml = Math.hypot(mx, my);
-    const px = CX + U * (mx + (mx / ml) * 0.8), py = CY + U * K * (my + (my / ml) * 0.8);
-    for (const v of p.vertices) {
-      const vv = B.vertices[v];
-      const x2 = this.vx(vv), y2 = this.vy(vv);
-      const len = Math.hypot(x2 - px, y2 - py);
-      const ang = (Math.atan2(y2 - py, x2 - px) * 180) / Math.PI;
-      out.push(`<i class="pier" style="left:${f1(px)}px;top:${f1(py)}px;width:${f1(len)}px;transform:rotate(${f1(ang)}deg);z-index:90"></i>`);
+    const [va, vb] = p.vertices.map((v) => B.vertices[v]);
+    const mx = (va.x + vb.x) / 2, my = (va.y + vb.y) / 2;
+    const owner = B.hexes.find((h) => h.vertices.includes(p.vertices[0]) && h.vertices.includes(p.vertices[1]));
+    let nx = mx - (owner ? owner.x : 0), ny = my - (owner ? owner.y : 0);
+    const nl = Math.hypot(nx, ny) || 1;
+    nx /= nl; ny /= nl;
+    const ap = SQ3 / 2;
+    const cxw = mx + nx * ap, cyw = my + ny * ap; // centre of the hex this piece is half of
+    const Cx = CX + U * cxw, Cy = CY + U * K * cyw;
+    const half = [], cut = [];
+    HEXV.forEach(([hx, hy]) => {
+      const d = hx * nx + hy * ny;
+      if (d > 0.01) return;
+      const q = [S / 2 + U * hx, S / 2 - 1 + U * K * hy];
+      half.push(q);
+      if (d > -0.01) cut.push(q);
+    });
+    const down = (pts, dy) => pts.map(([x, y]) => [x, y + dy]);
+    const terr = PORT_TERR[p.type] || 'desert';
+    const lift = nl && ny > 0.01 ? (terr === 'forest' ? 26 : terr === 'mountains' ? 14 : 0) : 0;
+    let sil = hull([...half, ...down(half, PIECE_T), ...down(half, -lift)]);
+    let wall = '';
+    if (ny > 0.01 && cut.length === 2) {
+      const [c1, c2] = cut;
+      const keep = half.find((q) => Math.abs(q[0] - c1[0]) + Math.abs(q[1] - c1[1]) > 1 && Math.abs(q[0] - c2[0]) + Math.abs(q[1] - c2[1]) > 1);
+      const side = (q) => (c2[0] - c1[0]) * (q[1] - c1[1]) - (c2[1] - c1[1]) * (q[0] - c1[0]);
+      const sg = Math.sign(side(keep));
+      sil = clipPlane(sil, side, sg);
+      wall = `<i class="pp-wall" style="background-color:${PORT_WALL[terr]};clip-path:polygon(${[c1, c2, ...down([c2, c1], PIECE_T)].map(([x, y]) => `${f1(x)}px ${f1(y)}px`).join(',')})"></i>`;
     }
+    const poly = sil.map(([x, y]) => `${f1(x)}px ${f1(y)}px`).join(',');
+    const gx = half.reduce((t, q) => t + q[0], 0) / half.length, gy = half.reduce((t, q) => t + q[1], 0) / half.length;
+    const tx = Cx - S / 2 + gx, ty = Cy - S / 2 + gy; // token centre in world px
+    const z = this.zAt(Cy + (ny > 0 ? 0 : 20));
     const generic = p.type === 'generic';
     const num = (t) => `<u class="pc${t.length >= 3 ? ' l3' : ''}">${t}</u>`;
     const up = [p.up.overflow ? 'overflow' : '', p.up.bigger ? num(`+${p.up.bigger}`) : '', p.up.smaller ? num(`−${p.up.smaller}`) : '', p.up.free ? 'free' : ''].filter(Boolean).join('');
-    const art = generic ? '' : `<span class="art" style="background-position:${((RES_ART[p.type] % 5) * 100) / 4}% ${(Math.floor(RES_ART[p.type] / 5) * 100) / 3}%"></span>`;
-    out.push(`<div class="port ${generic ? 'generic' : p.type}${target ? ' target' : ''}" ${target ? `data-k="port" data-id="${p.id}"` : ''} style="left:${f1(px - 34)}px;top:${f1(py - 22)}px;z-index:95"><b>${generic ? '3:1' : '2:1'}</b>${art}<small>${generic ? 'any' : p.type}</small>${up ? `<em>${up}</em>` : ''}<title>${generic ? 'Generic port: trade 3:1' : `${p.type} port: trade 2:1`}</title></div>`);
+    const title = generic ? 'Generic port: trade 3:1' : `${p.type} port: trade 2:1`;
+    out.push(`<div class="pport${target ? ' target' : ''}" style="left:${f1(Cx - S / 2)}px;top:${f1(Cy - S / 2)}px;z-index:${z}"><i class="pp-top" style="background-position:${cellPos(TERR[terr])};clip-path:polygon(${poly})"></i>${wall}</div>`);
+    out.push(`<div class="tok ptok ${generic ? 'any' : p.type}" style="left:${f1(tx - 24)}px;top:${f1(ty - 20 * K)}px;height:${f1(40 * K)}px;z-index:${z + 4}"><div class="in" style="transform:scaleY(${K})"><span class="n">${generic ? '3:1' : '2:1'}</span><small>${generic ? 'any' : p.type}</small></div></div>`);
+    if (up) out.push(`<em class="pup" style="left:${f1(tx)}px;top:${f1(ty - 40)}px;z-index:${z + 6}">${up}</em>`);
+    const svgPts = sil.map(([x, y]) => `${f1(x)},${f1(y)}`).join(' ');
+    out.push(`<svg class="phit${target ? ' target' : ''}" ${target ? `data-k="port" data-id="${p.id}"` : ''} style="left:${f1(Cx - S / 2)}px;top:${f1(Cy - S / 2)}px;z-index:${z + 8}" width="${S}" height="${S}" viewBox="0 0 ${S} ${S}"><polygon points="${svgPts}"><title>${esc(title)}</title></polygon></svg>`);
   }
 }

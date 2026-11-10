@@ -195,20 +195,19 @@ select, input { font: inherit; color: var(--ink); background: var(--inset); bord
 .pop { position: absolute; transform: translateX(-50%); display: flex; align-items: center; gap: 7px; height: 32px; padding: 0 14px 0 10px; border-radius: 16px; background: var(--ink); color: #0c0d0f; font: 700 13px/1 var(--sans); white-space: nowrap; pointer-events: none; box-shadow: 0 10px 20px rgba(0, 0, 0, .6); animation: rise .5s ease-out both; }
 .pop i { width: 12px; height: 12px; border-radius: 50%; }
 @keyframes rise { from { opacity: 0; margin-top: 10px; } to { opacity: 1; margin-top: 0; } }
-.pier { position: absolute; height: 0; border-top: 2px dashed rgba(233, 228, 214, .5); transform-origin: 0 0; pointer-events: none; }
-.port { position: absolute; width: 68px; height: 44px; border-radius: 10px; background: var(--bone); color: #17181b; display: flex; flex-direction: column; align-items: center; justify-content: center; box-shadow: 0 3px 0 #8f8a7c, 0 8px 12px rgba(0, 0, 0, .55); overflow: hidden; }
-.port b { font: 800 17px/1 var(--display); }
-.port small { font: 600 7.5px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; margin-top: 3px; color: #55544e; }
-.port em { position: absolute; top: 2px; right: 3px; display: flex; gap: 2px; align-items: center; font: 600 7px/1 var(--mono); font-style: normal; color: #a3271a; text-transform: uppercase; }
-.port em u { text-decoration: none; box-sizing: border-box; width: 16px; height: 16px; border-radius: 50%; background: #a3271a; color: #fff; font: 800 9px/1 var(--sans); display: flex; align-items: center; justify-content: center; }
-.port em u.l3 { font-size: 7.5px; }
-.port .art { position: absolute; inset: 0; background: url(../assets/art.webp) no-repeat; background-size: 500% 400%; opacity: .0; }
-.port.brick { box-shadow: inset 0 -5px 0 var(--brick), 0 3px 0 #8f8a7c, 0 8px 12px rgba(0, 0, 0, .55); }
-.port.lumber { box-shadow: inset 0 -5px 0 var(--lumber), 0 3px 0 #8f8a7c, 0 8px 12px rgba(0, 0, 0, .55); }
-.port.wool { box-shadow: inset 0 -5px 0 var(--wool), 0 3px 0 #8f8a7c, 0 8px 12px rgba(0, 0, 0, .55); }
-.port.grain { box-shadow: inset 0 -5px 0 var(--grain), 0 3px 0 #8f8a7c, 0 8px 12px rgba(0, 0, 0, .55); }
-.port.ore { box-shadow: inset 0 -5px 0 var(--ore), 0 3px 0 #8f8a7c, 0 8px 12px rgba(0, 0, 0, .55); }
-.port.target { cursor: pointer; outline: 3px solid var(--accent); outline-offset: 2px; }
+.pport, .phit { position: absolute; width: 250px; height: 250px; pointer-events: none; }
+.pp-top, .pp-wall { position: absolute; inset: 0; }
+.pp-top { background: url(../assets/terrain.webp) no-repeat; background-size: 400% 400%; }
+.phit polygon { fill: transparent; stroke: none; }
+.phit.target { pointer-events: auto; cursor: pointer; }
+.phit.target polygon { fill: rgba(255, 74, 28, .22); stroke: var(--accent); stroke-width: 3; stroke-linejoin: round; pointer-events: all; }
+.tok.ptok { width: 48px; }
+.ptok .in { width: 48px; }
+.ptok small { position: absolute; left: 0; right: 0; top: 27px; text-align: center; font: 700 7.5px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: #3b3a36; }
+.ptok .n { font-size: 21px; line-height: 40px; transform: translateY(-6px); }
+.pup { position: absolute; transform: translateX(-50%); display: flex; gap: 3px; align-items: center; font: 600 8px/1 var(--mono); font-style: normal; letter-spacing: .08em; text-transform: uppercase; color: var(--bone); pointer-events: none; }
+.pup u { text-decoration: none; box-sizing: border-box; width: 20px; height: 20px; border-radius: 50%; background: #a3271a; border: 2px solid var(--bone); color: #fff; font: 800 10px/1 var(--sans); display: flex; align-items: center; justify-content: center; box-shadow: 0 3px 6px rgba(0, 0, 0, .5); }
+.pup u.l3 { font-size: 8px; }
 
 /* ---------- right panel: the step you are on ---------- */
 .panel { display: flex; flex-direction: column; min-height: 0; background: var(--panel); border-left: 1px solid var(--line); }
