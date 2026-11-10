@@ -4,8 +4,8 @@ import { RNG } from './rng.js';
 import { generateBoard, RES, TERRAINS, TERRAIN_RES, pips } from './board.js';
 import {
   ITEMS, ITEM_LIST, LOADING, BOSSES, BOSS_BY_ID, CATEGORY_GROUPS, RARITY_WEIGHTS, isUnique,
-  TRIBUTE_SMALL, TRIBUTE_BIG2, TRIBUTE_BOSS3, SHOP_REROLL, BOSS_REROLL, PACK_PRICE,
-  ROLLS_PER_ROUND, HAND_LIMIT, ECHO_BREAK, seqAt,
+  tributeFor, SHOP_REROLL, BOSS_REROLL, PACK_PRICE,
+  ROLLS_PER_ROUND, HAND_LIMIT, ECHO_BREAK, SETUP_RESOURCES, seqAt,
 } from './content.js';
 
 export const COSTS = {
@@ -32,6 +32,7 @@ export class Game {
   // ------------------------------------------------------------ utilities
   log(msg, cls = '') {
     this.logLines.push({ msg, cls });
+    if (this.capture) this.capture.push({ msg, cls });
     if (this.logLines.length > 300) this.logLines.shift();
   }
   emit() {
@@ -93,11 +94,13 @@ export class Game {
       const roadSpots = this.board.vertices[v].edges.filter((id) => !this.roads.has(id));
       while (e == null) e = await this.io.chooseEdge(roadSpots, 'Place a free road next to it', { cancel: false });
       this.roads.add(e);
-      if (i === 1) {
+      if (i === 1 || SETUP_RESOURCES === 'all') {
+        const got = [];
         for (const hid of this.board.vertices[v].hexes) {
           const r = TERRAIN_RES[this.hex(hid).terrain];
-          if (r) this.gain(r);
+          if (r) { this.gain(r); got.push(r); }
         }
+        this.log(`Starting resources from settlement ${i + 1}: ${got.length ? got.join(', ') : 'none (desert/coast)'}.`, 'good');
       }
       this.emit();
     }
@@ -128,7 +131,7 @@ export class Game {
 
     // Tribute
     const a = this.ante - 1;
-    const amounts = [seqAt(TRIBUTE_SMALL, a), seqAt(TRIBUTE_BIG2, a), seqAt(TRIBUTE_BOSS3, a)].slice(0, this.blind + 1);
+    const amounts = tributeFor(this.ante, this.blind);
     this.tribute = amounts.map((amount) => ({ amount, type: null, fixed: false, carried: false }));
     for (const c of this.carried) this.tribute.push({ amount: c, type: null, fixed: false, carried: true });
     this.carried = [];
@@ -225,6 +228,17 @@ export class Game {
       this.devForce = null;
     }
     this.pendingRoll = pr;
+    // Report shown in the Result step: what each die did, what happened, what you gained.
+    const rep = { stage: 'adjust', echo: pr.echo, dice: [{ notes: [] }, { notes: [] }], lines: [], hexes: [], seen: false };
+    for (const i of [0, 1]) {
+      const d = this.dice[i];
+      if (pr.hold[i] != null) rep.dice[i].notes.push('Held from the last roll (Echo)');
+      else {
+        if (d.loaded) rep.dice[i].notes.push(`Loaded die (level ${d.loaded.level} on face ${d.loaded.face + 1})`);
+        if (pr.set[i] != null) rep.dice[i].notes.push(`Forced to ${pr.set[i]} (dev tools)`);
+      }
+    }
+    this.report = rep;
     this.emit();
     if (!this.modifiersAvailable().length) await this.resolveRoll();
   }
@@ -258,6 +272,7 @@ export class Game {
       if (delta == null) return;
       pr.adj[die] += delta;
       d.used.nudge = true;
+      this.report?.dice[die].notes.push(`Nudge: ${delta > 0 ? '+1' : '−1'}`);
     } else if (id === 'recast') {
       pr.faces[die] = this.rollFace(die);
       pr.adj[die] = 0;
@@ -265,14 +280,17 @@ export class Game {
       pr.blank[die] = null;
       d.used.recast = true;
       this.log(`Recast die ${die + 1}.`);
+      this.report?.dice[die].notes.push('Recast: rerolled');
     } else if (id === 'alchemist') {
       const v = await this.io.chooseOption([1, 2, 3, 4, 5, 6].map((n) => ({ label: String(n), value: n })), `Alchemist: set die ${die + 1}`, { cancel: true });
       if (v == null) return;
       pr.set[die] = v;
       pr.adj[die] = 0;
       d.used.alchemist = true;
+      this.report?.dice[die].notes.push(`Alchemist: set to ${v}`);
     } else if (id === 'twin') {
       [pr.faces[die], pr.alt[die]] = [pr.alt[die], pr.faces[die]];
+      this.report?.dice[die].notes.push('Twin Die: switched to the other result');
     }
     this.emit();
   }
@@ -316,6 +334,22 @@ export class Game {
     for (const face of f) for (const t of face.triggers) triggers[t] = (triggers[t] || 0) + 1;
     const ctx = { sum: seven ? 7 : sum, isDouble, seven, triggers, produced: 0, gold: 0, producedHexes: new Set() };
     this.lastRoll = { faces: [...pr.faces], values: v, sum: ctx.sum, isDouble, seven, zero };
+    const rep = this.report || { dice: [{ notes: [] }, { notes: [] }], lines: [], hexes: [] };
+    this.report = rep;
+    for (const i of [0, 1]) {
+      if (pr.hold[i] != null || pr.set[i] != null) continue;
+      const face = f[i];
+      const n = rep.dice[i].notes;
+      if (pr.alt[i] != null) n.push(`Twin Die: rolled two results, kept this one`);
+      if (face.setter === 'mirror') n.push(zero ? 'Mirror Face vs Mirror Face: both count as 0' : `Mirror Face: copied the other die (${v[i]})`);
+      if (face.setter === 'blank') n.push(`Blank Face: you chose ${pr.blank[i]}`);
+      if (face.setter === 'robber') n.push("Robber's Face: the roll counts as 7, +2 resources of your choice");
+      for (const t of face.triggers) n.push(`${ITEMS[t].name} face: ${ITEMS[t].desc}`);
+    }
+    rep.handBefore = { ...this.hand };
+    rep.storeBefore = { ...this.storehouse };
+    rep.ctx = ctx;
+    this.capture = rep.lines;
     this.pendingRoll = null;
     this.log(`Rolled ${v[0]} + ${v[1]} = ${zero ? '0 (mirror vs mirror)' : ctx.sum}${isDouble ? ' (double)' : ''}${robberFace ? " — Robber's Face!" : ''}`, 'roll');
 
@@ -353,6 +387,13 @@ export class Game {
     if (ctx.produced === 0) {
       if (this.bossIs('oldBoot')) { this.oldBootExtra += 1; this.log('The Old Boot: dead roll, tribute +1', 'bad'); }
     }
+    this.capture = null;
+    rep.gains = Object.fromEntries(RES.map((r) => [r, this.hand[r] - rep.handBefore[r]]));
+    rep.storeGains = Object.fromEntries(RES.map((r) => [r, this.storehouse[r] - rep.storeBefore[r]]));
+    rep.final = { values: v, sum: ctx.sum, isDouble, seven, zero, robberFace };
+    rep.hexes = [...ctx.paidHexes || []];
+    rep.stage = 'result';
+    rep.seen = false;
     this.bumper = false;
     this.omen = null;
 
@@ -360,6 +401,7 @@ export class Game {
     if (isDouble) {
       for (const i of [0, 1]) if (this.hasDieUp(i, 'echo')) this.echoQueue.push(i);
     }
+    if (isDouble && this.echoQueue.length) rep.lines.push({ msg: `Double + Echo: you get a free extra roll of die ${this.echoQueue.map((i) => i + 1).join(' and ')}.`, cls: 'good' });
     if (this.echoQueue.length && this.chain + 1 >= ECHO_BREAK) {
       this.echoQueue = [];
       this.brokeGame = true;
@@ -456,6 +498,7 @@ export class Game {
         if (r === 'gold') ctx.gold += amt;
         else this.gain(r, amt);
         ctx.produced += amt;
+        (ctx.paidHexes ||= new Set()).add(h.id);
         this.log(`${h.terrain} (${h.token ?? '—'}) → +${amt} ${r}${fromSister ? ' (sister)' : ''}`, 'good');
       }
       if (h.hexEffect?.id === 'volcanic') {
@@ -574,7 +617,8 @@ export class Game {
       const vs = Object.keys(this.buildings);
       if (vs.length) {
         const v = this.rng.pick(vs);
-        if (this.buildings[v] === 'city') { this.buildings[v] = 'settlement'; this.log('The barbarians sack a city (→ settlement).', 'bad'); }
+        if (this.buildings[v] === 'city' && this.counts().settlement < this.limits.settlement) { this.buildings[v] = 'settlement'; this.log('The barbarians sack a city (→ settlement).', 'bad'); }
+        else if (this.buildings[v] === 'city') { delete this.buildings[v]; this.log('The barbarians raze a city (no settlement piece left to replace it).', 'bad'); }
         else { delete this.buildings[v]; this.log('The barbarians burn a settlement.', 'bad'); }
       }
     }
@@ -614,6 +658,35 @@ export class Game {
     if (kind === 'city') return this.canAfford(COSTS.city) && c.city < this.limits.city && this.validCitySpots().length > 0;
     if (kind === 'dev') return this.canAfford(COSTS.dev);
     return false;
+  }
+
+  missingText(cost) {
+    const miss = RES.filter((r) => (this.hand[r] || 0) < (cost[r] || 0)).map((r) => `${cost[r] - this.hand[r]} ${r}`);
+    return miss.length ? `Need ${miss.join(', ')} more` : null;
+  }
+
+  // Short reason why a build action is unavailable, or null if it is available.
+  whyNot(kind) {
+    if (this.phase !== 'turn') return 'Not during this step';
+    if (this.pendingRoll) return 'Finish the roll first';
+    const c = this.counts();
+    if (kind === 'road') {
+      if (c.road >= this.limits.road) return `All ${this.limits.road} roads used`;
+      if (!this.validRoadSpots().length) return 'No free edge next to your pieces';
+      return this.missingText(COSTS.road);
+    }
+    if (kind === 'settlement') {
+      if (c.settlement >= this.limits.settlement) return `All ${this.limits.settlement} settlements used (upgrade one to a city)`;
+      if (!this.validSettlementSpots().length) return 'No legal spot: needs your road and 2 edges distance to other buildings';
+      return this.missingText(COSTS.settlement);
+    }
+    if (kind === 'city') {
+      if (c.city >= this.limits.city) return `All ${this.limits.city} cities used`;
+      if (!this.validCitySpots().length) return 'No settlement to upgrade';
+      return this.missingText(COSTS.city);
+    }
+    if (kind === 'dev') return this.missingText(COSTS.dev);
+    return null;
   }
 
   async build(kind) {

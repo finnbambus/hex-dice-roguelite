@@ -18,13 +18,14 @@ This is draft 0.1, built to **test the workflows** of the rulebook (*Hex & Dice 
 
 No build step, no dependencies. It's plain HTML, CSS and JavaScript.
 
-### Controls
+### How the screen works
+
+The board is on the left with the log underneath. The right side walks you through each round one step at a time: **Roll → Result → Build & trade → … → Tribute → Shop**. Each step shows only what you can do right now; unavailable actions say why (e.g. "Need 1 brick more"). The header always shows the tribute due, whether you can pay it yet, rolls left and your resources.
 
 | Key | Action |
 | --- | --- |
-| `R` / `Space` | Roll (or resolve a pending roll) |
-| `E` | End the round |
-| `Esc` | Cancel the current choice / close a panel |
+| `Enter` / `Space` | The step's main button (roll, continue, pay, next round) |
+| `Esc` | Cancel the current choice / close a dialog |
 
 Every run has a **seed** (shown top right and in the URL, e.g. `?seed=4242`). The same seed gives the same board and the same dice, as long as you make the same choices, so a bug or a fun situation can be shared as a link.
 
@@ -46,7 +47,7 @@ The `.nojekyll` file stops GitHub from running Jekyll over the files. All paths 
 index.html          page shell
 css/style.css       placeholder styling (light and dark mode)
 js/main.js          bootstraps the UI, reads ?seed=
-js/ui.js            rendering (SVG board, panels, modals) and the browser `io`
+js/ui.js            rendering (SVG board, step-by-step panel, dialogs) and the browser `io`
 js/game.js          the rules engine (no DOM access)
 js/content.js       all shop items, bosses and tables as data
 js/board.js         board geometry and random board generation
@@ -87,6 +88,7 @@ Everything in the rulebook's current version:
 
 Where the rulebook was open, the draft picks one reading. Each is a single spot in `game.js` to change.
 
+- **Starting resources:** both starting settlements pay one card per adjacent hex (the base game pays only the second). Switch with `SETUP_RESOURCES` in `js/content.js`.
 - **Building before the first roll:** allowed. The build window is open any time during a round when no roll is pending.
 - **Levy Delay:** carried tribute parts may use any type, even one already used by this round's parts.
 - **Overflow:** leftover cards smaller than a batch ship 1:1 (so 7 ore at 6+1 → 8 in total).

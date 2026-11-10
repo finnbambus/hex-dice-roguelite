@@ -1,5 +1,7 @@
-// Browser UI. Renders state from the engine and implements the engine's `io` interface
-// (board clicks and modals that resolve promises).
+// Browser UI. The right panel is a guided flow that shows one step at a time:
+//   Roll → (Adjust) → Result → Build & trade → … → Tribute → Shop
+// Each step lists only what you can do right now, with a reason next to anything unavailable.
+// The UI also implements the engine's `io` interface (board clicks and choice dialogs).
 import { Game, COSTS, BLINDS } from './game.js';
 import { RES, TERRAIN_RES, pips } from './board.js';
 import { ITEMS, ITEM_LIST, BOSS_BY_ID, ROLLS_PER_ROUND, LOADING } from './content.js';
@@ -9,23 +11,33 @@ const RES_ICON = { brick: 'B', lumber: 'L', wool: 'W', grain: 'G', ore: 'O' };
 const HEX_BADGE = { fertile: '+1', palisade: 'PAL', gold: 'GOLD', river: 'RIVER', guildDistrict: 'GUILD', volcanic: 'VOLC', sister: 'SIS', haven: 'HAVEN', capital: 'CAP' };
 const TOKEN_BADGE = { jackpot: 'JACK', twinToken: 'TWIN', sevenToken: '+7', heartland: '±1', evergreen: 'EVER' };
 const FACE_LABEL = { mirror: 'M', robber: 'R7', blank: '?' };
+const SETTER_ITEM = { mirror: 'mirror', robber: 'robberFace', blank: 'blank' };
 const TRIG_LABEL = { lucky: 'L', knightFav: 'kF', knightLucky: 'kL', robberFav: 'rF', robberLucky: 'rL', hidden: 'H' };
+const MOD_INFO = {
+  nudge: ['Nudge', 'Change this die by ±1 (once per round).'],
+  recast: ['Recast', 'Reroll this die (once per round).'],
+  alchemist: ['Alchemist', 'Set this die to any value (once per round).'],
+  twin: ['Twin Die', 'Switch to the other result you rolled.'],
+};
+const PRE_ROLL_CARDS = ['bumper', 'omen', 'monopoly'];
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const resDot = (r) => `<span class="res-dot" style="background:var(--${r})"></span>`;
-const costText = (c) => RES.filter((r) => c[r]).map((r) => `${c[r]}${RES_ICON[r]}`).join(' ');
+const costChips = (c) => RES.filter((r) => c[r]).map((r) => `<span class="cost" title="${c[r]} ${r}">${resDot(r)}${c[r]}</span>`).join('');
 
 export class UI {
   constructor() {
     this.game = null;
     this.busy = false;
     this.boardReq = null;
-    this.modal = null; // io modal (a pending choice)
-    this.panel = null; // non-blocking modal: trade, ship, help
+    this.modal = null; // a pending choice from the engine
+    this.panel = null; // help dialog
     this.devOpen = false;
     this.tributeTypes = null;
+    this.trade = { give: 'brick', get: 'grain' };
+    this.preBuild = false;
     this.$board = document.getElementById('board');
     this.$side = document.getElementById('side');
-    this.$dice = document.getElementById('dice');
+    this.$below = document.getElementById('below');
     this.$prompt = document.getElementById('prompt');
     this.$modal = document.getElementById('modal-root');
     this.bindEvents();
@@ -38,6 +50,7 @@ export class UI {
     this.panel = null;
     this.busy = false;
     this.tributeTypes = null;
+    this.preBuild = false;
     const g = new Game({ seed, io: this });
     this.game = g;
     g.onChange = () => this.render();
@@ -104,6 +117,17 @@ export class UI {
     this.render();
   }
 
+  // ---------------------------------------------------------------- which step is shown
+  step() {
+    const g = this.game;
+    if (!g || g.phase === 'init' || g.phase === 'setup') return 'setup';
+    if (g.phase !== 'turn') return g.phase; // tribute | shop | gameover
+    if (g.pendingRoll) return 'adjust';
+    if (g.report && g.report.stage === 'result' && !g.report.seen) return 'result';
+    if (g.rollsUsed === 0 && !g.echoQueue.length && !this.preBuild) return 'roll';
+    return 'build';
+  }
+
   // ---------------------------------------------------------------- events
   bindEvents() {
     document.addEventListener('click', (ev) => {
@@ -111,6 +135,11 @@ export class UI {
       if (t) return this.onTop(t.dataset.top);
       const a = ev.target.closest('[data-a]');
       if (a && !a.disabled) this.onAction(a.dataset.a, a.dataset);
+    });
+    document.addEventListener('change', (ev) => {
+      const el = ev.target;
+      if (el.dataset.trade) { this.trade[el.dataset.trade] = el.value; this.render(); }
+      if (el.dataset.tp != null) { this.readTributeSelects(); this.render(); }
     });
     this.$board.addEventListener('click', (ev) => {
       const el = ev.target.closest('[data-k]');
@@ -120,16 +149,17 @@ export class UI {
     });
     document.addEventListener('keydown', (ev) => {
       if (ev.target.matches('input, select')) return;
-      const g = this.game;
-      if (!g) return;
       if (ev.key === 'Escape') {
         if (this.boardReq?.cancel) this.resolveBoard(null);
         else if (this.modal?.cancel) this.resolveModal(null);
         else if (this.panel) { this.panel = null; this.render(); }
+        return;
       }
-      if (this.busy || this.modal || this.panel) return;
-      if (ev.key === 'r' || ev.key === ' ') { ev.preventDefault(); if (g.canRoll()) this.run(() => g.roll()); else if (g.pendingRoll) this.run(() => g.resolveRoll()); }
-      if (ev.key === 'e' && g.canEndRound()) g.endRound();
+      if (this.busy || this.modal || this.panel || this.boardReq) return;
+      if (ev.key === 'Enter' || ev.key === ' ') {
+        const btn = this.$side.querySelector('[data-primary]:not([disabled])');
+        if (btn) { ev.preventDefault(); btn.click(); }
+      }
     });
   }
 
@@ -157,11 +187,11 @@ export class UI {
   onAction(a, d) {
     const g = this.game;
     switch (a) {
-      // modal resolution
       case 'opt': return this.resolveModal(this.modal.options[Number(d.i)].value);
       case 'face': return this.resolveModal(this.modal.options[Number(d.i)]);
       case 'cancel-modal': return this.resolveModal(null);
       case 'cancel-board': return this.resolveBoard(null);
+      case 'close-panel': this.panel = null; return this.render();
       case 'res-inc': case 'res-dec': {
         const m = this.modal;
         const total = RES.reduce((s, r) => s + m.counts[r], 0);
@@ -170,20 +200,20 @@ export class UI {
         return this.render();
       }
       case 'res-ok': return this.resolveModal({ ...this.modal.counts });
-      // turn
-      case 'roll': return this.run(() => g.roll());
+      // turn flow
+      case 'roll': this.preBuild = false; return this.run(() => g.roll());
       case 'resolve': return this.run(() => g.resolveRoll());
       case 'mod': return this.run(() => g.useModifier(Number(d.die), d.id));
-      case 'end': g.endRound(); return;
+      case 'seen': if (g.report) g.report.seen = true; return this.render();
+      case 'prebuild': this.preBuild = true; return this.render();
+      case 'end': this.preBuild = false; g.endRound(); return;
       case 'build': return this.run(() => g.build(d.kind));
       case 'play': return this.run(() => g.playCard(Number(d.uid)));
-      case 'panel': this.panel = { type: d.p, give: 'brick', get: 'grain' }; return this.render();
-      case 'close-panel': this.panel = null; return this.render();
-      case 'trade': g.trade(this.panel.give, this.panel.get); return;
+      case 'trade': g.trade(this.trade.give, this.trade.get); return;
       case 'ship': g.ship(Number(d.port), d.r, d.mode); return;
       case 'ship-mixed': return this.run(() => g.shipMixed(Number(d.port)));
       // tribute
-      case 'pay': if (g.payTribute(this.currentTributeTypes())) this.tributeTypes = null; return;
+      case 'pay': this.readTributeSelects(); if (g.payTribute(this.tributeTypes)) this.tributeTypes = null; return;
       case 'fail': g.failTribute(); return;
       // shop
       case 'buy': return this.run(() => g.buy(Number(d.i)));
@@ -197,10 +227,8 @@ export class UI {
       case 'dev-res': g.devGive(d.r, Number(d.n)); return;
       case 'dev-budget': g.devBudget(10); return;
       case 'dev-force': {
-        const a1 = Number(document.getElementById('dev-d1').value);
-        const a2 = Number(document.getElementById('dev-d2').value);
-        g.devForce = [a1, a2];
-        g.log(`Dev: next roll forced to ${a1}+${a2}.`);
+        g.devForce = [Number(document.getElementById('dev-d1').value), Number(document.getElementById('dev-d2').value)];
+        g.log(`Dev: next roll forced to ${g.devForce.join('+')}.`);
         return this.render();
       }
       case 'dev-item': {
@@ -216,9 +244,9 @@ export class UI {
     const g = this.game;
     if (!g || !g.board) { this.renderModal(); return; }
     this.renderBoard();
-    this.renderDice();
-    this.renderSide();
     this.renderPrompt();
+    this.renderSide();
+    this.renderBelow();
     this.renderModal();
   }
 
@@ -226,7 +254,7 @@ export class UI {
     const b = this.boardReq;
     this.$prompt.hidden = !b;
     if (!b) return;
-    this.$prompt.innerHTML = `<span>${esc(b.prompt)}</span>${b.cancel ? '<button data-a="cancel-board">Cancel (Esc)</button>' : ''}`;
+    this.$prompt.innerHTML = `<span><b>Click on the board:</b> ${esc(b.prompt)}</span>${b.cancel ? '<button data-a="cancel-board">Cancel (Esc)</button>' : ''}`;
   }
 
   renderBoard() {
@@ -234,16 +262,18 @@ export class UI {
     const B = g.board;
     const req = this.boardReq;
     const isT = (k, id) => req && req.kind === k && req.ids.has(id);
+    const showPaid = this.step() === 'result' ? new Set(g.report?.hexes || []) : new Set();
+    const rolled = this.step() === 'result' && g.report?.final && !g.report.final.zero ? g.report.final.sum : null;
     const parts = [];
-    // sea outline
     parts.push(`<polygon points="${[0, 1, 2, 3, 4, 5].map((i) => { const a = (Math.PI / 3) * i; return `${4.75 * Math.cos(a)},${4.75 * Math.sin(a)}`; }).join(' ')}" fill="#0002"/>`);
     for (const h of B.hexes) {
       const pts = h.vertices.map((v) => `${B.vertices[v].x},${B.vertices[v].y}`).join(' ');
-      parts.push(`<polygon class="hex ${isT('hex', h.id) ? 'target' : ''}" data-k="hex" data-id="${h.id}" points="${pts}" fill="${TERRAIN_COLOR[h.terrain]}"><title>${h.terrain}${TERRAIN_RES[h.terrain] ? ' → ' + TERRAIN_RES[h.terrain] : ''}${h.hexEffect ? ' · ' + ITEMS[h.hexEffect.id].name : ''}${h.tokenEffect ? ' · ' + ITEMS[h.tokenEffect.id].name : ''}</title></polygon>`);
+      const cls = ['hex', isT('hex', h.id) ? 'target' : '', showPaid.has(h.id) ? 'paid' : '', req && !isT('hex', h.id) && req.kind === 'hex' ? 'dim' : ''].join(' ');
+      parts.push(`<polygon class="${cls}" data-k="hex" data-id="${h.id}" points="${pts}" fill="${TERRAIN_COLOR[h.terrain]}"><title>${h.terrain}${TERRAIN_RES[h.terrain] ? ' → ' + TERRAIN_RES[h.terrain] : ''}${h.hexEffect ? ' · ' + ITEMS[h.hexEffect.id].name : ''}${h.tokenEffect ? ' · ' + ITEMS[h.tokenEffect.id].name : ''}</title></polygon>`);
       if (h.token) {
         const hot = h.token === 6 || h.token === 8;
-        const label = h.hidden ? '?' : h.token;
-        parts.push(`<g pointer-events="none"><circle class="token" cx="${h.x}" cy="${h.y}" r=".33"/><text class="token-num ${hot && !h.hidden ? 'hot' : ''}" x="${h.x}" y="${h.y - 0.03}">${label}</text>`);
+        const hit = rolled != null && h.token === rolled;
+        parts.push(`<g pointer-events="none"><circle class="token ${hit ? 'hit' : ''}" cx="${h.x}" cy="${h.y}" r=".33"/><text class="token-num ${hot && !h.hidden ? 'hot' : ''}" x="${h.x}" y="${h.y - 0.03}">${h.hidden ? '?' : h.token}</text>`);
         if (!h.hidden) {
           const n = pips(h.token);
           for (let i = 0; i < n; i++) parts.push(`<circle cx="${h.x + (i - (n - 1) / 2) * 0.07}" cy="${h.y + 0.2}" r=".022" fill="${hot ? '#c0392b' : '#333'}"/>`);
@@ -261,14 +291,12 @@ export class UI {
       }
       if (g.volcanoHex === h.id) parts.push(`<text class="badge" x="${h.x}" y="${h.y + 0.58}" pointer-events="none">VOLCANO</text>`);
     }
-    // ports
     for (const p of B.ports) {
-      for (const v of p.vertices) parts.push(`<line x1="${p.x}" y1="${p.y}" x2="${B.vertices[v].x}" y2="${B.vertices[v].y}" class="port-line" stroke="#f7efd9" stroke-width=".03" stroke-dasharray=".06 .05"/>`);
+      for (const v of p.vertices) parts.push(`<line x1="${p.x}" y1="${p.y}" x2="${B.vertices[v].x}" y2="${B.vertices[v].y}" stroke="#f7efd9" stroke-width=".03" stroke-dasharray=".06 .05"/>`);
       const lbl = p.type === 'generic' ? '3:1' : `2:1${RES_ICON[p.type]}`;
       const up = [p.up.overflow ? 'O' : '', p.up.bigger ? `+${p.up.bigger}` : '', p.up.smaller ? `−${p.up.smaller}` : '', p.up.free ? 'F' : ''].join('');
       parts.push(`<g class="port ${isT('port', p.id) ? 'target' : ''}" data-k="port" data-id="${p.id}"><circle cx="${p.x}" cy="${p.y}" r=".27" ${p.type !== 'generic' ? `style="fill:var(--${p.type})"` : ''}/><text x="${p.x}" y="${p.y - (up ? 0.05 : 0)}">${lbl}</text>${up ? `<text x="${p.x}" y="${p.y + 0.13}" style="font-size:.12px">${up}</text>` : ''}<title>${p.type} port</title></g>`);
     }
-    // edges
     for (const e of B.edges) {
       const [a, b] = e.v.map((v) => B.vertices[v]);
       if (g.roads.has(e.id)) parts.push(`<line class="road" x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}"/>`);
@@ -277,10 +305,8 @@ export class UI {
         parts.push(`<line class="edge target" data-k="edge" data-id="${e.id}" x1="${sx}" y1="${sy}" x2="${ex}" y2="${ey}"/>`);
       }
     }
-    // robber
     const rh = B.hexes[g.robber];
     parts.push(`<g pointer-events="none"><circle class="robber" cx="${rh.x + 0.42}" cy="${rh.y - 0.1}" r=".17"/><text x="${rh.x + 0.42}" y="${rh.y - 0.1}" class="token-num" style="fill:#fff;font-size:.18px">R</text></g>`);
-    // buildings & vertex targets
     for (const v of B.vertices) {
       const b = g.buildings[v.id];
       const t = isT('vertex', v.id);
@@ -291,115 +317,279 @@ export class UI {
     this.$board.innerHTML = parts.join('');
   }
 
-  renderDice() {
-    const g = this.game;
-    const pr = g.pendingRoll;
-    let vals = null;
-    let faces = null;
-    if (pr) { vals = g.valuesOf(pr).v; faces = pr.faces; }
-    else if (g.lastRoll) { vals = g.lastRoll.values; faces = g.lastRoll.faces; }
-    this.$dice.innerHTML = [0, 1].map((i) => {
-      const d = g.dice[i];
-      const ups = g.dieUps(i);
-      const face = (f, k) => {
-        const lbl = f.setter ? FACE_LABEL[f.setter] : f.value;
-        const tr = f.triggers.map((t) => TRIG_LABEL[t]).join('');
-        const loaded = d.loaded && d.loaded.face === k;
-        const title = `Face ${k + 1}: ${f.setter ? ITEMS[{ mirror: 'mirror', robber: 'robberFace', blank: 'blank' }[f.setter]].name : 'shows ' + f.value}${f.triggers.length ? ' · ' + f.triggers.map((t) => ITEMS[t].name).join(', ') : ''}${loaded ? ` · loaded L${d.loaded.level} (${Math.round(LOADING[d.loaded.level - 1][0] * 100)}%)` : ''}`;
-        return `<div class="face ${loaded ? 'loaded' : ''} ${faces && faces[i] === k ? 'shown' : ''}" title="${esc(title)}">${lbl}<span class="tr">${tr || '&nbsp;'}</span></div>`;
-      };
-      const held = pr && pr.hold[i] != null;
-      return `<div class="die-card">
-        <div class="die-big ${held ? 'held' : ''}" title="${held ? 'Held (Echo)' : ''}">${vals ? (vals[i] || '?') : '–'}</div>
-        <div><div class="faces">${d.faces.map(face).join('')}</div>
-        <div class="tags">${d.loaded ? `<span class="tag">Loaded L${d.loaded.level}</span>` : ''}${ups.map((u) => `<span class="tag" title="${esc(ITEMS[u].desc)}">${ITEMS[u].name}${d.used[u] ? ' ✓' : ''}${!d.upgrades.includes(u) ? ' (copied)' : ''}</span>`).join('')}</div></div>
-      </div>`;
-    }).join('') + (g.lastRoll && !pr ? `<div class="die-card"><div><div class="muted small">Last roll</div><div class="stat"><b>${g.lastRoll.zero ? 0 : g.lastRoll.sum}</b>${g.lastRoll.isDouble ? ' double' : ''}${g.lastRoll.seven ? ' — robber!' : ''}</div></div></div>` : '');
-  }
-
+  // ---------------------------------------------------------------- right panel
   renderSide() {
     const g = this.game;
-    const dis = (cond) => (this.busy || !cond ? 'disabled' : '');
-    const out = [];
+    const step = this.step();
+    const body = {
+      setup: () => this.viewSetup(),
+      roll: () => this.viewRoll(),
+      adjust: () => this.viewAdjust(),
+      result: () => this.viewResult(),
+      build: () => this.viewBuild(),
+      tribute: () => this.viewTribute(),
+      shop: () => this.viewShop(),
+      gameover: () => this.viewGameOver(),
+    }[step]();
+    this.$side.innerHTML = `${this.viewHeader(step)}<div class="step-body">${body}</div>`;
+  }
+
+  viewHeader(step) {
+    const g = this.game;
     const vp = g.vpBreakdown();
-    const c = g.counts();
-
-    // Status
-    out.push(`<div class="card"><div class="row between">
-      <div class="stat">Ante <b>${g.ante}</b> <span class="blind ${g.blind === 2 ? 'boss' : ''}">${BLINDS[g.blind]}</span></div>
-      <div class="stat" title="Settlements ${vp.settlements} · Cities ${vp.cities} · VP cards ${vp.vpCards} · Longest road ${vp.road} (length ${vp.longestRoad}) · Army ${vp.army} (${g.knights} knights)">Score <b>${vp.total}</b> VP</div>
-      <div class="stat">Rounds <b>${g.roundsSurvived}</b></div></div>
-      <div class="row small muted" style="margin-top:4px">Rolls ${g.rollsUsed ?? 0}/${ROLLS_PER_ROUND}${g.chain ? ` · Echo chain ${g.chain}` : ''} · 7s rolled ${g.sevens} · Knights ${g.knights}${g.brokeGame ? ' · <b class="good">GAME BROKEN</b>' : ''}</div></div>`);
-
-    // Boss & tribute
-    const boss = g.boss;
     const due = g.tribute ? g.tributeDue() : [];
-    const mods = [];
-    if (g.bribe) mods.push(`Bribe −${g.bribe}`);
-    if (g.hasGuild('taxCollector') && c.city) mods.push(`Tax Collector −${c.city}`);
-    if (g.oldBootExtra) mods.push(`Old Boot +${g.oldBootExtra}`);
-    if (g.levyDelay) mods.push('Levy Delay active');
-    if (g.monopoly) mods.push(`Monopoly: ${g.monopoly}`);
-    if (g.bumper) mods.push('Bumper Harvest');
-    if (g.omen != null) mods.push(`Omen: ${g.omen}`);
-    if (g.fireSale) mods.push('Fire Sale 2:1');
-    if (g.bossIs?.('barbarians')) mods.push(`Fleet ${g.fleet}/3`);
-    out.push(`<div class="card"><h3>Tribute due this round</h3>
-      <div class="row">${due.map((p) => `<span class="chip">${p.type ? resDot(p.type) : ''}<b>${p.amount}</b> ${p.type ?? 'any type'}${p.carried ? ' (carried)' : ''}</span>`).join('<span class="muted">+</span>') || '<span class="muted">—</span>'}</div>
-      ${mods.length ? `<div class="small muted" style="margin-top:4px">${mods.join(' · ')}</div>` : ''}
-      <div class="small" style="margin-top:6px"><b>${boss.name}</b> ${g.blind === 2 ? '<span class="bad">(active now)</span>' : '<span class="muted">(boss of this ante)</span>'}<br><span class="muted">${boss.desc}</span></div></div>`);
+    const payable = g.tribute && g.phase === 'turn' ? g.autoAssign() != null : null;
+    const steps = [['roll', 'Roll'], ['result', 'Result'], ['build', 'Build & trade'], ['tribute', 'Tribute'], ['shop', 'Shop']];
+    const current = step === 'adjust' ? 'roll' : step === 'gameover' ? '' : step;
+    const dots = g.rollsUsed != null ? Array.from({ length: ROLLS_PER_ROUND }, (_, i) => `<span class="dot ${i < g.rollsUsed ? 'used' : ''}"></span>`).join('') : '';
+    const status = [];
+    if (g.bribe) status.push(`Bribe −${g.bribe}`);
+    if (g.hasGuild('taxCollector') && g.counts().city) status.push(`Tax Collector −${g.counts().city}`);
+    if (g.oldBootExtra) status.push(`Old Boot +${g.oldBootExtra}`);
+    if (g.levyDelay) status.push('Levy Delay: tribute pushed to next round');
+    if (g.monopoly) status.push(`Monopoly: all production → ${g.monopoly}`);
+    if (g.bumper) status.push('Bumper Harvest: next roll ×2');
+    if (g.omen != null) status.push(`Omen on ${g.omen}: ×3`);
+    if (g.fireSale) status.push('Fire Sale: bank trades 2:1');
+    if (g.bossIs?.('barbarians')) status.push(`Barbarian fleet ${g.fleet}/3`);
+    if (g.brokeGame) status.push('<b class="good">Game broken: tribute counts as paid</b>');
+    return `<div class="hdr">
+      <div class="row between">
+        <div><span class="blind ${g.blind === 2 ? 'boss' : ''}">Ante ${g.ante} · ${BLINDS[g.blind]}</span></div>
+        <div class="row small"><span title="Settlements ${vp.settlements} · Cities ${vp.cities} · VP cards ${vp.vpCards} · Longest road ${vp.road} (length ${vp.longestRoad}) · Army ${vp.army} (${g.knights} knights)">Score <b>${vp.total} VP</b></span><span class="muted">·</span><span>Survived <b>${g.roundsSurvived}</b></span></div>
+      </div>
+      ${g.phase === 'shop' ? `<div class="tribute-line"><span class="ok">✓ Tribute paid.</span><span class="muted small">Next: ${g.blind === 2 ? `ante ${g.ante + 1}, Small round` : `${BLINDS[g.blind + 1]} round`}</span></div>` : `<div class="tribute-line">
+        <span class="muted small">Tribute due</span>
+        ${due.map((p) => `<span class="chip">${p.type ? resDot(p.type) : ''}<b>${p.amount}</b> ${p.type ?? 'of one type'}</span>`).join('<span class="muted">+</span>') || '<span class="muted small">—</span>'}
+        ${payable == null ? '' : payable ? '<span class="ok">✓ you can pay it now</span>' : '<span class="no">✗ not yet</span>'}
+      </div>
+      ${due.length > 1 ? '<div class="small muted">Each part must be a different resource.</div>' : ''}`}
+      <div class="row between small"><span ${g.phase !== 'turn' ? 'hidden' : ''}>Rolls <span class="dots">${dots}</span> ${g.rollsUsed != null ? `${ROLLS_PER_ROUND - g.rollsUsed} left` : ''}</span><span class="muted" title="${esc(g.boss.desc)}">Boss: ${g.boss.name}${g.blind === 2 ? ' <b class="bad">(active)</b>' : ''}</span></div>
+      ${status.length ? `<div class="small status">${status.join(' · ')}</div>` : ''}
+      ${this.resourceStrip()}
+      <ol class="stepper">${steps.map(([k, l]) => `<li class="${k === current ? 'on' : ''}">${l}</li>`).join('')}</ol>
+    </div>`;
+  }
 
-    // Actions
-    const pr = g.pendingRoll;
-    let act = '';
-    if (g.phase === 'setup') act = '<div class="muted">Place your two starting settlements and roads on the board.</div>';
-    else if (g.phase === 'tribute') act = '<div class="muted">Paying the tribute…</div>';
-    else if (g.phase === 'shop') act = '<div class="muted">In the shop.</div>';
-    else if (g.phase === 'gameover') act = '<div class="bad">Run over.</div>';
-    else if (pr) {
-      const ms = g.modifiersAvailable();
-      const label = { nudge: 'Nudge', recast: 'Recast', alchemist: 'Alchemist', twin: 'Swap Twin result' };
-      act = `<div class="muted small">Adjust the roll, then resolve it.</div><div class="row" style="margin:6px 0">${ms.map((m) => `<button data-a="mod" data-die="${m.die}" data-id="${m.id}" ${dis(true)}>${label[m.id]} die ${m.die + 1}</button>`).join('')}</div><button class="primary" data-a="resolve" ${dis(true)}>Resolve roll</button>`;
-    } else if (g.phase === 'turn') {
-      const echo = g.echoQueue.length > 0;
-      const unused = ROLLS_PER_ROUND - g.rollsUsed;
-      act = `<div class="row"><button class="primary" data-a="roll" ${dis(g.canRoll())}>${echo ? `Echo roll (free, die ${g.echoQueue[0] + 1})` : `Roll (${unused} left)`}</button>
-        <button data-a="end" ${dis(g.canEndRound())}>End round${unused > 0 ? ` (+${unused} VP)` : ''}</button></div>`;
-    }
-    out.push(`<div class="card"><h3>Turn</h3>${act}</div>`);
+  resourceStrip() {
+    const g = this.game;
+    return `<div class="res-strip">${RES.map((r) => `<div class="res ${g.hand[r] ? '' : 'zero'}" title="${r}">${resDot(r)}<span class="rn">${r}</span><b>${g.hand[r]}</b>${g.storehouse[r] ? `<span class="store" title="in the Storehouse">+${g.storehouse[r]}</span>` : ''}</div>`).join('')}</div>`;
+  }
 
-    // Build
-    if (g.phase === 'turn') {
-      out.push(`<div class="card"><h3>Build window</h3><div class="row">
-        <button data-a="build" data-kind="road" ${dis(g.canBuild('road'))}>Road <span class="muted small">${costText(COSTS.road)}</span></button>
-        <button data-a="build" data-kind="settlement" ${dis(g.canBuild('settlement'))}>Settlement <span class="muted small">${costText(COSTS.settlement)}</span></button>
-        <button data-a="build" data-kind="city" ${dis(g.canBuild('city'))}>City <span class="muted small">${costText(COSTS.city)}</span></button>
-        <button data-a="build" data-kind="dev" ${dis(g.canBuild('dev'))}>Dev card <span class="muted small">${costText(COSTS.dev)}</span></button>
-        <button data-a="panel" data-p="trade" ${dis(g.canAct())}>Trade</button>
-        <button data-a="panel" data-p="ship" ${dis(g.canShip())}>Ship${g.bossIs('pirate') ? ' (Pirate!)' : ''}</button>
-      </div><div class="small muted" style="margin-top:6px">Pieces: settlements ${c.settlement}/${g.limits.settlement} · cities ${c.city}/${g.limits.city} · roads ${c.road}/${g.limits.road}</div></div>`);
-    }
+  // Two dice, each with its six faces and upgrades. `values` = shown numbers (or null).
+  diceBlock(values, faces, opts = {}) {
+    const g = this.game;
+    return `<div class="dice2">${[0, 1].map((i) => {
+      const d = g.dice[i];
+      const ups = g.dieUps(i);
+      const held = opts.held && opts.held[i];
+      const faceHtml = d.faces.map((f, k) => {
+        const loaded = d.loaded && d.loaded.face === k;
+        const title = `Face ${k + 1}: ${f.setter ? ITEMS[SETTER_ITEM[f.setter]].name : 'shows ' + f.value}${f.triggers.length ? ' · ' + f.triggers.map((t) => ITEMS[t].name).join(', ') : ''}${loaded ? ` · loaded L${d.loaded.level} (${Math.round(LOADING[d.loaded.level - 1][0] * 100)}%)` : ''}`;
+        return `<span class="face ${loaded ? 'loaded' : ''} ${faces && faces[i] === k ? 'shown' : ''}" title="${esc(title)}">${f.setter ? FACE_LABEL[f.setter] : f.value}${f.triggers.length ? `<i>${f.triggers.map((t) => TRIG_LABEL[t]).join('')}</i>` : ''}</span>`;
+      }).join('');
+      const notes = opts.notes ? opts.notes[i] : [];
+      return `<div class="die-box">
+        <div class="die-top"><div class="die-big ${held ? 'held' : ''}">${values ? (values[i] || '0') : '·'}</div>
+          <div class="muted small">Die ${i + 1}${held ? '<br>held from last roll' : ''}</div></div>
+        <div class="faces" title="The six faces of this die; the outlined one is showing">${faceHtml}</div>
+        ${ups.length || d.loaded ? `<div class="tags">${d.loaded ? `<span class="tag">Loaded L${d.loaded.level}</span>` : ''}${ups.map((u) => `<span class="tag" title="${esc(ITEMS[u].desc)}">${ITEMS[u].name}${d.used[u] ? ' (used)' : ''}${!d.upgrades.includes(u) ? ' (copied)' : ''}</span>`).join('')}</div>` : ''}
+        ${notes && notes.length ? `<ul class="notes">${notes.map((n) => `<li>${esc(n)}</li>`).join('')}</ul>` : ''}
+      </div>`;
+    }).join('')}</div>`;
+  }
 
-    // Resources
-    const total = RES.reduce((s, r) => s + g.hand[r], 0);
-    out.push(`<div class="card"><h3>Resources <span class="muted">(${total} in hand · limit 7 on a 7)</span></h3>
-      <div class="row">${RES.map((r) => `<span class="chip" title="${r}">${resDot(r)} ${r} <b>${g.hand[r]}</b></span>`).join('')}</div>
-      <div class="small muted" style="margin-top:6px">Storehouse (tribute only): ${RES.some((r) => g.storehouse[r]) ? RES.filter((r) => g.storehouse[r]).map((r) => `${g.storehouse[r]} ${r}`).join(', ') : 'empty'}</div></div>`);
-
-    // Cards & guilds
-    out.push(`<div class="card"><h3>Hand cards ${g.cards.length}/${g.limits.handSlots}</h3><div class="list">${g.cards.map((card) => {
+  cardsList(filter) {
+    const g = this.game;
+    const cards = filter ? g.cards.filter((c) => filter(c.id)) : g.cards;
+    if (!cards.length) return '';
+    return `<div class="list">${cards.map((card) => {
       const it = ITEMS[card.id];
-      return `<div class="item-line"><span title="${esc(it.desc)}"><span class="rarity-${it.rarity}">●</span> ${it.name} <span class="muted small">${it.desc}</span></span><button class="small" data-a="play" data-uid="${card.uid}" ${dis(g.canAct())}>Play</button></div>`;
-    }).join('') || '<span class="muted small">No cards.</span>'}</div>
-      <h3 style="margin-top:10px">Guilds ${g.guilds.length}/${g.limits.guildSlots}</h3><div class="list">${g.guilds.map((gd) => {
-      const it = ITEMS[gd.id];
-      return `<div class="item-line"><span><span class="rarity-${it.rarity}">●</span> ${it.name}${gd.data.terrain ? ` (${gd.data.terrain})` : ''} <span class="muted small">${it.desc}</span></span></div>`;
-    }).join('') || '<span class="muted small">No guilds.</span>'}</div></div>`);
+      return `<div class="item-line"><span><b>${it.name}</b> <span class="muted small">${it.desc}</span></span><button class="small" data-a="play" data-uid="${card.uid}" ${this.busy || !g.canAct() ? 'disabled' : ''}>Play</button></div>`;
+    }).join('')}</div>`;
+  }
 
-    if (this.devOpen) out.push(this.devPanel());
+  viewSetup() {
+    const g = this.game;
+    const n = Object.keys(g.buildings || {}).length;
+    const roads = g.roads ? g.roads.size : 0;
+    const what = n > roads ? 'a road next to it' : `settlement ${n + 1} of 2`;
+    return `<h2>Set up your island</h2>
+      <p>Place <b>${what}</b> by clicking one of the white markers on the board.</p>
+      <ul class="small muted"><li>Pick corners touching good numbers: more dots under the number = rolled more often. 6 and 8 are best.</li>
+      <li>Each starting settlement gives you one card of every resource next to it.</li>
+      <li>Corners next to a port (3:1 or 2:1) unlock better trades and the Storehouse.</li></ul>`;
+  }
 
-    out.push(`<div class="card"><h3>Log</h3><div class="log">${g.logLines.slice(-120).reverse().map((l) => `<div class="${l.cls}">${esc(l.msg)}</div>`).join('')}</div></div>`);
-    this.$side.innerHTML = out.join('');
+  viewRoll() {
+    const g = this.game;
+    const pre = this.cardsList((id) => PRE_ROLL_CARDS.includes(id));
+    return `<h2>Roll the dice</h2>
+      <p>You get <b>${ROLLS_PER_ROUND} rolls</b> this round. Each roll pays out every hex with the rolled number to your adjacent buildings (settlement 1, city 2). After each roll you can build and trade.</p>
+      ${this.diceBlock(null, null)}
+      ${pre ? `<h3>Cards to play before rolling</h3>${pre}` : ''}
+      <div class="actions">
+        <button class="primary big" data-a="roll" data-primary ${this.busy ? 'disabled' : ''}>Roll the dice</button>
+        <div class="row"><button data-a="prebuild" ${this.busy ? 'disabled' : ''}>Build or trade first</button>
+        <button data-a="end" ${this.busy ? 'disabled' : ''}>Skip all rolls → tribute (+${ROLLS_PER_ROUND} VP)</button></div>
+      </div>`;
+  }
+
+  viewAdjust() {
+    const g = this.game;
+    const pr = g.pendingRoll;
+    const { v } = g.valuesOf(pr);
+    const mods = g.modifiersAvailable();
+    return `<h2>You rolled ${v[0] || '?'} + ${v[1] || '?'}</h2>
+      <p>Your dice upgrades let you change this roll before it pays out.</p>
+      ${this.diceBlock(v, pr.faces, { held: pr.hold.map((h) => h != null), notes: g.report?.dice.map((d) => d.notes) })}
+      <div class="list">${mods.map((m) => `<div class="item-line"><span><b>${MOD_INFO[m.id][0]}</b> die ${m.die + 1}${m.id === 'twin' ? ` (other result: ${g.dice[m.die].faces[pr.alt[m.die]].value})` : ''} <span class="muted small">${MOD_INFO[m.id][1]}</span></span><button class="small" data-a="mod" data-die="${m.die}" data-id="${m.id}" ${this.busy ? 'disabled' : ''}>Use</button></div>`).join('')}</div>
+      <div class="actions"><button class="primary big" data-a="resolve" data-primary ${this.busy ? 'disabled' : ''}>Use this roll (${v[0] + v[1] || '?'})</button></div>`;
+  }
+
+  viewResult() {
+    const g = this.game;
+    const rep = g.report;
+    const f = rep.final;
+    const gains = RES.filter((r) => rep.gains[r] > 0);
+    const losses = RES.filter((r) => rep.gains[r] < 0);
+    const store = RES.filter((r) => rep.storeGains[r] !== 0);
+    const lines = rep.lines.filter((l) => l.cls !== 'roll');
+    let headline;
+    if (f.zero) headline = 'Mirror vs Mirror: 0';
+    else if (f.robberFace) headline = "Robber's Face: counts as 7";
+    else headline = `${f.values[0]} + ${f.values[1]} = ${f.sum}`;
+    const tags = [];
+    if (f.isDouble) tags.push('<span class="pill">Double</span>');
+    if (f.seven) tags.push('<span class="pill bad">7: the robber</span>');
+    if (rep.echo) tags.push('<span class="pill">Echo roll</span>');
+    const nothing = !gains.length && !losses.length && !lines.length;
+    const echoNext = g.echoQueue.length > 0;
+    return `<h2 class="result-head">${headline} ${tags.join(' ')}</h2>
+      ${this.diceBlock(f.values, g.lastRoll.faces, { notes: rep.dice.map((d) => d.notes) })}
+      <h3>You got</h3>
+      <div class="gains">${gains.map((r) => `<span class="gain">${resDot(r)} +${rep.gains[r]} ${r}</span>`).join('')}${losses.map((r) => `<span class="gain lose">${resDot(r)} ${rep.gains[r]} ${r}</span>`).join('')}${store.map((r) => `<span class="gain ${rep.storeGains[r] < 0 ? 'lose' : ''}">${resDot(r)} ${rep.storeGains[r] > 0 ? '+' : ''}${rep.storeGains[r]} ${r} (Storehouse)</span>`).join('')}
+        ${!gains.length && !losses.length && !store.length ? `<span class="muted">Nothing.${!f.seven && !f.zero ? ` No hex with a ${f.sum} touches your buildings${g.board.hexes.some((h) => h.token === f.sum && h.id === g.robber) ? ', or the robber blocks it' : ''}.` : ''}</span>` : ''}</div>
+      ${lines.length ? `<h3>What happened</h3><ul class="events">${lines.map((l) => `<li class="${l.cls}">${esc(l.msg)}</li>`).join('')}</ul>` : ''}
+      ${nothing ? '' : ''}
+      <div class="actions"><button class="primary big" data-a="seen" data-primary>${echoNext ? 'Continue (free Echo roll waiting) →' : 'Continue to build & trade →'}</button></div>`;
+  }
+
+  viewBuild() {
+    const g = this.game;
+    const dis = this.busy;
+    const rollsLeft = ROLLS_PER_ROUND - g.rollsUsed;
+    const echo = g.echoQueue.length > 0;
+    const c = g.counts();
+    const row = (kind, name, cost, extra) => {
+      const why = g.whyNot(kind);
+      return `<div class="build-row ${why ? 'off' : ''}"><div><b>${name}</b> <span class="costs">${costChips(cost)}</span><div class="small muted">${why ? esc(why) : extra}</div></div>
+        <button class="small ${why ? '' : 'go'}" data-a="build" data-kind="${kind}" ${why || dis ? 'disabled' : ''}>Build</button></div>`;
+    };
+    // trade
+    const t = this.trade;
+    const rate = g.tradeRate(t.give);
+    const canTrade = g.hand[t.give] >= rate && t.give !== t.get;
+    const sel = (k) => `<select data-trade="${k}" id="trade-${k}">${RES.map((r) => `<option value="${r}" ${t[k] === r ? 'selected' : ''}>${r}${k === 'give' ? ` (${g.tradeRate(r)}:1, have ${g.hand[r]})` : ''}</option>`).join('')}</select>`;
+    // ship
+    const ports = g.ownedPorts();
+    let ship = '';
+    if (g.bossIs('pirate')) ship = '<p class="small bad">The Pirate: no shipping this round.</p>';
+    else if (!ports.length) ship = '<p class="small muted">Build a settlement on a port to unlock shipping. Shipped cards count toward this round\'s tribute with a bonus.</p>';
+    else {
+      ship = ports.map((port) => {
+        const { input, bonus } = g.storehouseRate(port);
+        const rs = port.type === 'generic' ? RES : [port.type];
+        return `<div class="small"><b>${port.type === 'generic' ? 'Generic port' : port.type + ' port'}</b>: ${input} cards → ${input + bonus} toward the tribute
+          <div class="row" style="margin-top:4px">${rs.map((r) => `<button class="small" data-a="ship" data-port="${port.id}" data-r="${r}" data-mode="batch" ${g.hand[r] >= input && !dis ? '' : 'disabled'}>Ship ${input} ${r}</button>${port.up.overflow ? `<button class="small" data-a="ship" data-port="${port.id}" data-r="${r}" data-mode="overflow" ${g.hand[r] > 0 && g.hand[r] < input ? '' : 'disabled'}>Leftover ${r} 1:1</button>` : ''}`).join('')}
+          ${port.up.free ? `<button class="small" data-a="ship-mixed" data-port="${port.id}">Mixed batch</button>` : ''}</div></div>`;
+      }).join('');
+    }
+    const cards = this.cardsList();
+    const primary = echo
+      ? `<button class="primary big" data-a="roll" data-primary ${dis ? 'disabled' : ''}>Free Echo roll (die ${g.echoQueue[0] + 1})</button>`
+      : rollsLeft > 0
+        ? `<button class="primary big" data-a="roll" data-primary ${dis ? 'disabled' : ''}>Roll again (${rollsLeft} left)</button>`
+        : `<button class="primary big" data-a="end" data-primary ${dis ? 'disabled' : ''}>Pay the tribute →</button>`;
+    const endBtn = rollsLeft > 0 || echo ? `<button data-a="end" ${dis ? 'disabled' : ''}>End round now → tribute${rollsLeft > 0 ? ` (+${rollsLeft} VP for unused rolls)` : ''}</button>` : '';
+    return `<h2>Build & trade</h2>
+      <p class="small muted">${g.rollsUsed === 0 ? 'Before your first roll.' : `After roll ${g.rollsUsed} of ${ROLLS_PER_ROUND}.`} Do as much as you like, then roll again or end the round.</p>
+      <div class="actions top">${primary}${endBtn}</div>
+      <h3>Build</h3>
+      ${row('settlement', 'Settlement', COSTS.settlement, `+1 VP, produces 1 · ${c.settlement}/${g.limits.settlement} used`)}
+      ${row('city', 'City', COSTS.city, `Upgrade a settlement: +1 VP, produces 2 · ${c.city}/${g.limits.city} used`)}
+      ${row('road', 'Road', COSTS.road, `Reach new corners · ${c.road}/${g.limits.road} used`)}
+      ${row('dev', 'Development card', COSTS.dev, 'Random card from the stack')}
+      <h3>Trade with the bank</h3>
+      <div class="trade-row">Give ${rate} ${sel('give')} → 1 ${sel('get')} <button class="small ${canTrade ? 'go' : ''}" data-a="trade" ${canTrade && !dis ? '' : 'disabled'}>Trade</button></div>
+      ${!canTrade ? `<div class="small muted">${t.give === t.get ? 'Pick two different resources.' : `You need ${rate} ${t.give} to trade.`}</div>` : ''}
+      <h3>Ship to the Storehouse</h3>${ship}
+      ${cards ? `<h3>Cards in hand (${g.cards.length}/${g.limits.handSlots})</h3>${cards}` : ''}
+      ${g.guilds.length ? `<h3>Guilds (always active)</h3><div class="list">${g.guilds.map((gd) => `<div class="small"><b>${ITEMS[gd.id].name}</b>${gd.data.terrain ? ` (${gd.data.terrain})` : ''} <span class="muted">${ITEMS[gd.id].desc}</span></div>`).join('')}</div>` : ''}
+      <details class="dice-details"><summary>Your dice</summary>${this.diceBlock(null, null)}</details>`;
+  }
+
+  readTributeSelects() {
+    const g = this.game;
+    const due = g.tributeDue();
+    if (!this.tributeTypes || this.tributeTypes.length !== due.length) this.tributeTypes = g.autoAssign() ?? due.map((p) => p.type);
+    due.forEach((p, i) => {
+      const el = document.getElementById(`tp-${i}`);
+      if (el && !p.fixed) this.tributeTypes[i] = el.value || null;
+    });
+  }
+
+  viewTribute() {
+    const g = this.game;
+    const due = g.tributeDue();
+    if (!this.tributeTypes || this.tributeTypes.length !== due.length) this.tributeTypes = g.autoAssign() ?? due.map((p) => p.type);
+    const types = this.tributeTypes;
+    const check = g.checkAssignment(types);
+    const canAny = g.autoAssign() != null;
+    return `<h2>Pay the tribute</h2>
+      <p class="small muted">${due.length > 1 ? 'Each part needs a different resource. ' : 'Pick which resource to pay with. '}Storehouse cards are used first, then your hand. We pre-selected the choice that leaves you the most.</p>
+      ${due.map((p, i) => `<div class="tribute-part"><b class="big-n">${p.amount}</b> ×
+        ${p.fixed ? `<span class="chip">${resDot(p.type)} ${p.type} (fixed by the boss)</span>` : `<select id="tp-${i}" data-tp="${i}"><option value="">choose…</option>${RES.map((r) => `<option value="${r}" ${types[i] === r ? 'selected' : ''}>${r} (you have ${g.available(r)})</option>`).join('')}</select>`}
+        ${p.carried ? '<span class="muted small">carried from Levy Delay</span>' : ''}</div>`).join('')}
+      ${!check.ok && canAny ? `<p class="bad small">${esc(check.msg)}</p>` : ''}
+      ${!canAny ? '<p class="bad"><b>You can\'t pay this tribute.</b> The run ends here.</p>' : ''}
+      <div class="actions">${canAny ? `<button class="primary big" data-a="pay" data-primary ${check.ok ? '' : 'disabled'}>Pay tribute</button>` : '<button class="primary big" data-a="fail" data-primary>End the run</button>'}</div>`;
+  }
+
+  viewShop() {
+    const g = this.game;
+    const e = g.earned;
+    const nextBoss = g.blind === 2 ? BOSS_BY_ID[g.nextBossId] : g.boss;
+    const where = { face: 'Dice · face', die: 'Dice · whole die', token: 'Field · number token', hex: 'Field · hex', port: 'Field · port', classic: 'Card · single use', edict: 'Card · single use', guild: 'Guild · always active', charter: 'Charter · immediate' };
+    const items = g.shop.map((s, i) => {
+      const price = g.slotPrice(s);
+      const afford = g.budget >= price;
+      const btn = `<button class="small ${!s.sold && afford ? 'go' : ''}" data-a="buy" data-i="${i}" ${!s.sold && afford && !this.busy ? '' : 'disabled'}>${s.sold ? 'Bought' : `Buy · ${price === Infinity ? 'max' : price} VP`}</button>`;
+      if (s.kind === 'pack') {
+        return `<div class="shop-item ${s.sold ? 'sold' : ''}"><div><div class="kind">Pack · ${s.group}</div><b>Choose 1 of 3</b><div class="small muted">${s.options.map((o) => `${o.name} <span class="rarity-${o.rarity}">(${o.rarity})</span>`).join(' · ')}</div></div>${btn}</div>`;
+      }
+      const it = s.item;
+      return `<div class="shop-item ${s.sold ? 'sold' : ''}"><div><div class="kind">${where[it.cat]} · <span class="rarity-${it.rarity}">${it.rarity}</span></div><b>${it.name}</b><div class="small muted">${it.desc}${it.id === 'loaded' ? ' Price rises with the level.' : ''}</div></div>${btn}</div>`;
+    }).join('');
+    return `<div class="row between"><h2>Shop</h2><div class="budget">${g.budget} VP</div></div>
+      <p class="small muted">Budget = score ${g.vp} + unused rolls ${e.unusedRolls} + Storehouse surplus ${e.storehouse}${e.river ? ` + River ${e.river}` : ''}${e.twinFortune ? ` + Twin Fortune ${e.twinFortune}` : ''}. Unspent VP is lost when you leave. Buying never lowers your score.</p>
+      <div class="list">${items}</div>
+      <div class="row" style="margin-top:8px"><button class="small" data-a="reroll" ${g.budget >= g.rerollPrice ? '' : 'disabled'}>Reroll shop · ${g.rerollPrice} VP</button></div>
+      <div class="boss-box small"><b>${g.blind === 2 ? 'Next boss' : 'Boss of this ante'}: ${nextBoss.name}</b><br><span class="muted">${nextBoss.desc}</span><br><button class="small" data-a="reroll-boss" ${g.budget >= g.bossRerollPrice ? '' : 'disabled'} style="margin-top:4px">Reroll boss · ${g.bossRerollPrice} VP</button></div>
+      <div class="actions"><button class="primary big" data-a="leave" data-primary ${this.busy ? 'disabled' : ''}>Next round →</button></div>`;
+  }
+
+  viewGameOver() {
+    const g = this.game;
+    return `<h2>Run over</h2><p>You survived <b>${g.roundsSurvived}</b> round(s) and reached ante ${g.ante} with a score of ${g.vp} VP.</p>
+      <p class="small muted">Seed ${g.seed}. The same seed gives the same board and dice if you make the same choices.</p>
+      <div class="actions"><button class="primary big" data-a="fresh" data-primary>New run</button><button data-a="again">Replay this seed</button></div>`;
+  }
+
+  // ---------------------------------------------------------------- below the board: log + dev tools
+  renderBelow() {
+    const g = this.game;
+    this.$below.innerHTML = `${this.devOpen ? this.devPanel() : ''}<div class="card"><h3>Log</h3><div class="log">${g.logLines.slice(-150).reverse().map((l) => `<div class="${l.cls}">${esc(l.msg)}</div>`).join('')}</div></div>`;
   }
 
   devPanel() {
@@ -412,39 +602,13 @@ export class UI {
       <div class="row small" style="margin-top:6px"><button class="small" data-a="dev-shop" ${g.phase === 'turn' && !g.pendingRoll ? '' : 'disabled'}>Skip tribute → shop</button><button class="small" data-a="dev-budget" ${g.phase === 'shop' ? '' : 'disabled'}>+10 shop budget</button><span class="muted">Seed ${g.seed}</span></div></div>`;
   }
 
-  currentTributeTypes() {
-    const g = this.game;
-    const due = g.tributeDue();
-    if (!this.tributeTypes || this.tributeTypes.length !== due.length) {
-      this.tributeTypes = g.autoAssign() ?? due.map((p) => p.type);
-    }
-    // read selects
-    due.forEach((p, i) => {
-      const el = document.getElementById(`tp-${i}`);
-      if (el && !p.fixed) this.tributeTypes[i] = el.value || null;
-    });
-    return this.tributeTypes;
-  }
-
+  // ---------------------------------------------------------------- dialogs
   renderModal() {
-    const g = this.game;
     const m = this.modal;
     let html = '';
     if (m) html = this.renderIoModal(m);
-    else if (this.panel) html = this.renderPanel();
-    else if (this.boardReq) html = '';
-    else if (g?.phase === 'tribute') html = this.renderTribute();
-    else if (g?.phase === 'shop' && !this.busy) html = this.renderShop();
-    else if (g?.phase === 'shop' && this.busy) html = '';
-    else if (g?.phase === 'gameover') html = this.renderGameOver();
+    else if (this.panel) html = this.renderHelp();
     this.$modal.innerHTML = html ? `<div class="modal-back">${html}</div>` : '';
-    // bind live tribute selects
-    if (g?.phase === 'tribute' && !m && !this.panel) {
-      this.$modal.querySelectorAll('select[data-tp]').forEach((s) => s.addEventListener('change', () => { this.currentTributeTypes(); this.render(); }));
-    }
-    if (this.panel?.type === 'trade') {
-      this.$modal.querySelectorAll('select[data-trade]').forEach((s) => s.addEventListener('change', () => { this.panel[s.dataset.trade] = s.value; this.render(); }));
-    }
   }
 
   renderIoModal(m) {
@@ -454,12 +618,12 @@ export class UI {
     }
     if (m.type === 'face') {
       const g = this.game;
-      const dieBlock = (d) => `<div class="muted small">Die ${d + 1}</div><div class="face-grid">${m.options.map((o, i) => (o.die !== d ? '' : (() => {
+      const dieBlock = (d) => `<div class="muted small">Die ${d + 1}</div><div class="face-grid">${m.options.map((o, i) => {
+        if (o.die !== d) return '';
         const f = g.dice[d].faces[o.face];
-        const lbl = f.setter ? FACE_LABEL[f.setter] : f.value;
-        return `<button data-a="face" data-i="${i}" title="${esc(f.triggers.map((t) => ITEMS[t].name).join(', '))}">${lbl}<small>${f.triggers.map((t) => TRIG_LABEL[t]).join(' ') || '&nbsp;'}</small></button>`;
-      })())).join('')}</div>`;
-      return `<div class="modal"><h2>${esc(m.prompt)}</h2><p class="muted small">Upgrades stay on the physical face, not its number. Value-setters replace each other; triggers stack.</p>${dieBlock(0)}${dieBlock(1)}<div class="modal-foot">${cancel}</div></div>`;
+        return `<button data-a="face" data-i="${i}" title="${esc(f.triggers.map((t) => ITEMS[t].name).join(', '))}">${f.setter ? FACE_LABEL[f.setter] : f.value}<small>${f.triggers.map((t) => TRIG_LABEL[t]).join(' ') || '&nbsp;'}</small></button>`;
+      }).join('')}</div>`;
+      return `<div class="modal"><h2>${esc(m.prompt)}</h2><p class="muted small">Upgrades stay on the physical face, not on its number. A new value-setter replaces the old one; triggers stack.</p>${dieBlock(0)}${dieBlock(1)}<div class="modal-foot">${cancel}</div></div>`;
     }
     if (m.type === 'resources') {
       const total = RES.reduce((s, r) => s + m.counts[r], 0);
@@ -470,89 +634,16 @@ export class UI {
     return '';
   }
 
-  renderPanel() {
-    const g = this.game;
-    const p = this.panel;
-    if (p.type === 'help') {
-      return `<div class="modal help"><h2>How to play (draft)</h2>
-        <p>Build one island across an endless run. Each round you get <b>4 rolls</b>; after each roll you can build, trade, ship and play cards. At the end of the round you must pay the <b>tribute</b> or the run ends.</p>
-        <ul><li><b>Antes</b> have three rounds: Small (1 resource type), Big (2 types), Boss (3 types + a drawback). Tributes grow each ante.</li>
-        <li><b>Ending early</b> gives +1 VP per unused roll.</li>
-        <li><b>Ports</b> unlock better trades and the <b>Storehouse</b>: ship full batches for a bonus that counts toward the tribute (and 3 surplus = +1 VP).</li>
-        <li><b>VP</b> is your score and, after each round, your shop budget (score + VP earned this round). Unspent budget is lost.</li>
-        <li><b>Shop:</b> dice upgrades (faces &amp; whole dice), field upgrades (tokens, hexes, ports), development cards and a pack.</li>
-        <li>On a <b>7</b>: discard half if you hold more than 7 cards, and the robber jumps onto one of your hexes.</li></ul>
-        <p class="muted small">Shortcuts: R / Space = roll or resolve · E = end round · Esc = cancel. The seed in the URL reproduces the board and every roll.</p>
-        <div class="modal-foot"><button data-a="close-panel" class="primary">Close</button></div></div>`;
-    }
-    if (p.type === 'trade') {
-      const rate = g.tradeRate(p.give);
-      const sel = (k) => `<select data-trade="${k}">${RES.map((r) => `<option ${p[k] === r ? 'selected' : ''}>${r}</option>`).join('')}</select>`;
-      return `<div class="modal"><h2>Trade with the bank</h2>
-        <p class="muted small">Rates: ${RES.map((r) => `${r} ${g.tradeRate(r)}:1`).join(' · ')}</p>
-        <div class="row">Give ${rate} ${sel('give')} → get 1 ${sel('get')} <button class="primary" data-a="trade" ${g.hand[p.give] >= rate && p.give !== p.get ? '' : 'disabled'}>Trade</button></div>
-        <p class="small">You have: ${RES.map((r) => `${g.hand[r]} ${r}`).join(', ')}</p>
-        <div class="modal-foot"><button data-a="close-panel">Done</button></div></div>`;
-    }
-    if (p.type === 'ship') {
-      const ports = g.ownedPorts();
-      return `<div class="modal"><h2>Ship to the Storehouse</h2><p class="muted small">Shipped cards count toward this round's tribute only. Storehouse: ${RES.map((r) => `${g.storehouse[r]} ${r}`).join(', ')}</p>
-        ${ports.map((port) => {
-          const { input, bonus } = g.storehouseRate(port);
-          const rs = port.type === 'generic' ? RES : [port.type];
-          return `<div class="card" style="margin-top:8px"><b>${port.type === 'generic' ? 'Generic port' : port.type + ' port'}</b> — batch ${input} → ${input + bonus}${port.up.overflow ? ' · Overflow' : ''}${port.up.free ? ' · Free Port' : ''}
-            <div class="row" style="margin-top:6px">${rs.map((r) => `<button class="small" data-a="ship" data-port="${port.id}" data-r="${r}" data-mode="batch" ${g.hand[r] >= input ? '' : 'disabled'}>${r} (${g.hand[r]})</button>${port.up.overflow ? `<button class="small" data-a="ship" data-port="${port.id}" data-r="${r}" data-mode="overflow" ${g.hand[r] > 0 && g.hand[r] < input ? '' : 'disabled'}>leftover ${r}</button>` : ''}`).join('')}
-            ${port.up.free ? `<button class="small" data-a="ship-mixed" data-port="${port.id}">Mixed batch</button>` : ''}</div></div>`;
-        }).join('') || '<p>You need a building on a port.</p>'}
-        <div class="modal-foot"><button data-a="close-panel">Done</button></div></div>`;
-    }
-    return '';
-  }
-
-  renderTribute() {
-    const g = this.game;
-    const due = g.tributeDue();
-    const types = this.currentTributeTypes();
-    const check = g.checkAssignment(types);
-    const canAny = g.autoAssign() != null;
-    return `<div class="modal"><h2>Pay the tribute — ${BLINDS[g.blind]} round, ante ${g.ante}</h2>
-      <p class="muted small">Each part must use a different resource type. The Storehouse is used first, then your hand.</p>
-      ${due.map((p, i) => `<div class="tribute-part"><b>${p.amount}</b> ×
-        ${p.fixed ? `<span class="chip">${resDot(p.type)} ${p.type} (fixed)</span>` : `<select id="tp-${i}" data-tp="${i}"><option value="">choose…</option>${RES.map((r) => `<option value="${r}" ${types[i] === r ? 'selected' : ''}>${r} (have ${g.available(r)})</option>`).join('')}</select>`}
-        ${p.carried ? '<span class="muted small">carried from Levy Delay</span>' : ''}</div>`).join('')}
-      <p class="small">Available: ${RES.map((r) => `${r} ${g.hand[r]}${g.storehouse[r] ? `+${g.storehouse[r]}` : ''}`).join(' · ')}</p>
-      ${!check.ok ? `<p class="bad small">${esc(check.msg)}</p>` : ''}
-      <div class="modal-foot">${!canAny ? '<span class="bad">You cannot pay this tribute.</span><button data-a="fail">End the run</button>' : ''}<button class="primary" data-a="pay" ${check.ok ? '' : 'disabled'}>Pay tribute</button></div></div>`;
-  }
-
-  renderShop() {
-    const g = this.game;
-    const e = g.earned;
-    const nextBoss = g.blind === 2 ? BOSS_BY_ID[g.nextBossId] : g.boss;
-    const rarity = (it) => `<span class="rarity-${it.rarity} small">${it.rarity}</span>`;
-    return `<div class="modal wide"><div class="row between"><div><h2>Shop</h2><div class="muted small">Score ${g.vp} + unused rolls ${e.unusedRolls} + Storehouse surplus ${e.storehouse} + River ${e.river} + Twin Fortune ${e.twinFortune}</div></div>
-      <div class="budget">${g.budget} VP</div></div>
-      <div class="shop-grid">${g.shop.map((s, i) => {
-        const price = g.slotPrice(s);
-        if (s.kind === 'pack') {
-          return `<div class="shop-slot ${s.sold ? 'sold' : ''}"><span class="kind">Pack · ${s.group}</span><span class="name">Choose 1 of 3</span><div class="desc">${s.options.map((o) => `${o.name} (${o.rarity})`).join('<br>')}</div><button data-a="buy" data-i="${i}" ${!s.sold && g.budget >= price ? '' : 'disabled'}>${s.sold ? 'Sold' : `Buy · ${price} VP`}</button></div>`;
-        }
-        const it = s.item;
-        return `<div class="shop-slot ${s.sold ? 'sold' : ''}"><span class="kind">${it.cat} upgrade ${rarity(it)}</span><span class="name">${it.name}</span><div class="desc">${it.desc}${it.id === 'loaded' ? '<br>Price depends on the die\'s level.' : ''}</div><button data-a="buy" data-i="${i}" ${!s.sold && g.budget >= price ? '' : 'disabled'}>${s.sold ? 'Sold' : `Buy · ${price === Infinity ? 'max' : price} VP`}</button></div>`;
-      }).join('')}</div>
-      <div class="row between" style="margin-top:12px">
-        <div class="small">${g.blind === 2 ? 'Next boss' : 'Boss of this ante'}: <b>${nextBoss.name}</b> <span class="muted">${nextBoss.desc}</span></div>
-      </div>
-      <div class="modal-foot"><span class="muted small">Unspent VP is lost.</span>
-        <button data-a="reroll-boss" ${g.budget >= g.bossRerollPrice ? '' : 'disabled'}>Reroll boss · ${g.bossRerollPrice} VP</button>
-        <button data-a="reroll" ${g.budget >= g.rerollPrice ? '' : 'disabled'}>Reroll shop · ${g.rerollPrice} VP</button>
-        <button class="primary" data-a="leave">Next round →</button></div></div>`;
-  }
-
-  renderGameOver() {
-    const g = this.game;
-    return `<div class="modal"><h2>Run over</h2><p>You survived <b>${g.roundsSurvived}</b> round(s) and reached ante ${g.ante} with a score of ${g.vp} VP.</p>
-      <p class="muted small">Seed ${g.seed}. Replaying the same seed gives the same board and the same dice, as long as you make the same choices.</p>
-      <div class="modal-foot"><button data-a="again">Replay seed</button><button class="primary" data-a="fresh">New run</button></div></div>`;
+  renderHelp() {
+    return `<div class="modal help"><h2>How to play (draft)</h2>
+      <p>Build one island across an endless run. The right side walks you through each round step by step.</p>
+      <ol><li><b>Roll</b> the dice. Every hex with that number pays its resource to your adjacent buildings (settlement 1, city 2).</li>
+      <li><b>Result</b> shows what the dice did, any upgrades that changed them, and what you got. On a 7 the robber strikes: discard half if you hold more than 7 cards, and the robber blocks one of your hexes.</li>
+      <li><b>Build & trade</b>: build, trade with the bank (better with ports), ship to the Storehouse, play cards. Then roll again; you have 4 rolls per round.</li>
+      <li><b>Tribute</b>: pay the resources shown at the top or the run ends. Ending the round early gives +1 VP per unused roll.</li>
+      <li><b>Shop</b>: your score plus VP earned this round is your budget. Buy dice upgrades, field upgrades and cards. Unspent VP is lost.</li></ol>
+      <p>Each ante has three rounds: Small (one resource type), Big (two types) and Boss (three types plus a drawback). Tributes grow every ante.</p>
+      <p class="muted small">Shortcuts: Enter or Space = the highlighted main button · Esc = cancel. The seed in the URL reproduces the board and every roll.</p>
+      <div class="modal-foot"><button data-a="close-panel" class="primary">Close</button></div></div>`;
   }
 }

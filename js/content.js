@@ -141,16 +141,35 @@ export const BOSSES = [
 ];
 export const BOSS_BY_ID = Object.fromEntries(BOSSES.map((b) => [b.id, b]));
 
-// Tribute starting values per ante (Small, Big second part, Boss third part). Beyond ante 5: ×1.5 rounded up.
-export const TRIBUTE_SMALL = [3, 5, 7, 11, 16];
-export const TRIBUTE_BIG2 = [2, 3, 5, 7, 11];
-export const TRIBUTE_BOSS3 = [1, 2, 3, 4, 6];
+// Tribute per ante: [Small parts, Big parts, Boss parts]. Each number is one part, paid in its own resource type.
+// Antes 1-3 are an easy on-ramp; ante 4 onward is the rulebook's original table (its antes 1-5).
+// Beyond the table, every part of the last ante is multiplied by 1.5 (rounded up) per extra ante.
+export const TRIBUTE_TABLE = [
+  [[1], [1, 1], [1, 1, 1]],          // ante 1 (on-ramp)
+  [[1], [2, 1], [2, 1, 1]],          // ante 2 (on-ramp)
+  [[2], [2, 2], [2, 2, 1]],          // ante 3 (on-ramp)
+  [[3], [3, 2], [3, 2, 1]],          // ante 4 = original ante 1
+  [[5], [5, 3], [5, 3, 2]],          // ante 5 = original ante 2
+  [[7], [7, 5], [7, 5, 3]],          // ante 6 = original ante 3
+  [[11], [11, 7], [11, 7, 4]],       // ante 7 = original ante 4
+  [[16], [16, 11], [16, 11, 6]],     // ante 8 = original ante 5
+];
+export function tributeFor(ante, blind) {
+  const i = ante - 1;
+  if (i < TRIBUTE_TABLE.length) return [...TRIBUTE_TABLE[i][blind]];
+  let parts = [...TRIBUTE_TABLE[TRIBUTE_TABLE.length - 1][blind]];
+  for (let k = TRIBUTE_TABLE.length; k <= i; k++) parts = parts.map((n) => Math.ceil(n * 1.5));
+  return parts;
+}
 export const SHOP_REROLL = [2, 3, 5, 7, 11];
 export const BOSS_REROLL = [3, 5, 7, 11, 16];
 export const PACK_PRICE = 4;
 export const ROLLS_PER_ROUND = 4;
 export const HAND_LIMIT = 7;
 export const ECHO_BREAK = 10;
+// Starting resources after setup: 'all' = one card per hex next to BOTH starting settlements,
+// 'second' = base-game rule (only the second settlement pays out).
+export const SETUP_RESOURCES = 'all';
 
 export function seqAt(base, i) {
   const a = base.slice();
