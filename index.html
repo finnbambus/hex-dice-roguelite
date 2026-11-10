@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Hex &amp; Dice Roguelite</title>
+  <meta name="description" content="A solo hex-and-dice roguelite: build an island, bend the dice, pay the tribute.">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><polygon points='50,5 90,27 90,73 50,95 10,73 10,27' fill='%23e8c547' stroke='%23333' stroke-width='6'/></svg>">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="top">
+    <h1>Hex &amp; Dice <small>roguelite · draft 0.1</small></h1>
+    <div class="top-actions">
+      <label class="seed">Seed <input id="seed" type="number" min="1"></label>
+      <button data-top="new">New run</button>
+      <button data-top="help">How to play</button>
+      <button data-top="dev" class="ghost">Dev tools</button>
+    </div>
+  </header>
+  <main class="layout">
+    <section class="board-col">
+      <div id="prompt" class="prompt" hidden></div>
+      <svg id="board" viewBox="-5.3 -4.9 10.6 9.8" role="img" aria-label="Game board"></svg>
+      <div id="dice" class="dice-row"></div>
+    </section>
+    <aside id="side" class="side"></aside>
+  </main>
+  <div id="modal-root"></div>
+  <noscript>This game needs JavaScript.</noscript>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>

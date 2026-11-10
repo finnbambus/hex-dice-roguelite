@@ -1,0 +1,11 @@
+{
+  "name": "hex-dice-roguelite",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Solo hex-and-dice roguelite (first playable draft). Static web app, no build step.",
+  "type": "module",
+  "scripts": {
+    "test": "node tests/sim.mjs 300",
+    "serve": "python3 -m http.server 8000"
+  }
+}
