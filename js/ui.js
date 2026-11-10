@@ -6,9 +6,9 @@
 import { Game, COSTS, BLINDS } from './game.js';
 import { RES, TERRAIN_RES, pips } from './board.js';
 import { ITEMS, ITEM_LIST, BOSS_BY_ID, ROLLS_PER_ROUND, LOADING, START_SETTLEMENTS, ECHO_BREAK } from './content.js';
-import { BoardView } from './board-view.js?v=15';
-import { figure } from './figures.js?v=15';
-import { Feel } from './feel.js?v=15';
+import { BoardView } from './board-view.js?v=16';
+import { figure } from './figures.js?v=16';
+import { Feel } from './feel.js?v=16';
 
 const TERRAIN_COLOR = { hills: '#c8734a', forest: '#3f7d4a', pasture: '#9ccf6a', fields: '#e8c547', mountains: '#8e939c', desert: '#e3d3a4' };
 const RES_ICON = { brick: 'B', lumber: 'L', wool: 'W', grain: 'G', ore: 'O' };
@@ -54,6 +54,7 @@ const faceArt = (f, loaded) => {
   const marks = f.triggers.length ? `<i class="trg">${[...new Set(f.triggers)].map((t) => TRIG_LABEL[t]).join('')}</i>` : '';
   return `<span class="fa" style="background:${bg}">${inner}${marks}</span>`;
 };
+const GAP = '<button class="small play" style="visibility:hidden" tabindex="-1" disabled aria-hidden="true">Play</button>'; // keeps guild and empty slots level with the cards that have a Play button
 const UPGRADE_CATS = ['face', 'die', 'token', 'hex', 'port'];
 const cardArt = (it) => artPos(CARD_ART[it.id] ?? CAT_ART[it.cat] ?? 3);
 
@@ -81,7 +82,6 @@ export class UI {
     document.body.appendChild(this.$tip);
     this.dieSheet = null; // which die's face sheet is open (0 | 1 | null)
     this.$boss = document.getElementById('boss');
-    this.$guilds = document.getElementById('guilds');
     this.$board = document.getElementById('board');
     this.view = new BoardView(this.$board);
     this.$prompt = document.getElementById('prompt');
@@ -1177,7 +1177,7 @@ export class UI {
     const pcard = (it, name, tipKey, info, extra = '', hl = '') => `<div class="pcard ${it.rarity}" style="rotate:${tilt(hs(tipKey), .8)}deg" ${this.tipAttr(tipKey, info)} ${hl}><i class="dot" style="background:${CAT_DOT[it.cat] || '#a6a59e'}"></i><span class="art" style="background-position:${cardArt(it)}"></span><span class="nm">${esc(name)}</span>${extra}</div>`;
     const cardSlots = Array.from({ length: g.limits.handSlots }, (_, i) => {
       const c = g.cards[i];
-      if (!c) return '<div class="slot empty">Empty<br>card slot</div>';
+      if (!c) return `<div class="slot-wrap"><div class="slot empty">Empty<br>card slot</div>${GAP}</div>`;
       const it = ITEMS[c.id];
       const info = {
         kind: CAT_LABEL[it.cat] || 'Card',
@@ -1190,17 +1190,17 @@ export class UI {
     }).join('');
     const guildSlots = Array.from({ length: g.limits.guildSlots }, (_, i) => {
       const gd = g.guilds[i];
-      if (!gd) return '<div class="slot empty small-slot">Empty<br>guild slot</div>';
+      if (!gd) return `<div class="slot-wrap"><div class="slot empty small-slot">Empty<br>guild slot</div>${GAP}</div>`;
       const it = ITEMS[gd.id];
       const now = this.guildNow(gd.id);
       const nm = `${it.name}${gd.data.terrain ? ` (${gd.data.terrain})` : ''}`;
       const info = { kind: 'Guild · always on', title: nm, desc: it.desc, now, lines: [`Rarity: ${it.rarity}`] };
-      return `<div class="slot-wrap">${pcard(it, nm, `guild:${gd.uid}`, info)}</div>`;
+      return `<div class="slot-wrap">${pcard(it, nm, `guild:${gd.uid}`, info)}${GAP}</div>`;
     }).join('');
-    this.$guilds.innerHTML = `<div><div class="zone-h" style="justify-content:flex-end">Guilds <b>${g.guilds.length} of ${g.limits.guildSlots}</b></div><div class="slots" style="--n:${g.limits.guildSlots}">${guildSlots}</div></div>`;
     this.$hand.innerHTML = `
       <section class="zone"><div class="zone-h">Hand <b>${total} card${total === 1 ? '' : 's'}${countable > 7 ? ' · <span class="bad">over 7: a 7 makes you discard</span>' : ' · safe from the robber up to 7'}</b></div><div class="res-row">${stacks}${storeBox}</div></section>
-      <section class="zone"><div class="zone-h">Cards <b>${g.cards.length} of ${g.limits.handSlots}</b></div><div class="slots" style="--n:${g.limits.handSlots}">${cardSlots}</div></section>`;
+      <section class="zone"><div class="zone-h">Cards <b>${g.cards.length} of ${g.limits.handSlots}</b></div><div class="slots" style="--n:${g.limits.handSlots}">${cardSlots}</div></section>
+      <section class="zone guilds"><div class="zone-h">Guilds <b>${g.guilds.length} of ${g.limits.guildSlots}</b></div><div class="slots" style="--n:${g.limits.guildSlots}">${guildSlots}</div></section>`;
     const lz = this.$hand.firstElementChild;
     this.$stage.style.setProperty('--hand-l', `${lz ? lz.offsetHeight : 160}px`);
     if (this.view && this.$hand.offsetHeight !== this._handH) { this._handH = this.$hand.offsetHeight; this.view.fit(); }

@@ -50,7 +50,7 @@ export class BoardView {
     this.tilesEl = el.querySelector('.tiles');
     this.layer = el.querySelector('.layer');
     this.pan = { x: 0, y: 0 };
-    this.insets = { top: 108, right: 16, bottom: 190, left: 16 };
+    this.insets = { top: 70, right: 16, bottom: 190, left: 16 };
     this.tileKey = '';
     this.moved = false;
     this.bindPan();
@@ -65,7 +65,7 @@ export class BoardView {
     const hand = document.getElementById('hand');
     const { top, left } = this.insets;
     const panel = document.getElementById('panel');
-    const right = this.insets.right + (panel && getComputedStyle(panel).position === 'absolute' ? panel.offsetWidth + 16 : 0); // the action card floats over the right edge
+    const right = this.insets.right + (panel && getComputedStyle(panel).position === 'absolute' ? panel.offsetWidth + 56 : 0); // the action card floats over the right edge
     const bottom = Math.max(this.insets.bottom, hand ? hand.offsetHeight + 14 : 0);
     const aw = Math.max(200, r.width - left - right), ah = Math.max(200, r.height - top - bottom);
     this.scale = Math.min(aw / 1075, ah / 730);

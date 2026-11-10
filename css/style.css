@@ -413,17 +413,16 @@ select, input { font: inherit; color: var(--ink); background: var(--inset); bord
 .figure { flex: none; }
 
 /* ---------- guilds (top right of the stage) and hand (bottom of the stage) ---------- */
-.guilds { margin-left: auto; }
-.guilds .slots { display: grid; grid-template-columns: repeat(var(--n, 3), clamp(52px, 5.6vw, 92px)); gap: 8px; align-items: start; }
-.guilds .zone-h { justify-content: flex-end; }
 .hand { position: absolute; left: 0; right: 0; bottom: 0; z-index: 8; display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: end; gap: 26px; padding: 0 18px 16px; pointer-events: none; }
 .hand > * { pointer-events: auto; min-width: 0; }
 .zone-h { display: flex; gap: 10px; align-items: center; font: 600 10px/1 var(--mono); letter-spacing: .16em; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; }
 .zone-h b { font: 500 12px/1 var(--sans); letter-spacing: 0; text-transform: none; color: var(--ink); padding: 6px 11px; border-radius: 999px; background: rgba(16, 17, 19, .86); border: 1px solid var(--line); }
-.res-row { display: flex; gap: 2px; align-items: flex-end; zoom: .82; }
-@media (min-width: 1760px) { .res-row { zoom: 1; } }
-@media (max-width: 1300px) { .res-row { zoom: .68; } .hand { gap: 16px; padding: 0 12px 12px; } }
-@media (max-width: 1100px) { .res-row { zoom: .56; } }
+.hand { --hz: .82; }
+.res-row { display: flex; gap: 2px; align-items: flex-end; }
+.hand .res-row, .hand .slots { zoom: var(--hz); }
+@media (min-width: 1760px) { .hand { --hz: 1; } }
+@media (max-width: 1300px) { .hand { --hz: .68; gap: 16px; padding: 0 12px 12px; } }
+@media (max-width: 1100px) { .hand { --hz: .56; } }
 .stack { position: relative; width: 94px; padding: 12px 0 0 12px; display: flex; flex-direction: column; align-items: center; gap: 4px; }
 .stack-cards { position: relative; width: 82px; height: 112px; }
 .rcard { position: absolute; left: 0; top: 0; width: 82px; height: 112px; rotate: var(--rot, 0deg); border-radius: 9px; border: 1px solid var(--bone-line); background-color: #1d1e22; background-image: radial-gradient(rgba(255, 255, 255, .035) .8px, transparent 1.3px); background-size: 5px 5px; box-shadow: 0 1px 0 #0b0b0d, 0 14px 16px -8px rgba(0, 0, 0, .9); overflow: hidden; color: var(--ink); }
@@ -444,7 +443,7 @@ select, input { font: inherit; color: var(--ink); background: var(--inset); bord
 .stack-label { font-size: 11px; color: var(--muted); white-space: nowrap; min-height: 14px; }
 .stack-label .store { color: var(--good); font-weight: 700; }
 .slots { display: grid; grid-template-columns: repeat(var(--n, 3), minmax(0, 1fr)); gap: 10px; align-items: end; }
-.hand .slots { grid-template-columns: repeat(var(--n, 3), minmax(0, 168px)); }
+.hand .slots { grid-template-columns: repeat(var(--n, 3), 82px); gap: 10px; align-items: end; }
 .slot-wrap { display: flex; flex-direction: column; align-items: stretch; gap: 7px; min-width: 0; }
 .pcard { position: relative; width: 100%; aspect-ratio: 78 / 108; container-type: inline-size; border-radius: 10px; border: 3px solid transparent; background: linear-gradient(#1d1e22, #1d1e22) padding-box, var(--band, #3a3c42) border-box; box-shadow: 0 1px 0 #0b0b0d, 0 14px 18px -8px rgba(0, 0, 0, .9); overflow: hidden; }
 .pcard.common { border-width: 1.5px; --band: #3a3c42; }
@@ -461,7 +460,7 @@ select, input { font: inherit; color: var(--ink); background: var(--inset); bord
 .pcard .nm { position: absolute; left: 4cqw; right: 4cqw; bottom: 8cqw; text-align: center; font: 600 15cqw/1.02 var(--display); text-wrap: balance; }
 .slot { width: 100%; aspect-ratio: 78 / 108; border-radius: 10px; border: 1px dashed var(--line2); display: flex; align-items: center; justify-content: center; text-align: center; color: var(--dim); font: 600 8.5px/1.4 var(--mono); letter-spacing: .12em; text-transform: uppercase; background: rgba(16, 17, 19, .45); container-type: inline-size; }
 .slot-wrap .play { padding: 7px 14px; width: 100%; }
-.guilds .pcard .nm { font-size: 14.5cqw; }
+
 .pcard.big { width: 176px; height: 246px; aspect-ratio: auto; container-type: normal; border-radius: 14px; }
 .mini-dice { display: flex; flex-direction: column; gap: 8px; }
 .mini-die { display: flex; flex-direction: column; gap: 5px; }
@@ -612,3 +611,40 @@ select, input { font: inherit; color: var(--ink); background: var(--inset); bord
 .dice-area .side .lbl { font-size: 26px; }
 .dice-area .die-val { font-size: 22px; margin-top: 2px; }
 .dice-area { padding-top: 10px; }
+
+/* ---- one row for the hand: resources, cards and guilds, all at the same card size ---- */
+.hand { display: flex; align-items: flex-end; gap: 22px; }
+.hand .slot, .hand .pcard { width: 82px; }
+.hand .slot { height: 113px; aspect-ratio: auto; }
+.hand .zone { flex: none; }
+
+/* ---- right column: tribute and boss stack above the action card ---- */
+.rcol { position: absolute; z-index: 14; right: 16px; top: 66px; bottom: 16px; width: var(--act-w); display: flex; flex-direction: column; justify-content: flex-end; gap: 10px; pointer-events: none; }
+.rcol > * { pointer-events: auto; flex: none; }
+.rcol .tribute, .rcol .bossbox { min-width: 0; max-width: none; width: 100%; }
+.rcol .panel { position: static; width: 100%; max-height: none; flex: 0 1 auto; min-height: 0; }
+.rcol .tribute[hidden], .rcol .bossbox[hidden] { display: none; }
+.stage-overlay { padding-top: 24px; }
+.board-prompt { top: 20px; }
+@media (max-width: 900px) { .rcol { position: static; width: auto; padding: 12px; } }
+
+/* Right column on shorter screens: tighter plaques and dice so the action card keeps room to work in */
+.rcol .panel-body { min-height: 150px; }
+@media (max-height: 980px) {
+  .rcol { gap: 8px; }
+  .rcol .tribute, .rcol .bossbox { padding-top: 9px; padding-bottom: 9px; }
+  .rcol .bossbox p { margin-top: 3px; font-size: 12px; }
+  .rcol .dice-area { padding: 8px 14px 2px; gap: 6px; }
+  .rcol .dice-area .die3d { width: 34px; height: 34px; margin: 4px 6px 4px 2px; }
+  .rcol .dice-area .side.front { transform: translateZ(17px); }
+  .rcol .dice-area .side.back { transform: rotateY(180deg) translateZ(17px); }
+  .rcol .dice-area .side.right { transform: rotateY(90deg) translateZ(17px); }
+  .rcol .dice-area .side.left { transform: rotateY(-90deg) translateZ(17px); }
+  .rcol .dice-area .side.top { transform: rotateX(90deg) translateZ(17px); }
+  .rcol .dice-area .side.bottom { transform: rotateX(-90deg) translateZ(17px); }
+  .rcol .dice-area .side .lbl { font-size: 20px; }
+  .rcol .panel-body { padding-top: 10px; gap: 10px; }
+  .rcol .panel-body h2 { font-size: 24px; }
+  .rcol .panel-foot { padding: 8px 16px 14px; }
+  .rcol .howto { font-size: 12.5px; }
+}
