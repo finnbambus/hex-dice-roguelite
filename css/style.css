@@ -119,18 +119,18 @@ select, input { font: inherit; color: var(--ink); background: var(--inset); bord
 
 /* ---------- stage ---------- */
 .main { display: grid; grid-template-columns: minmax(0, 1fr) var(--panel-w); min-width: 0; min-height: 0; }
-.stage { position: relative; min-width: 0; min-height: 0; overflow: hidden; background: #16110d; isolation: isolate; }
+.stage { position: relative; min-width: 0; min-height: 0; overflow: hidden; background: #0c0c0c; isolation: isolate; }
 .stage { --lamp-rgb: 255, 168, 92; --lamp-k: 1; --vig-rgb: 12, 13, 15; --vig-a: .8; }
-.stage::after { content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 5; background: radial-gradient(ellipse at 48% 44%, rgba(var(--vig-rgb), 0) 48%, rgba(var(--vig-rgb), var(--vig-a)) 100%); transition: background .8s; }
+.stage::after { content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 5; background: radial-gradient(ellipse 54% 58% at 50% 40%, rgba(var(--vig-rgb), 0) 30%, rgba(var(--vig-rgb), calc(var(--vig-a) * .42)) 64%, rgba(var(--vig-rgb), var(--vig-a)) 100%); transition: background .8s; }
 
-/* ---------- the table: one fixed lamp over the island, soft shadows under everything that sits on it ---------- */
+/* ---------- the table: one harsh lamp over the island; the board is paper lying flat, so it casts no shadow ---------- */
 .lamp { position: absolute; inset: 0; z-index: 6; pointer-events: none; mix-blend-mode: soft-light;
-  background: radial-gradient(ellipse 56% 56% at 48% 46%, rgba(var(--lamp-rgb), calc(.9 * var(--lamp-k))) 0%, rgba(var(--lamp-rgb), calc(.46 * var(--lamp-k))) 46%, transparent 80%); }
-.lamp::after { content: ""; position: absolute; inset: 0; mix-blend-mode: screen; opacity: calc(.3 * var(--lamp-k));
+  background: radial-gradient(ellipse 46% 50% at 50% 40%, rgba(var(--lamp-rgb), calc(1 * var(--lamp-k))) 0%, rgba(var(--lamp-rgb), calc(.72 * var(--lamp-k))) 22%, rgba(var(--lamp-rgb), calc(.22 * var(--lamp-k))) 48%, transparent 66%); }
+.lamp::before { content: ""; position: absolute; inset: 0; mix-blend-mode: screen; opacity: var(--lamp-k);
+  background: radial-gradient(ellipse 13% 15% at 50% 38%, rgba(var(--lamp-rgb), .3) 0%, transparent 100%), radial-gradient(ellipse 42% 46% at 50% 40%, rgba(var(--lamp-rgb), .26) 0%, rgba(var(--lamp-rgb), .12) 45%, transparent 90%); }
+.lamp::after { content: ""; position: absolute; inset: 0; mix-blend-mode: screen; opacity: calc(.34 * var(--lamp-k));
   background-image: radial-gradient(circle, rgba(var(--lamp-rgb), 1) 0 1.1px, transparent 1.5px); background-size: 6px 6px;
-  -webkit-mask-image: radial-gradient(ellipse 54% 54% at 48% 46%, #000 0%, transparent 78%); mask-image: radial-gradient(ellipse 54% 54% at 48% 46%, #000 0%, transparent 78%); }
-.world .island-shadow { position: absolute; left: 90px; top: 130px; width: 860px; height: 640px; pointer-events: none;
-  background: radial-gradient(ellipse at 50% 50%, rgba(3, 3, 4, .6) 0%, rgba(3, 3, 4, .5) 46%, rgba(3, 3, 4, 0) 70%); }
+  -webkit-mask-image: radial-gradient(ellipse 44% 48% at 50% 40%, #000 0%, transparent 72%); mask-image: radial-gradient(ellipse 44% 48% at 50% 40%, #000 0%, transparent 72%); }
 .tray { position: absolute; left: 18px; bottom: calc(var(--hand-l, 160px) + 24px); z-index: 8; width: clamp(204px, 17vw, 244px); display: flex; flex-direction: column; gap: 8px;
   padding: 12px 13px 13px; border-radius: 16px; background-color: #090a0c; border: 1px solid #1d1e22;
   background-image: radial-gradient(rgba(255, 255, 255, .045) .8px, transparent 1.3px); background-size: 5px 5px;
@@ -163,10 +163,8 @@ select, input { font: inherit; color: var(--ink); background: var(--inset); bord
 
 /* ---------- the island (world coordinates are 1140 × 900 px; the camera scales and pans it) ---------- */
 .world { position: absolute; left: 0; top: 0; width: 1140px; height: 900px; transform-origin: 0 0; will-change: transform; }
-.world .table { position: absolute; left: -2048px; top: -1536px; width: 5120px; height: 3840px; pointer-events: none; background: #16110d url(../assets/table.webp) 0 0 / 1024px 768px repeat; }
+.world .table { position: absolute; left: -2048px; top: -1536px; width: 5120px; height: 3840px; pointer-events: none; background: #0c0c0c url(../assets/table.webp) 0 0 / 1024px 768px repeat; }
 .world .tiles, .world .layer { position: absolute; left: 0; top: 0; width: 0; height: 0; }
-.world .tiles { filter: drop-shadow(0 12px 9px rgba(0, 0, 0, .8)) drop-shadow(0 2px 1px rgba(0, 0, 0, .6)); }
-.world .pport:not(.target) { filter: drop-shadow(0 8px 6px rgba(0, 0, 0, .7)); }
 .tile { position: absolute; width: 250px; height: 250px; overflow: hidden; pointer-events: none; transition: filter .25s; }
 .tile i { position: absolute; inset: 0; background: url(../assets/terrain.webp) no-repeat; background-size: 400% 400%; }
 .tile.dim { filter: brightness(.5) saturate(.65); }

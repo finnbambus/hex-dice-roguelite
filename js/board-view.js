@@ -1,8 +1,8 @@
 // The island view: isometric printed tiles, 3D-rendered pieces, number tokens drawn in perspective,
-// lying on a halftone wooden tabletop, and a pannable camera.
+// lying flat on an abstract halftone tabletop, and a pannable camera.
 // It only draws. All game rules stay in game.js; the UI passes in what to highlight.
 import { TERRAIN_RES, pips } from './board.js';
-import { PORT_ATLAS, PORT_SCALE, PORT_SHEET } from './ports-atlas.js?v=9';
+import { PORT_ATLAS, PORT_SCALE, PORT_SHEET } from './ports-atlas.js?v=10';
 
 const SQ3 = Math.sqrt(3);
 const U = 96; // hex radius in world pixels
@@ -43,7 +43,7 @@ const hexPoints = (k) => [0, 1, 2, 3, 4, 5].map((i) => { const a = (Math.PI / 18
 export class BoardView {
   constructor(el) {
     this.el = el;
-    this.el.innerHTML = `<div class="world"><div class="table" aria-hidden="true"></div><div class="island-shadow" aria-hidden="true"></div><div class="tiles"></div><div class="layer"></div></div>`;
+    this.el.innerHTML = `<div class="world"><div class="table" aria-hidden="true"></div><div class="tiles"></div><div class="layer"></div></div>`;
     this.world = el.querySelector('.world');
     this.tilesEl = el.querySelector('.tiles');
     this.layer = el.querySelector('.layer');

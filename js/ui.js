@@ -6,8 +6,8 @@
 import { Game, COSTS, BLINDS } from './game.js';
 import { RES, TERRAIN_RES, pips } from './board.js';
 import { ITEMS, ITEM_LIST, BOSS_BY_ID, ROLLS_PER_ROUND, LOADING, START_SETTLEMENTS, ECHO_BREAK } from './content.js';
-import { BoardView } from './board-view.js?v=9';
-import { figure } from './figures.js?v=9';
+import { BoardView } from './board-view.js?v=10';
+import { figure } from './figures.js?v=10';
 
 const TERRAIN_COLOR = { hills: '#c8734a', forest: '#3f7d4a', pasture: '#9ccf6a', fields: '#e8c547', mountains: '#8e939c', desert: '#e3d3a4' };
 const RES_ICON = { brick: 'B', lumber: 'L', wool: 'W', grain: 'G', ore: 'O' };
@@ -985,10 +985,10 @@ export class UI {
     const t = Math.min(Math.max(g.ante - 1, 0) / 7, 1);
     const mix = (a, b) => a.map((v, i) => Math.round(v + (b[i] - v) * t)).join(',');
     const boss = g.blind === 2 && g.phase !== 'shop' && g.phase !== 'gameover';
-    let rgb = mix([255, 168, 92], [236, 116, 66]), k = 1, vig = '12,13,15', va = (0.78 + t * 0.1).toFixed(2);
+    let rgb = mix([255, 168, 92], [236, 116, 66]), k = 1, vig = '12,13,15', va = (0.93 + t * 0.04).toFixed(2);
     if (g.phase === 'shop') { rgb = mix([255, 188, 110], [244, 150, 84]); k = 0.9; }
     if (g.phase === 'gameover') { rgb = '150,160,175'; k = 0.7; }
-    if (boss) { rgb = '255,74,28'; k = 1.45; vig = '30,6,3'; va = '0.9'; }
+    if (boss) { rgb = '255,74,28'; k = 1.45; vig = '30,6,3'; va = '0.97'; }
     const s = this.$stage.style;
     s.setProperty('--lamp-rgb', rgb);
     s.setProperty('--lamp-k', k);
