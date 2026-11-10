@@ -129,30 +129,32 @@ export function isUnique(item) {
 }
 
 export const BOSSES = [
-  { id: 'fog', name: 'The Fog', source: 'Seafarers', desc: 'Tokens on your 3 best hexes are hidden and shuffled among them this round.' },
-  { id: 'doldrums', name: 'The Doldrums', source: 'Seafarers', desc: 'Rolls of 2, 3, 11 and 12 produce nothing.' },
+  { id: 'fog', gentle: true, name: 'The Fog', source: 'Seafarers', desc: 'Tokens on your 3 best hexes are hidden and shuffled among them this round.' },
+  { id: 'doldrums', gentle: true, name: 'The Doldrums', source: 'Seafarers', desc: 'Rolls of 2, 3, 11 and 12 produce nothing.' },
   { id: 'pirate', name: 'The Pirate', source: 'Seafarers', desc: 'No shipments this round; one tribute type is fixed to wool.' },
   { id: 'barbarians', name: 'The Barbarian Fleet', source: 'Cities & Knights', desc: 'Each 7 or double advances the fleet; at 3 a random building is hit. Knights push it back.' },
   { id: 'caravan', name: 'The Caravan', source: 'Traders & Barbarians', desc: 'Tribute types are set randomly; one changes after every roll.' },
   { id: 'volcano', name: 'The Volcano', source: 'Seafarers', desc: 'A volcano sits on your best hex: eruption check after each payout (no ×2).' },
-  { id: 'flood', name: 'The Flood', source: 'Traders & Barbarians', desc: 'Odd numbers produce nothing.' },
-  { id: 'robberBaron', name: 'The Robber Baron', source: 'Base game', desc: 'On a 7, the robber also takes half the Storehouse.' },
+  { id: 'flood', gentle: true, name: 'The Flood', source: 'Traders & Barbarians', desc: 'Odd numbers produce nothing.' },
+  { id: 'robberBaron', gentle: true, name: 'The Robber Baron', source: 'Base game', desc: 'On a 7, the robber also takes half the Storehouse.' },
   { id: 'oldBoot', name: 'The Old Boot', source: 'Fishermen', desc: 'Each roll that produces nothing raises the tribute by 1.' },
 ];
 export const BOSS_BY_ID = Object.fromEntries(BOSSES.map((b) => [b.id, b]));
+// Ante 1 only draws from the gentle bosses; the run-wreckers start in ante 2.
+export const GENTLE_UNTIL_ANTE = 1;
 
 // Tribute per ante: [Small parts, Big parts, Boss parts]. Each number is one part, paid in its own resource type.
-// Antes 1-3 are an easy on-ramp; ante 4 onward is the rulebook's original table (its antes 1-5).
+// "Breather" curve: each ante's Small is a breather below the previous boss, then Big and Boss climb.
+// Ante 1's boss asks for two types; three types from ante 2. Totals roughly double every two antes.
 // Beyond the table, every part of the last ante is multiplied by 1.5 (rounded up) per extra ante.
 export const TRIBUTE_TABLE = [
-  [[1], [1, 1], [1, 1, 1]],          // ante 1 (on-ramp)
-  [[1], [2, 1], [2, 1, 1]],          // ante 2 (on-ramp)
-  [[2], [2, 2], [2, 2, 1]],          // ante 3 (on-ramp)
-  [[3], [3, 2], [3, 2, 1]],          // ante 4 = original ante 1
-  [[5], [5, 3], [5, 3, 2]],          // ante 5 = original ante 2
-  [[7], [7, 5], [7, 5, 3]],          // ante 6 = original ante 3
-  [[11], [11, 7], [11, 7, 4]],       // ante 7 = original ante 4
-  [[16], [16, 11], [16, 11, 6]],     // ante 8 = original ante 5
+  [[1], [1, 1], [2, 1]],             // ante 1: kick-start (boss: two types)
+  [[1], [2, 1], [2, 1, 1]],          // ante 2: three types from here
+  [[2], [3, 2], [3, 2, 1]],          // ante 3
+  [[3], [4, 3], [5, 3, 2]],          // ante 4
+  [[4], [6, 4], [7, 4, 3]],          // ante 5
+  [[6], [9, 6], [10, 6, 4]],         // ante 6
+  [[9], [13, 9], [15, 9, 6]],        // ante 7
 ];
 export function tributeFor(ante, blind) {
   const i = ante - 1;
@@ -170,6 +172,10 @@ export const ECHO_BREAK = 10;
 // Starting resources after setup: 'all' = one card per hex next to BOTH starting settlements,
 // 'second' = base-game rule (only the second settlement pays out).
 export const SETUP_RESOURCES = 'all';
+// Losing streak: if all rolls of a round produce no resources for you, draw a free development card.
+export const LOSING_STREAK = true;
+// Free settlements (each with a free road) placed at the start of a run. Base game: 2.
+export const START_SETTLEMENTS = 4;
 
 export function seqAt(base, i) {
   const a = base.slice();

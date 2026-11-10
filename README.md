@@ -24,7 +24,7 @@ The game fills the browser window:
 
 - **Top bar:** current ante and round, rolls left, the tribute due (with a ✓ when you can already pay it), score, rounds survived and the boss. Hover the boss for its drawback.
 - **Board** (centre) with the **step panel** beside it. The panel walks you through each round: **Roll → Result → Build & trade → … → Tribute → Shop**. It shows only what you can do right now, explains anything unavailable (e.g. "Need 1 lumber more"), and has one main button at the bottom to move on. Hovering a build option highlights the cards it would use in your hand.
-- **Hand** (bottom): your resources as card stacks, your single-use card slots (with Play buttons), your Guild slots, and both dice with their faces and upgrades.
+- **Hand** (bottom): your resources as card stacks, your single-use card slots (with Play buttons), your Guild slots, and both dice with their faces and upgrades. Hover or click any card, die, face or upgrade for its details and current stacking (e.g. Loaded level, stacked triggers, what a Guild does right now). After a roll, whatever it changed or triggered pulses on screen and is listed under "Changed by this roll".
 - **Log** and **Dev tools** open in a side drawer from the top bar.
 
 | Key | Action |
@@ -93,7 +93,9 @@ Everything in the rulebook's current version:
 
 Where the rulebook was open, the draft picks one reading. Each is a single spot in `game.js` to change.
 
-- **Starting resources:** both starting settlements pay one card per adjacent hex (the base game pays only the second). Switch with `SETUP_RESOURCES` in `js/content.js`.
+- **Starting position:** you place 4 free settlements, each with a free road (base game: 2). Set with `START_SETTLEMENTS` in `js/content.js`.
+- **Starting resources:** every starting settlement pays one card per adjacent hex (the base game pays only the last one). Switch with `SETUP_RESOURCES` in `js/content.js`.
+- **Losing streak (new rule):** if all 4 rolls of a round produce no resources for you, you draw a free development card. Skipping rolls doesn't count. Switch off with `LOSING_STREAK` in `js/content.js`.
 - **Building before the first roll:** allowed. The build window is open any time during a round when no roll is pending.
 - **Levy Delay:** carried tribute parts may use any type, even one already used by this round's parts.
 - **Overflow:** leftover cards smaller than a batch ship 1:1 (so 7 ore at 6+1 → 8 in total).

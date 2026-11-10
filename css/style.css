@@ -90,6 +90,10 @@ select, input { font: inherit; color: var(--ink); background: var(--panel); bord
 .pay-state { font-size: 12px; font-weight: 650; padding-right: 6px; }
 .pay-state.ok { color: var(--good); }
 .pay-state.no { color: var(--bad); }
+.fx { display: inline-flex; gap: 4px; flex-wrap: wrap; }
+.fx-chip { font-size: 12px; font-weight: 650; padding: 2px 8px; border-radius: 6px; border: 1px solid var(--line); cursor: help; white-space: nowrap; }
+.fx-chip.bad { color: var(--bad); border-color: var(--bad); background: color-mix(in srgb, var(--bad) 8%, var(--panel)); }
+.fx-chip.good { color: var(--good); border-color: var(--good); background: color-mix(in srgb, var(--good) 8%, var(--panel)); }
 .boss-chip { font-size: 12px; padding: 2px 8px; border-radius: 6px; border: 1px dashed var(--line); cursor: help; }
 .boss-chip.active { border: 1px solid var(--accent); color: var(--accent); font-weight: 650; }
 
@@ -125,6 +129,34 @@ select, input { font: inherit; color: var(--ink); background: var(--panel); bord
 .dice2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .die-box { border: 1px solid var(--line); border-radius: var(--radius); padding: 10px; display: flex; flex-direction: column; gap: 8px; min-width: 0; background: var(--raised); }
 .die-top { display: flex; gap: 10px; align-items: center; }
+/* 3D dice */
+.die3d { width: 56px; height: 56px; flex: none; perspective: 420px; margin: 8px 14px 8px 6px; }
+.die3d .tilt { width: 100%; height: 100%; transform-style: preserve-3d; transform: rotateX(-22deg) rotateY(28deg); }
+.cube { position: relative; width: 100%; height: 100%; transform-style: preserve-3d; transition: transform .25s ease; }
+.cube.rolling { animation: tumble .85s cubic-bezier(.15, .75, .25, 1) both; }
+@keyframes tumble {
+  from { transform: rotateX(var(--rx0)) rotateY(var(--ry0)) rotateZ(var(--rz0)); }
+  to { transform: var(--final); }
+}
+@keyframes reveal { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+.side {
+  position: absolute; inset: 0; border-radius: 10px; background: #fbfaf5; border: 1.5px solid #00000030;
+  box-shadow: inset 0 0 10px #0000001f; display: grid; grid-template: repeat(3, 1fr) / repeat(3, 1fr); padding: 7px; backface-visibility: hidden;
+}
+.side.front { transform: translateZ(28px); }
+.side.back { transform: rotateY(180deg) translateZ(28px); }
+.side.right { transform: rotateY(90deg) translateZ(28px); }
+.side.left { transform: rotateY(-90deg) translateZ(28px); }
+.side.top { transform: rotateX(90deg) translateZ(28px); }
+.side.bottom { transform: rotateX(-90deg) translateZ(28px); }
+.side.loaded { background: #f4e2ad; }
+.dpip { width: 9px; height: 9px; border-radius: 50%; background: #23211d; place-self: center; }
+.side .lbl { grid-area: 1 / 1 / 4 / 4; place-self: center; font-weight: 800; font-size: 18px; color: #b5452b; }
+.side .trg { position: absolute; bottom: 2px; right: 5px; font-size: 9px; font-weight: 700; color: #b5452b; }
+.die3d.held .side { border-style: dashed; border-color: #b5452b; }
+.die-val { font-size: 22px; font-weight: 800; color: var(--ink); font-variant-numeric: tabular-nums; }
+.die-val.changed { color: var(--accent); }
+@media (prefers-reduced-motion: reduce) { .cube.rolling { animation: none; } }
 .die-big { width: 52px; height: 52px; flex: none; border-radius: 10px; border: 2px solid var(--ink); background: var(--panel); display: grid; place-items: center; font-size: 26px; font-weight: 800; font-variant-numeric: tabular-nums; }
 .die-big.held { border-style: dashed; }
 .faces { display: flex; gap: 3px; }
@@ -221,6 +253,44 @@ select, input { font: inherit; color: var(--ink); background: var(--panel); bord
 .mini-dice { display: flex; flex-direction: column; gap: 6px; overflow: auto; min-height: 0; }
 .mini-die { display: flex; flex-direction: column; gap: 3px; }
 .mini-die .faces .face { height: 24px; }
+[data-tip] { cursor: pointer; }
+.slot.card[data-tip] { cursor: default; }
+
+/* ---------- detail card (hover, or click to keep open) ---------- */
+.card-tip {
+  position: fixed; z-index: 200; width: 270px; max-width: calc(100vw - 16px); pointer-events: none;
+  background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: var(--radius);
+  box-shadow: 0 8px 24px #0005; padding: 10px 12px; font-size: 12px; line-height: 1.35;
+}
+.card-tip.pinned { border-color: var(--accent); }
+.card-tip .tip-kind { font-size: 10px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.card-tip .tip-title { font-size: 15px; font-weight: 750; margin: 2px 0 6px; }
+.card-tip p { margin: 0 0 6px; }
+.card-tip .tip-now { background: var(--raised); border: 1px solid var(--line); border-radius: 6px; padding: 5px 7px; font-weight: 650; margin-bottom: 6px; }
+.card-tip ul { margin: 0; padding-left: 16px; color: var(--muted); }
+.card-tip .tip-hint { margin-top: 7px; font-size: 10px; color: var(--muted); }
+
+/* ---------- stacking and roll highlights ---------- */
+.lvl { display: inline-flex; gap: 2px; margin-left: 6px; vertical-align: middle; }
+.lvl i { width: 5px; height: 9px; border-radius: 2px; background: var(--line); }
+.lvl i.on { background: var(--legendary); }
+.loaded-tag { color: var(--ink); border-color: var(--legendary); }
+.s-now { font-size: 11px; font-weight: 650; color: var(--good); }
+.hl { position: relative; animation: hlpulse 1.2s ease-out 3 both; animation-delay: var(--hd, 0ms); }
+@keyframes hlpulse {
+  0% { box-shadow: 0 0 0 0 var(--focus), 0 0 0 0 transparent; }
+  100% { box-shadow: 0 0 0 0 transparent, 0 0 0 12px transparent; }
+}
+.delta {
+  position: absolute; left: 50%; top: -6px; transform: translateX(-50%); z-index: 40; pointer-events: none;
+  background: var(--good); color: #fff; font-style: normal; font-size: 11px; font-weight: 800; line-height: 16px;
+  border-radius: 99px; padding: 0 6px; white-space: nowrap; animation: rise 1.6s ease-out both; animation-delay: var(--hd, 0ms);
+}
+.delta.bang { background: var(--focus); color: #1f2420; }
+@keyframes rise { from { opacity: 1; margin-top: 0; } to { opacity: 0; margin-top: -18px; } }
+.changes { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 10px; }
+.chg { font-size: 12px; font-weight: 650; padding: 3px 9px; border-radius: 99px; border: 1px solid var(--good); color: var(--good); background: color-mix(in srgb, var(--good) 10%, var(--panel)); }
+.chg.bad { border-color: var(--bad); color: var(--bad); background: color-mix(in srgb, var(--bad) 10%, var(--panel)); }
 
 /* ---------- board ---------- */
 .hex { stroke: #00000055; stroke-width: .03; }

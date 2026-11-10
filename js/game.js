@@ -5,7 +5,7 @@ import { generateBoard, RES, TERRAINS, TERRAIN_RES, pips } from './board.js';
 import {
   ITEMS, ITEM_LIST, LOADING, BOSSES, BOSS_BY_ID, CATEGORY_GROUPS, RARITY_WEIGHTS, isUnique,
   tributeFor, SHOP_REROLL, BOSS_REROLL, PACK_PRICE,
-  ROLLS_PER_ROUND, HAND_LIMIT, ECHO_BREAK, SETUP_RESOURCES, seqAt,
+  ROLLS_PER_ROUND, HAND_LIMIT, ECHO_BREAK, SETUP_RESOURCES, LOSING_STREAK, GENTLE_UNTIL_ANTE, START_SETTLEMENTS, seqAt,
 } from './content.js';
 
 export const COSTS = {
@@ -76,7 +76,8 @@ export class Game {
     this.bossRerolls = 0;
     this.carried = [];
     this.forcedNext = null;
-    this.bossId = this.rng.pick(BOSSES).id;
+    this.bossId = this.randomBoss(null, 1);
+    this.rollSeq = 0;
     this.lastRoll = null;
     this.pendingRoll = null;
     this.echoQueue = [];
@@ -85,16 +86,16 @@ export class Game {
     this.log(`New run — seed ${this.seed}`, 'big');
     this.emit();
 
-    for (let i = 0; i < 2; i++) {
+    for (let i = 0; i < START_SETTLEMENTS; i++) {
       let v = null;
-      while (v == null) v = await this.io.chooseVertex(this.validSettlementSpots(true), `Place free settlement ${i + 1} of 2`, { cancel: false });
+      while (v == null) v = await this.io.chooseVertex(this.validSettlementSpots(true), `Place free settlement ${i + 1} of ${START_SETTLEMENTS}`, { cancel: false });
       this.buildings[v] = 'settlement';
       this.emit();
       let e = null;
       const roadSpots = this.board.vertices[v].edges.filter((id) => !this.roads.has(id));
       while (e == null) e = await this.io.chooseEdge(roadSpots, 'Place a free road next to it', { cancel: false });
       this.roads.add(e);
-      if (i === 1 || SETUP_RESOURCES === 'all') {
+      if (i === START_SETTLEMENTS - 1 || SETUP_RESOURCES === 'all') {
         const got = [];
         for (const hid of this.board.vertices[v].hexes) {
           const r = TERRAIN_RES[this.hex(hid).terrain];
@@ -127,6 +128,8 @@ export class Game {
     this.fleet = 0;
     this.earned = { unusedRolls: 0, storehouse: 0, river: 0, twinFortune: 0 };
     this.firePriestReroll = false;
+    this.roundProduced = 0;
+    this.streakGiven = false;
     for (const d of this.dice) d.used = {};
 
     // Tribute
@@ -202,6 +205,7 @@ export class Game {
 
   async roll() {
     if (!this.canRoll()) return;
+    this.preRoll = this.snapshot();
     const pr = { faces: [0, 0], hold: [null, null], blank: [null, null], alt: [null, null], adj: [0, 0], set: [null, null], echo: false };
     if (this.echoQueue.length) {
       const die = this.echoQueue.shift();
@@ -228,6 +232,7 @@ export class Game {
       this.devForce = null;
     }
     this.pendingRoll = pr;
+    this.rollSeq = (this.rollSeq || 0) + 1;
     // Report shown in the Result step: what each die did, what happened, what you gained.
     const rep = { stage: 'adjust', echo: pr.echo, dice: [{ notes: [] }, { notes: [] }], lines: [], hexes: [], seen: false };
     for (const i of [0, 1]) {
@@ -275,6 +280,7 @@ export class Game {
       this.report?.dice[die].notes.push(`Nudge: ${delta > 0 ? '+1' : '−1'}`);
     } else if (id === 'recast') {
       pr.faces[die] = this.rollFace(die);
+      this.rollSeq++;
       pr.adj[die] = 0;
       pr.set[die] = null;
       pr.blank[die] = null;
@@ -388,9 +394,16 @@ export class Game {
       if (this.bossIs('oldBoot')) { this.oldBootExtra += 1; this.log('The Old Boot: dead roll, tribute +1', 'bad'); }
     }
     this.capture = null;
+    this.roundProduced += ctx.produced;
     rep.gains = Object.fromEntries(RES.map((r) => [r, this.hand[r] - rep.handBefore[r]]));
     rep.storeGains = Object.fromEntries(RES.map((r) => [r, this.storehouse[r] - rep.storeBefore[r]]));
     rep.final = { values: v, sum: ctx.sum, isDouble, seven, zero, robberFace };
+    // Faces that fired an effect this roll (triggers or a setter face), for the UI to light up.
+    rep.fired = [];
+    for (const i of [0, 1]) {
+      if (pr.hold[i] != null || pr.set[i] != null) continue;
+      if (f[i].triggers.length || f[i].setter) rep.fired.push({ die: i, face: pr.faces[i] });
+    }
     rep.hexes = [...ctx.paidHexes || []];
     rep.stage = 'result';
     rep.seen = false;
@@ -414,7 +427,71 @@ export class Game {
       p.type = this.rng.pick(unused);
       this.log(`The Caravan: a tribute part now wants ${p.type}.`, 'bad');
     }
+    // Losing streak: every roll this round came up empty → free development card
+    if (LOSING_STREAK && !this.streakGiven && this.rollsUsed >= ROLLS_PER_ROUND && !this.echoQueue.length && this.roundProduced === 0) {
+      this.streakGiven = true;
+      const msg = 'Losing streak: no resources all round. You get a free development card!';
+      this.log(msg, 'good');
+      rep.lines.push({ msg, cls: 'good' });
+      const item = await this.drawDevCard();
+      if (item) rep.lines.push({ msg: `Free card: ${item.name}.`, cls: 'good' });
+    }
+    rep.changes = this.diffSnapshot(this.preRoll || this.snapshot(), this.snapshot());
     this.emit();
+  }
+
+  // The numbers a roll can move, so the Result step can show what grew (pure data, no DOM).
+  snapshot() {
+    return {
+      vp: this.vp,
+      fleet: this.fleet,
+      oldBoot: this.oldBootExtra,
+      chain: this.chain,
+      knights: this.knights,
+      streak: !!this.streakGiven,
+      cardUids: this.cards.map((c) => c.uid),
+      loaded: this.dice.map((d) => (d.loaded ? d.loaded.level : 0)),
+      hand: { ...this.hand },
+      store: { ...this.storehouse },
+    };
+  }
+
+  // Compares two snapshots (before and after a roll). Returns [{ key, delta, text, cls }].
+  diffSnapshot(a, b) {
+    const out = [];
+    const add = (key, from, to, text, cls = 'good') => { if (from !== to) out.push({ key, delta: to - from, text, cls }); };
+    add('vp', a.vp, b.vp, `Score ${b.vp} VP`);
+    add('fleet', a.fleet, b.fleet, `Barbarian Fleet ${b.fleet}/3`, 'bad');
+    add('oldBoot', a.oldBoot, b.oldBoot, `Old Boot: tribute +${b.oldBoot}`, 'bad');
+    add('chain', a.chain, b.chain, `Echo chain ${b.chain}`);
+    add('knights', a.knights, b.knights, `Knights ${b.knights}`);
+    if (!a.streak && b.streak) out.push({ key: 'streak', delta: 1, text: 'Losing streak: free card', cls: 'good' });
+    for (const uid of b.cardUids) {
+      if (a.cardUids.includes(uid)) continue;
+      const c = this.cards.find((x) => x.uid === uid);
+      out.push({ key: `card:${uid}`, delta: 1, text: `New card: ${c ? ITEMS[c.id].name : 'development card'}`, cls: 'good' });
+    }
+    b.loaded.forEach((lv, i) => add(`loaded:${i}`, a.loaded[i], lv, `Die ${i + 1} Loaded level ${lv}`));
+    for (const r of RES) {
+      add(`hand:${r}`, a.hand[r], b.hand[r], `${r} ${b.hand[r]} in hand`);
+      add(`store:${r}`, a.store[r], b.store[r], `${r} ${b.store[r]} stored`);
+    }
+    return out;
+  }
+
+  // Draws a random development card (70/25/5 rarity) and takes it for free. Returns the item.
+  async drawDevCard() {
+    const w = RARITY_WEIGHTS;
+    let item;
+    for (let t = 0; t < 50; t++) {
+      const rarity = ['common', 'rare', 'legendary'][this.rng.weightedIndex([w.common, w.rare, w.legendary])];
+      const pool = ITEM_LIST.filter((i) => CATEGORY_GROUPS.dev.includes(i.cat) && i.rarity === rarity && this.itemAvailable(i));
+      if (pool.length) { item = this.rng.pick(pool); break; }
+    }
+    if (!item) return null;
+    this.log(`Drew a development card: ${item.name}.`, 'good');
+    await this.acquire(item, { free: true, fromStack: true });
+    return item;
   }
 
   addRes(got) {
@@ -711,15 +788,7 @@ export class Game {
       this.log('Built a city.');
     } else if (kind === 'dev') {
       this.pay(COSTS.dev);
-      const w = RARITY_WEIGHTS;
-      let item;
-      for (let t = 0; t < 50; t++) {
-        const rarity = ['common', 'rare', 'legendary'][this.rng.weightedIndex([w.common, w.rare, w.legendary])];
-        const pool = ITEM_LIST.filter((i) => CATEGORY_GROUPS.dev.includes(i.cat) && i.rarity === rarity && this.itemAvailable(i));
-        if (pool.length) { item = this.rng.pick(pool); break; }
-      }
-      this.log(`Drew a development card: ${item.name}.`, 'good');
-      await this.acquire(item, { free: true, fromStack: true });
+      await this.drawDevCard();
     }
     this.emit();
   }
@@ -1051,13 +1120,15 @@ export class Game {
     this.log(`Shop budget: ${this.vp} score + ${earnedTotal} earned = ${this.budget} VP.`, 'big');
     // After a boss round, reveal the next ante's boss now so it can be rerolled in this shop.
     if (this.blind === 2) {
-      this.nextBossId = this.randomBoss(this.bossId);
+      this.nextBossId = this.randomBoss(this.bossId, this.ante + 1);
     }
     this.openShop();
   }
 
-  randomBoss(exclude) {
-    return this.rng.pick(BOSSES.filter((b) => b.id !== exclude)).id;
+  // Random boss for an ante; early antes only draw gentle bosses.
+  randomBoss(exclude, ante = this.ante) {
+    const pool = BOSSES.filter((b) => b.id !== exclude && (ante > GENTLE_UNTIL_ANTE || b.gentle));
+    return this.rng.pick(pool).id;
   }
 
   // ------------------------------------------------------------ shop
@@ -1164,7 +1235,7 @@ export class Game {
     this.budget -= this.bossRerollPrice;
     this.bossRerolls++;
     if (this.blind === 2) {
-      this.nextBossId = this.randomBoss(this.nextBossId);
+      this.nextBossId = this.randomBoss(this.nextBossId, this.ante + 1);
       this.log(`Next boss rerolled: ${BOSS_BY_ID[this.nextBossId].name}.`);
     } else {
       this.bossId = this.randomBoss(this.bossId);

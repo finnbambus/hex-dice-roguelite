@@ -5,7 +5,7 @@
 // The UI also implements the engine's `io` interface (board clicks and choice dialogs).
 import { Game, COSTS, BLINDS } from './game.js';
 import { RES, TERRAIN_RES, pips } from './board.js';
-import { ITEMS, ITEM_LIST, BOSS_BY_ID, ROLLS_PER_ROUND, LOADING } from './content.js';
+import { ITEMS, ITEM_LIST, BOSS_BY_ID, ROLLS_PER_ROUND, LOADING, START_SETTLEMENTS, ECHO_BREAK } from './content.js';
 
 const TERRAIN_COLOR = { hills: '#c8734a', forest: '#3f7d4a', pasture: '#9ccf6a', fields: '#e8c547', mountains: '#8e939c', desert: '#e3d3a4' };
 const RES_ICON = { brick: 'B', lumber: 'L', wool: 'W', grain: 'G', ore: 'O' };
@@ -25,6 +25,8 @@ const PRE_ROLL_CARDS = ['bumper', 'omen', 'monopoly'];
 const STEPS = [['roll', 'Roll'], ['result', 'Result'], ['build', 'Build & trade'], ['tribute', 'Tribute'], ['shop', 'Shop']];
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const resDot = (r) => `<span class="res-dot" style="background:var(--${r})"></span>`;
+const HL_MS = 3600; // how long a roll's highlights (pulses, +1 badges) stay lit
+const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
 
 // Simple white glyphs for the resource cards.
 const ICON = {
@@ -48,6 +50,16 @@ export class UI {
     this.tradeGive = null;
     this.hoverCost = null;
     this.preBuild = false;
+    this.tips = new Map(); // detail cards registered during the latest render, by key
+    this.tipKey = null; // the detail card on screen
+    this.pinnedTip = null; // a detail card opened by click stays until clicked again
+    this.hlReport = null; // the roll report whose highlights are running
+    this.hlStart = 0;
+    this.hlMap = new Map(); // change key → highlight for that element
+    this.$tip = document.createElement('div');
+    this.$tip.className = 'card-tip';
+    this.$tip.hidden = true;
+    document.body.appendChild(this.$tip);
     this.$status = document.getElementById('status');
     this.$board = document.getElementById('board');
     this.$prompt = document.getElementById('prompt');
@@ -146,6 +158,24 @@ export class UI {
       const a = ev.target.closest('[data-a]');
       if (a && !a.disabled) this.onAction(a.dataset.a, a.dataset);
     });
+    // Detail cards: hover shows one, click keeps it open (buttons keep their own clicks).
+    document.addEventListener('pointerover', (ev) => {
+      if (this.pinnedTip) return;
+      const el = ev.target.closest?.('[data-tip]');
+      if (el && el.dataset.tip !== this.tipKey) this.openTip(el.dataset.tip, el);
+    });
+    document.addEventListener('pointerout', (ev) => {
+      if (this.pinnedTip) return;
+      if (!ev.relatedTarget?.closest?.('[data-tip]')) this.hideTip();
+    });
+    document.addEventListener('click', (ev) => {
+      if (ev.target.closest('button, [data-a], [data-top]')) return;
+      const el = ev.target.closest('[data-tip]');
+      if (el) {
+        if (this.pinnedTip === el.dataset.tip) this.unpinTip();
+        else this.pinTip(el.dataset.tip, el);
+      } else if (this.pinnedTip) this.unpinTip();
+    });
     this.$board.addEventListener('click', (ev) => {
       const el = ev.target.closest('[data-k]');
       if (!el || !this.boardReq) return;
@@ -165,7 +195,8 @@ export class UI {
         return;
       }
       if (ev.key === 'Escape') {
-        if (this.boardReq?.cancel) this.resolveBoard(null);
+        if (this.pinnedTip) this.unpinTip();
+        else if (this.boardReq?.cancel) this.resolveBoard(null);
         else if (this.modal?.cancel) this.resolveModal(null);
         else if (this.dialog) { this.dialog = null; this.render(); }
         else if (this.drawer) { this.drawer = null; this.render(); }
@@ -262,6 +293,8 @@ export class UI {
   render() {
     const g = this.game;
     if (!g || !g.board) { this.renderModal(); return; }
+    this.tips = new Map();
+    this.syncHighlights();
     this.renderStatus();
     this.renderBoard();
     this.renderPrompt();
@@ -270,6 +303,95 @@ export class UI {
     this.renderHand();
     this.renderDrawer();
     this.renderModal();
+    this.refreshTip();
+  }
+
+  // ---------------------------------------------------------------- roll highlights
+  // A roll's report gets `changes` when it resolves; that starts the highlight clock.
+  syncHighlights() {
+    const rep = this.game.report;
+    const key = rep && rep.changes ? rep : null;
+    if (key === this.hlReport) return;
+    this.hlReport = key;
+    this.hlStart = performance.now();
+    this.hlMap = new Map();
+    if (!key) return;
+    for (const c of key.changes) this.hlMap.set(c.key, c);
+    for (const f of key.fired || []) {
+      this.hlMap.set(`face:${f.die}:${f.face}`, { key: '', badge: '!' });
+      this.hlMap.set(`die:${f.die}`, { key: '', badge: '!' });
+    }
+  }
+
+  // Pulses every element the latest roll changed or fired, with a +n badge. Runs after the hand renders.
+  applyHighlights() {
+    const el = performance.now() - this.hlStart;
+    if (!this.hlMap.size || el > HL_MS) return;
+    const hd = `${-Math.round(el)}ms`;
+    for (const node of document.querySelectorAll('[data-hl]')) {
+      const hit = node.dataset.hl.split(' ').map((k) => this.hlMap.get(k)).find(Boolean);
+      if (!hit) continue;
+      node.classList.add('hl');
+      node.style.setProperty('--hd', hd);
+      if (node.querySelector(':scope > .delta')) continue;
+      const b = document.createElement('i');
+      let text = hit.badge ?? (hit.key.startsWith('card:') ? 'New' : `${hit.delta > 0 ? '+' : ''}${hit.delta}`);
+      if (hit.key === 'vp') text += ' VP';
+      b.className = `delta${hit.badge ? ' bang' : ''}`;
+      b.textContent = text;
+      b.style.setProperty('--hd', hd);
+      node.appendChild(b);
+    }
+  }
+
+  // ---------------------------------------------------------------- detail cards (hover, or click to keep open)
+  // Registers a detail card for an element; returns the attribute that opens it.
+  tipAttr(key, info) {
+    this.tips.set(key, info);
+    return `data-tip="${esc(key)}"`;
+  }
+
+  openTip(key, el) {
+    this.tipKey = key;
+    this.$tip.hidden = false;
+    this.fillTip(key, el);
+  }
+
+  fillTip(key, el) {
+    const info = this.tips.get(key);
+    if (!info || !el) { this.hideTip(); return; }
+    const pinned = this.pinnedTip === key;
+    this.$tip.classList.toggle('pinned', pinned);
+    this.$tip.innerHTML = `<div class="tip-kind">${esc(info.kind)}</div><div class="tip-title">${esc(info.title)}</div>
+      ${info.desc ? `<p>${esc(info.desc)}</p>` : ''}
+      ${info.now ? `<div class="tip-now">${esc(info.now)}</div>` : ''}
+      ${info.lines && info.lines.length ? `<ul>${info.lines.map((l) => `<li>${esc(l)}</li>`).join('')}</ul>` : ''}
+      <div class="tip-hint">${pinned ? 'Click again to close' : 'Click to keep this open'}</div>`;
+    const r = el.getBoundingClientRect();
+    const w = this.$tip.offsetWidth;
+    const h = this.$tip.offsetHeight;
+    let top = r.top - h - 10;
+    if (top < 8) top = r.bottom + 10;
+    top = Math.max(8, Math.min(top, innerHeight - h - 8));
+    const left = Math.max(8, Math.min(r.left + r.width / 2 - w / 2, innerWidth - w - 8));
+    this.$tip.style.left = `${left}px`;
+    this.$tip.style.top = `${top}px`;
+  }
+
+  hideTip() {
+    this.tipKey = null;
+    this.$tip.hidden = true;
+  }
+
+  pinTip(key, el) { this.pinnedTip = key; this.openTip(key, el); }
+  unpinTip() { this.pinnedTip = null; this.hideTip(); }
+
+  // Keeps an open detail card in step with re-renders, or closes it when its element is gone.
+  refreshTip() {
+    if (!this.tipKey) return;
+    const el = document.querySelector(`[data-tip="${CSS.escape(this.tipKey)}"]`);
+    if (!el || !this.tips.has(this.tipKey)) { this.pinnedTip = null; this.hideTip(); return; }
+    this.fillTip(this.tipKey, el);
   }
 
   // ---------------------------------------------------------------- status bar
@@ -290,16 +412,50 @@ export class UI {
       const ok = assign != null;
       const parts = due.map((p, i) => {
         const t = p.type || (ok ? assign[i] : null);
-        return `<span class="tpart ${ok ? 'ok' : ''}" title="${p.type ? 'Must be ' + p.type : 'Any resource type (each part a different one)'}">${t ? resDot(t) : ''}<b>${p.amount}</b>${p.type ? ' ' + p.type : ''}</span>`;
+        const base = g.tribute[i] ? g.tribute[i].amount : p.amount;
+        const why = [`${base} base`];
+        if (i === 0 && g.oldBootExtra) why.push(`+${g.oldBootExtra} The Old Boot (dead rolls)`);
+        if (p.amount < base + (i === 0 ? g.oldBootExtra : 0)) why.push(`−${base + (i === 0 ? g.oldBootExtra : 0) - p.amount} reductions`);
+        const tip = `${p.type ? 'Must be ' + p.type : 'Any resource type (each part a different one)'} · ${why.join(' ')}`;
+        return `<span class="tpart ${ok ? 'ok' : ''}" title="${esc(tip)}">${t ? resDot(t) : ''}<b>${p.amount}</b>${p.type ? ' ' + p.type : ''}</span>`;
       }).join('<span class="muted">+</span>');
       const state = g.phase === 'setup' ? '' : ok ? '<span class="pay-state ok">✓ payable</span>' : '<span class="pay-state no">✗ not yet</span>';
       out.push(`<span class="tribute" title="Pay this at the end of the round. Each part needs a different resource type."><span class="small muted">Tribute</span>${parts}${state}</span>`);
     }
-    out.push(`<span class="stat" title="Settlements ${vp.settlements} · Cities ${vp.cities} · VP cards ${vp.vpCards} · Longest road ${vp.road} (length ${vp.longestRoad}) · Army ${vp.army} (${g.knights} knights)">Score <b>${vp.total}</b> VP</span>`);
+    const fx = this.effects();
+    if (fx.length) out.push(`<span class="fx">${fx.map(([t, cls, tip, key]) => `<span class="fx-chip ${cls}" ${this.tipAttr(`fx:${t}`, { kind: 'Active this round', title: t, desc: tip })} data-hl="${key || ''}">${t}</span>`).join('')}</span>`);
+    out.push(`<span class="stat" data-hl="vp" title="Settlements ${vp.settlements} · Cities ${vp.cities} · VP cards ${vp.vpCards} · Longest road ${vp.road} (length ${vp.longestRoad}) · Army ${vp.army} (${g.knights} knights)">Score <b>${vp.total}</b> VP</span>`);
     out.push(`<span class="stat">Survived <b>${g.roundsSurvived}</b></span>`);
     const boss = g.phase === 'shop' && g.blind === 2 ? BOSS_BY_ID[g.nextBossId] : g.boss;
     out.push(`<span class="boss-chip ${g.blind === 2 && g.phase !== 'shop' ? 'active' : ''}" title="${esc(boss.desc)}">${g.blind === 2 && g.phase !== 'shop' ? 'Boss active' : 'Boss'}: ${boss.name}</span>`);
     this.$status.innerHTML = out.join('');
+  }
+
+  // Active round effects: [label, 'bad' | 'good' | '', tooltip]
+  effects() {
+    const g = this.game;
+    if (g.phase !== 'turn' && g.phase !== 'tribute') return [];
+    const fx = [];
+    if (g.oldBootExtra) fx.push([`Old Boot +${g.oldBootExtra}`, 'bad', 'The Old Boot: every roll that produces nothing for you adds 1 to the tribute.', 'oldBoot']);
+    if (g.bossIs('barbarians')) fx.push([`Fleet ${g.fleet}/3`, 'bad', 'Barbarian Fleet: each 7 or double advances it; at 3 a random building is hit. Knights push it back.', 'fleet']);
+    if (g.chain > 0) fx.push([`Echo chain ${g.chain}`, 'good', `Echo: each double gives a free roll of that die. The chain breaks the game at ${ECHO_BREAK}.`, 'chain']);
+    if (g.bribe) fx.push([`Bribe −${g.bribe}`, 'good', 'Bribe: the tribute is reduced.']);
+    const cities = g.counts().city;
+    if (g.hasGuild('taxCollector') && cities) fx.push([`Tax −${cities}`, 'good', 'Tax Collector: each city reduces the tribute by 1.']);
+    if (g.levyDelay) fx.push(['Levy Delay', 'good', 'This round\'s tribute is pushed to the next round at +50%.']);
+    if (g.monopoly) fx.push([`Monopoly: ${g.monopoly}`, 'good', 'All your production this round becomes this resource.']);
+    if (g.bumper) fx.push(['Bumper ×2', 'good', 'Your next roll produces double.']);
+    if (g.omen != null) fx.push([`Omen ${g.omen}`, 'good', 'If the next roll hits this number, production is tripled.']);
+    if (g.fireSale) fx.push(['Fire Sale 2:1', 'good', 'Bank trades are 2:1 for the rest of the round.']);
+    if (g.phase === 'turn' && g.rollsUsed > 0 && g.roundProduced === 0 && !g.streakGiven) fx.push([`Dry ${g.rollsUsed}/${ROLLS_PER_ROUND}`, '', `Losing streak: no resources from ${g.rollsUsed} roll(s) so far. If all ${ROLLS_PER_ROUND} rolls come up empty, you get a free development card.`]);
+    if (g.brokeGame) fx.push(['Game broken!', 'good', 'Echo chain of 10: this round\'s tribute counts as paid.']);
+    return fx;
+  }
+
+  bossCallout() {
+    const g = this.game;
+    if (g.blind !== 2) return '';
+    return `<div class="callout bad"><b>Boss round: ${g.boss.name}</b><div class="small">${g.boss.desc} This applies for this round only.</div></div>`;
   }
 
   // ---------------------------------------------------------------- board
@@ -400,9 +556,13 @@ export class UI {
       const ups = g.dieUps(i);
       const held = opts.held && opts.held[i];
       const notes = opts.notes ? opts.notes[i] : [];
+      const fi = faces ? faces[i] : (g.lastRoll ? g.lastRoll.faces[i] : 0);
+      const face = d.faces[fi];
+      const shownNum = face.setter ? null : face.value;
+      const diff = values && values[i] !== shownNum;
       return `<div class="die-box">
-        <div class="die-top"><div class="die-big ${held ? 'held' : ''}">${values ? (values[i] || '0') : '·'}</div>
-          <div class="small muted">Die ${i + 1}${held ? '<br>held from last roll' : ''}</div></div>
+        <div class="die-top">${this.cube(i, fi, held, faces != null)}
+          <div class="small muted">Die ${i + 1}${held ? '<br>held from last roll' : ''}${values ? `<div class="die-val ${diff ? 'changed' : ''}" title="${diff ? 'The face was changed by an upgrade' : ''}">${diff ? '= ' : ''}${values[i] || 0}</div>` : ''}</div></div>
         ${this.facesHtml(i, faces ? faces[i] : null)}
         ${ups.length || d.loaded ? this.dieTags(i) : ''}
         ${notes && notes.length ? `<ul class="notes">${notes.map((n) => `<li>${esc(n)}</li>`).join('')}</ul>` : ''}
@@ -410,27 +570,161 @@ export class UI {
     }).join('')}</div>`;
   }
 
+  // A CSS 3D cube showing the die's six real faces, turned to face `fi`. Tumbles after each new roll.
+  cube(i, fi, held, live) {
+    const d = this.game.dice[i];
+    const SIDE = ['front', 'right', 'top', 'bottom', 'left', 'back']; // physical face k → cube side (opposites: 0-5, 1-4, 2-3)
+    const TURN = { front: 'rotateX(0deg) rotateY(0deg)', right: 'rotateY(-90deg)', top: 'rotateX(-90deg)', bottom: 'rotateX(90deg)', left: 'rotateY(90deg)', back: 'rotateY(180deg)' };
+    const PIPS = { 1: [5], 2: [1, 9], 3: [1, 5, 9], 4: [1, 3, 7, 9], 5: [1, 3, 5, 7, 9], 6: [1, 3, 4, 6, 7, 9] };
+    const sides = d.faces.map((f, k) => {
+      const inner = f.setter
+        ? `<span class="lbl">${FACE_LABEL[f.setter]}</span>`
+        : PIPS[f.value].map((c) => `<span class="dpip" style="grid-area:${Math.ceil(c / 3)}/${((c - 1) % 3) + 1}"></span>`).join('');
+      const loaded = d.loaded && d.loaded.face === k;
+      return `<div class="side ${SIDE[k]} ${loaded ? 'loaded' : ''}">${inner}${f.triggers.length ? `<span class="trg">${f.triggers.map((t) => TRIG_LABEL[t]).join('')}</span>` : ''}</div>`;
+    }).join('');
+    const final = TURN[SIDE[fi]];
+    let cls = '';
+    let style = `--final:${final};transform:${final};`;
+    const el = live ? this.rollElapsed() : null;
+    if (el != null && !held) {
+      const r = this.rollSpin[i];
+      cls = 'rolling';
+      style += `--rx0:${r[0]}deg;--ry0:${r[1]}deg;--rz0:${r[2]}deg;animation-delay:${-Math.round(el)}ms;`;
+    }
+    return `<div class="die3d ${held ? 'held' : ''}" ${this.tipAttr(`die:${i}`, this.dieInfo(i))} data-hl="die:${i}"><div class="tilt"><div class="cube ${cls}" style="${style}">${sides}</div></div></div>`;
+  }
+
+  // Milliseconds since the latest roll started, while its animation is still running (else null).
+  rollElapsed() {
+    const g = this.game;
+    if (g.rollSeq !== this.seenSeq) {
+      this.seenSeq = g.rollSeq;
+      this.rollStart = performance.now();
+      const spin = () => [720 + Math.floor(Math.random() * 360), 540 + Math.floor(Math.random() * 360), Math.floor(Math.random() * 180)];
+      this.rollSpin = [spin(), spin()];
+    }
+    const el = performance.now() - (this.rollStart || 0);
+    return g.rollSeq > 0 && el < 900 ? el : null;
+  }
+
+  // Inline style that fades content in once the dice have landed.
+  revealStyle(extra = 0) {
+    const el = this.game.rollSeq === this.seenSeq ? performance.now() - (this.rollStart || 0) : 9999;
+    if (el > 1200) return '';
+    return `style="animation:reveal .3s ease both;animation-delay:${Math.round(800 + extra - el)}ms"`;
+  }
+
   facesHtml(i, shownFace) {
     const d = this.game.dice[i];
-    return `<div class="faces" title="The six faces of die ${i + 1}">${d.faces.map((f, k) => {
+    return `<div class="faces">${d.faces.map((f, k) => {
       const loaded = d.loaded && d.loaded.face === k;
-      const title = `Face ${k + 1}: ${f.setter ? ITEMS[SETTER_ITEM[f.setter]].name : 'shows ' + f.value}${f.triggers.length ? ' · ' + f.triggers.map((t) => ITEMS[t].name).join(', ') : ''}${loaded ? ` · loaded L${d.loaded.level} (${Math.round(LOADING[d.loaded.level - 1][0] * 100)}%)` : ''}`;
-      return `<span class="face ${loaded ? 'loaded' : ''} ${shownFace === k ? 'shown' : ''}" title="${esc(title)}">${f.setter ? FACE_LABEL[f.setter] : f.value}${f.triggers.length ? `<i>${f.triggers.map((t) => TRIG_LABEL[t]).join('')}</i>` : ''}</span>`;
+      return `<span class="face ${loaded ? 'loaded' : ''} ${shownFace === k ? 'shown' : ''}" ${this.tipAttr(`face:${i}:${k}`, this.faceInfo(i, k))} data-hl="face:${i}:${k}">${f.setter ? FACE_LABEL[f.setter] : f.value}${f.triggers.length ? `<i>${this.triggerCounts(f).map(([t, n]) => `${TRIG_LABEL[t]}${n > 1 ? '×' + n : ''}`).join('')}</i>` : ''}</span>`;
     }).join('')}</div>`;
+  }
+
+  // Triggers on a face as [id, count], so stacked copies show as ×2, ×3 …
+  triggerCounts(face) {
+    const counts = {};
+    for (const t of face.triggers) counts[t] = (counts[t] || 0) + 1;
+    return Object.entries(counts);
   }
 
   dieTags(i) {
     const g = this.game;
     const d = g.dice[i];
     const ups = g.dieUps(i);
-    return `<div class="tags">${d.loaded ? `<span class="tag">Loaded L${d.loaded.level}</span>` : ''}${ups.map((u) => `<span class="tag" title="${esc(ITEMS[u].desc)}">${ITEMS[u].name}${d.used[u] ? ' (used)' : ''}${!d.upgrades.includes(u) ? ' (copied)' : ''}</span>`).join('')}</div>`;
+    const lv = d.loaded ? d.loaded.level : 0;
+    const meter = Array.from({ length: 10 }, (_, k) => `<i class="${k < lv ? 'on' : ''}"></i>`).join('');
+    const loaded = d.loaded ? `<span class="tag loaded-tag" ${this.tipAttr(`load:${i}`, this.loadedInfo(i))} data-hl="loaded:${i}">Loaded L${lv}<span class="lvl">${meter}</span></span>` : '';
+    const upTags = ups.map((u) => `<span class="tag" ${this.tipAttr(`up:${i}:${u}`, this.upgradeInfo(i, u))}>${ITEMS[u].name}${d.used[u] ? ' (used)' : ''}${!d.upgrades.includes(u) ? ' (copied)' : ''}</span>`).join('');
+    return `<div class="tags">${loaded}${upTags}</div>`;
+  }
+
+  // ---- detail-card content (what each element says when hovered or clicked)
+  dieInfo(i) {
+    const g = this.game;
+    const d = g.dice[i];
+    const ups = g.dieUps(i);
+    const lines = ups.map((u) => `${ITEMS[u].name}${d.used[u] ? ' · used this round' : ''}${!d.upgrades.includes(u) ? ' · copied from the other die' : ''}`);
+    if (d.loaded) lines.unshift(`Loaded to level ${d.loaded.level} of 10`);
+    return {
+      kind: 'Die',
+      title: `Die ${i + 1}`,
+      desc: 'Each roll shows one face of this die. Its six faces are listed under it, with their labels.',
+      lines: lines.length ? lines : ['No upgrades yet.'],
+    };
+  }
+
+  loadedInfo(i) {
+    const d = this.game.dice[i];
+    const lv = d.loaded.level;
+    const [fav, opp, side] = LOADING[lv - 1];
+    const sum = fav + opp + 4 * side;
+    const pct = (x) => Math.round((x / sum) * 100);
+    return {
+      kind: 'Dice · Loaded',
+      title: `Loaded, level ${lv} of 10`,
+      desc: 'Buy Loaded again to raise the level. The favoured face gets more likely, and its opposite face too.',
+      now: `Favoured face ${pct(fav)}% · opposite ${pct(opp)}% · each other face ${pct(side)}%`,
+      lines: [lv < 10 ? `Next level costs ${LOADING[lv][3]} VP` : 'Maximum level reached'],
+    };
+  }
+
+  upgradeInfo(i, u) {
+    const d = this.game.dice[i];
+    return {
+      kind: 'Dice · upgrade',
+      title: ITEMS[u].name,
+      desc: ITEMS[u].desc,
+      now: d.used[u] ? 'Used this round.' : null,
+      lines: [!d.upgrades.includes(u) ? 'Copied from the other die (Copycat).' : 'Bought for this die.'],
+    };
+  }
+
+  faceInfo(i, k) {
+    const g = this.game;
+    const d = g.dice[i];
+    const f = d.faces[k];
+    const fired = (g.report?.fired || []).some((x) => x.die === i && x.face === k);
+    const lines = this.triggerCounts(f).map(([t, n]) => `${ITEMS[t].name}${n > 1 ? ` ×${n}` : ''}: ${ITEMS[t].desc}`);
+    const loaded = d.loaded && d.loaded.face === k;
+    const nows = [];
+    if (fired) nows.push('Fired on the last roll');
+    if (loaded) nows.push(`Loaded face (level ${d.loaded.level})`);
+    return {
+      kind: `Die ${i + 1} · face ${k + 1}`,
+      title: f.setter ? ITEMS[SETTER_ITEM[f.setter]].name : `Shows ${f.value}`,
+      desc: f.setter ? ITEMS[SETTER_ITEM[f.setter]].desc : (lines.length ? '' : 'A plain face.'),
+      now: nows.length ? nows.join(' · ') : null,
+      lines,
+    };
+  }
+
+  // What a guild is doing right now, for guilds whose effect grows with the run.
+  guildNow(id) {
+    const g = this.game;
+    const vp = g.vpBreakdown();
+    const cities = g.counts().city;
+    const owned = g.ownedPorts();
+    const gen = owned.filter((p) => p.type === 'generic').length;
+    const spec = owned.length - gen;
+    switch (id) {
+      case 'taxCollector': return `Now: −${cities} from every tribute (${cities} ${cities === 1 ? 'city' : 'cities'})`;
+      case 'twinFortune': return `Now: ${g.earned.twinFortune} VP earned from doubles this run`;
+      case 'cartographer': return vp.longestRoad >= 5 ? `Now: +${vp.longestRoad - 5} VP from road segments beyond 5` : 'Now: needs a road of 5 to count';
+      case 'marshal': return g.knights >= 3 ? `Now: +${g.knights - 3} VP from knights beyond 3` : 'Now: needs 3 knights to count';
+      case 'moneylender': return `Now: ${gen} generic port${gen === 1 ? '' : 's'} give each specific port +${gen}`;
+      case 'tradeConsul': return `Now: generic ports need ${spec} less input (${spec} specific port${spec === 1 ? '' : 's'})`;
+      default: return null;
+    }
   }
 
   viewSetup() {
     const g = this.game;
     const n = Object.keys(g.buildings || {}).length;
     const roads = g.roads ? g.roads.size : 0;
-    const what = n > roads ? 'a road next to your new settlement' : `settlement ${n + 1} of 2`;
+    const what = n > roads ? 'a road next to your new settlement' : `settlement ${n + 1} of ${START_SETTLEMENTS}`;
     return {
       body: `<h2>Set up your island</h2>
         <p>Place <b>${what}</b> on one of the white markers.</p>
@@ -438,7 +732,7 @@ export class UI {
           <li>Each corner touches up to three hexes. Every hex pays its resource when its number is rolled.</li>
           <li>More dots under a number = rolled more often. 6 and 8 are best.</li>
           <li>Try to touch different resources: the Boss tribute needs three different types.</li>
-          <li>Both starting settlements give you one card per hex next to them.</li></ul></div>`,
+          <li>Each starting settlement gives you one card per hex next to it.</li><li>Spread out: settlements need two edges of distance between them.</li></ul></div>`,
       foot: '<div class="hint">Click a white marker on the board to place it.</div>',
     };
   }
@@ -450,6 +744,7 @@ export class UI {
       body: `<h2>${BLINDS[g.blind]} round · ante ${g.ante}</h2>
         <p class="lead">You have <b>${ROLLS_PER_ROUND} rolls</b>. Each roll pays every hex with that number to your buildings next to it (settlement 1, city 2). Between rolls you can build and trade. At the end you pay the tribute shown at the top.</p>
         ${this.diceBlock(null, null)}
+        ${this.bossCallout()}
         ${pre.length ? `<div class="callout"><b>Before rolling:</b> you can play ${pre.map((c) => ITEMS[c.id].name).join(', ')} from your hand below.</div>` : ''}`,
       foot: `<button class="primary big" data-a="roll" data-primary ${this.busy ? 'disabled' : ''}>Roll the dice</button>
         <div class="row" style="justify-content:center"><button class="small ghost" data-a="prebuild" ${this.busy ? 'disabled' : ''}>Build or trade first</button>
@@ -480,6 +775,13 @@ export class UI {
     const losses = RES.filter((r) => rep.gains[r] < 0);
     const store = RES.filter((r) => rep.storeGains[r] !== 0);
     const lines = rep.lines.filter((l) => l.cls !== 'roll');
+    // Stacks and resources are shown under "You got"; this strip lists what else grew, fired or appeared.
+    const fired = (rep.fired || []).map((f) => {
+      const face = g.dice[f.die].faces[f.face];
+      const names = face.setter ? [ITEMS[SETTER_ITEM[face.setter]].name] : this.triggerCounts(face).map(([t, n]) => `${ITEMS[t].name}${n > 1 ? ` ×${n}` : ''}`);
+      return { cls: 'good', text: `Die ${f.die + 1} triggered: ${names.join(', ')}` };
+    }).filter((c) => !c.text.endsWith(': '));
+    const changes = [...fired, ...(rep.changes || []).filter((c) => c.delta !== 0 && !/^(hand|store):/.test(c.key))];
     const head = f.zero ? 'Mirror vs Mirror: 0' : f.robberFace ? "Robber's Face: counts as 7" : `${f.values[0]} + ${f.values[1]} = ${f.sum}`;
     const tags = [];
     if (f.isDouble) tags.push('<span class="pill">Double</span>');
@@ -495,11 +797,11 @@ export class UI {
     ].join('');
     const echoNext = g.echoQueue.length > 0;
     return {
-      body: `<div class="sum-line">${head} ${tags.join(' ')}</div>
-        ${this.diceBlock(f.values, g.lastRoll.faces, { notes: rep.dice.map((d) => d.notes) })}
-        <h3>You got</h3>
+      body: `${this.diceBlock(f.values, g.lastRoll.faces, { notes: rep.dice.map((d) => d.notes) })}
+        <div class="sum-line" ${this.revealStyle()}>${head} ${tags.join(' ')}</div>
+        <div ${this.revealStyle(120)}>${changes.length ? `<h3>Changed by this roll</h3><div class="changes">${changes.map((c) => `<span class="chg ${c.cls}">${esc(c.text)}</span>`).join('')}</div>` : ''}<h3>You got</h3>
         ${gainCards ? `<div class="gains">${gainCards}</div>` : `<p class="muted">Nothing this time. ${nothingWhy}</p>`}
-        ${lines.length ? `<h3>What happened</h3><ul class="events">${lines.map((l) => `<li class="${l.cls}">${esc(l.msg)}</li>`).join('')}</ul>` : ''}
+        ${lines.length ? `<h3>What happened</h3><ul class="events">${lines.map((l) => `<li class="${l.cls}">${esc(l.msg)}</li>`).join('')}</ul>` : ''}</div>
         <p class="small muted">Hexes that paid you are outlined on the board.</p>`,
       foot: `<button class="primary big" data-a="seen" data-primary>${echoNext ? 'Continue · free Echo roll waiting' : 'Continue to build & trade'}</button>`,
     };
@@ -550,6 +852,7 @@ export class UI {
     return {
       body: `<h2>Build & trade</h2>
         <p class="lead">${g.rollsUsed === 0 ? 'Before your first roll.' : `After roll ${g.rollsUsed} of ${ROLLS_PER_ROUND}.`} Do as much as you like. Hover an option to see the cards it uses.</p>
+        ${this.bossCallout()}
         <div class="callout ${payable ? 'good' : ''}">${payable ? '✓ You can already pay this round\'s tribute. Anything you build now comes out of the rest.' : '✗ You can\'t pay the tribute yet. Keep the cards it needs, or trade toward them.'}</div>
         <h3>Build</h3>
         <div class="tiles">
@@ -653,7 +956,15 @@ export class UI {
         cards += rcard(r, isNeed ? 'need' : '', `top:${i * 7}px;z-index:${i}`);
       }
       const short = need > n;
-      return `<div class="stack ${short ? 'short' : ''}" title="${n} ${r}${short ? ` · need ${need}` : ''}">
+      const store = g.storehouse[r];
+      const info = {
+        kind: 'Resource',
+        title: cap(r),
+        desc: `Your ${r} cards. Build costs and tribute spend them; hover a build option to see which cards it would use.`,
+        now: `${n} in hand${store ? ` · ${store} stored` : ''}`,
+        lines: short ? [`Missing ${need - n} for the option you are hovering`] : [],
+      };
+      return `<div class="stack ${short ? 'short' : ''}" ${this.tipAttr(`res:${r}`, info)} data-hl="hand:${r} store:${r}">
         <div class="stack-cards">${cards}${n > 0 ? `<span class="count">${n}</span>` : ''}</div>
         <span class="stack-label">${short ? `<b class="bad">need ${need}</b>` : ''}${g.storehouse[r] ? ` <span class="store">+${g.storehouse[r]} stored</span>` : ''}&nbsp;</span></div>`;
     }).join('');
@@ -665,21 +976,37 @@ export class UI {
       const c = g.cards[i];
       if (!c) return '<div class="slot empty">Empty card slot</div>';
       const it = ITEMS[c.id];
-      return `<div class="slot card ${it.rarity}"><span class="s-kind">${it.cat === 'edict' ? 'Edict' : 'Card'} · single use</span><span class="s-name">${it.name}</span><span class="s-desc" title="${esc(it.desc)}">${it.desc}</span>
+      const info = {
+        kind: CAT_LABEL[it.cat] || 'Card',
+        title: it.name,
+        desc: it.desc,
+        now: canPlay ? 'Playable now.' : 'Playable on your turn, when no roll is pending.',
+        lines: [`Rarity: ${it.rarity}`],
+      };
+      return `<div class="slot card ${it.rarity}" ${this.tipAttr(`card:${c.uid}`, info)} data-hl="card:${c.uid}"><span class="s-kind">${it.cat === 'edict' ? 'Edict' : 'Card'} · single use</span><span class="s-name">${it.name}</span><span class="s-desc">${it.desc}</span>
         <button class="small ${canPlay ? 'primary' : ''}" data-a="play" data-uid="${c.uid}" ${canPlay ? '' : 'disabled'} title="${canPlay ? 'Play this card' : 'Cards can be played during your turn, when no roll is pending'}">Play</button></div>`;
     }).join('');
     const guildSlots = Array.from({ length: g.limits.guildSlots }, (_, i) => {
       const gd = g.guilds[i];
       if (!gd) return '<div class="slot empty">Empty guild slot</div>';
       const it = ITEMS[gd.id];
-      return `<div class="slot card ${it.rarity}"><span class="s-kind">Guild · always on</span><span class="s-name">${it.name}${gd.data.terrain ? ` (${gd.data.terrain})` : ''}</span><span class="s-desc" title="${esc(it.desc)}">${it.desc}</span></div>`;
+      const now = this.guildNow(gd.id);
+      const info = {
+        kind: 'Guild · always on',
+        title: `${it.name}${gd.data.terrain ? ` (${gd.data.terrain})` : ''}`,
+        desc: it.desc,
+        now,
+        lines: [`Rarity: ${it.rarity}`],
+      };
+      return `<div class="slot card ${it.rarity}" ${this.tipAttr(`guild:${gd.uid}`, info)}><span class="s-kind">Guild · always on</span><span class="s-name">${it.name}${gd.data.terrain ? ` (${gd.data.terrain})` : ''}</span><span class="s-desc">${it.desc}</span>${now ? `<span class="s-now">${now}</span>` : ''}</div>`;
     }).join('');
     const dice = [0, 1].map((i) => `<div class="mini-die"><span class="small muted">Die ${i + 1}</span>${this.facesHtml(i, null)}${this.dieTags(i)}</div>`).join('');
     this.$hand.innerHTML = `
       <section class="zone"><div class="zone-h">Resources <b>${total} card${total === 1 ? '' : 's'}${countable > 7 ? ' · <span class="bad">over 7: a 7 makes you discard</span>' : ''}</b></div><div class="res-row">${stacks}</div></section>
       <section class="zone"><div class="zone-h">Cards in hand <b>${g.cards.length}/${g.limits.handSlots}</b></div><div class="slots" style="--n:${g.limits.handSlots}">${cardSlots}</div></section>
       <section class="zone"><div class="zone-h">Guilds <b>${g.guilds.length}/${g.limits.guildSlots}</b></div><div class="slots" style="--n:${g.limits.guildSlots}">${guildSlots}</div></section>
-      <section class="zone"><div class="zone-h">Dice <b>hover faces for details</b></div><div class="mini-dice">${dice}</div></section>`;
+      <section class="zone"><div class="zone-h">Dice <b>hover or click for details</b></div><div class="mini-dice">${dice}</div></section>`;
+    this.applyHighlights();
   }
 
   // ---------------------------------------------------------------- drawer (log / dev tools)
@@ -750,6 +1077,7 @@ export class UI {
       <li><b>Result</b> shows what the dice did and what you got. On a 7 the robber strikes: discard half if you hold more than 7 cards, and one of your hexes gets blocked.</li>
       <li><b>Build & trade</b> between rolls: build, trade with the bank (cheaper with ports), ship to the Storehouse, play cards. You get 4 rolls per round.</li>
       <li><b>Tribute</b>: pay what the top bar shows, or the run ends. Each part needs a different resource type. Leftover cards stay in your hand.</li>
+      <li><b>Losing streak:</b> if all 4 rolls of a round give you nothing, you get a free development card.</li>
       <li><b>Shop</b>: your score plus VP earned this round is your budget. Unspent VP is lost.</li></ol>
       <p>Each ante has three rounds: Small, Big and Boss. Bosses add a drawback for one round. Tributes grow every ante.</p>
       <p class="small muted">Keys: Enter or Space = the main button · Esc = cancel or close.</p>
