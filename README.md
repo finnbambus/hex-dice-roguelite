@@ -121,7 +121,8 @@ Where the rulebook was open, the draft picks one reading. Each is a single spot 
 ## Code map (interface)
 
 - `js/ui.js`: rail, stepper, panel, hand, shop, dialogs; implements the engine's `io` (board clicks, choices).
-- `js/board-view.js`: the island (tiles, pieces, tokens, sea canvas, camera, targets). Draws only; no rules.
+- `js/board-view.js`: the island (tiles, pieces, ports, tokens, sea canvas, camera, targets). Draws only; no rules.
+- `js/ports-atlas.js` + `assets/ports.webp`: the port pieces (generated): six 3D-modelled ports (brick, lumber, wool, grain, ore, generic), each rendered for the six coast directions with the same camera as the tiles and printed in the same two-tone halftone.
 - `js/figures.js`: the 43 upgrade figures, exported as `figure(id, scale)` (HTML).
 - `css/fonts.css`, `css/style.css`: fonts (self-hosted in `assets/fonts`) and the theme.
 - `assets/`: `terrain.webp` (6 single-ink terrains), `pieces.webp` (settlement, city, robber, roads), `art.webp` (halftone card art), `hexprint.webp` (cardboard hex print).

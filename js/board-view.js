@@ -2,6 +2,7 @@
 // a halftone sea that is the only animated part, and a pannable camera.
 // It only draws. All game rules stay in game.js; the UI passes in what to highlight.
 import { TERRAIN_RES, pips } from './board.js';
+import { PORT_ATLAS, PORT_SCALE, PORT_SHEET } from './ports-atlas.js?v=7';
 
 const SQ3 = Math.sqrt(3);
 const U = 96; // hex radius in world pixels
@@ -39,30 +40,6 @@ const TOKEN_FX = {
 const cellPos = (i) => `${((i % 4) * 100) / 3}% ${(Math.floor(i / 4) * 100) / 3}%`;
 const hexPoints = (k) => [0, 1, 2, 3, 4, 5].map((i) => { const a = (Math.PI / 180) * (60 * i - 30); return `${f1(k * U * Math.cos(a))},${f1(k * U * K * Math.sin(a))}`; }).join(' ');
 
-// ---- half-hex port pieces
-const HEXV = [0, 1, 2, 3, 4, 5].map((i) => { const a = (Math.PI / 180) * (60 * i - 30); return [Math.cos(a), Math.sin(a)]; });
-const PORT_TERR = { brick: 'hills', lumber: 'forest', wool: 'pasture', grain: 'fields', ore: 'mountains', generic: 'desert' };
-const PORT_WALL = { forest: '#294c2f', pasture: '#42591f', fields: '#75520e', hills: '#6f2c1a', mountains: '#3a4456', desert: '#694f2a' };
-const PIECE_T = 20; // thickness of a printed tile, in world px
-function hull(pts) {
-  const P = pts.map((q) => [q[0], q[1]]).sort((a, b) => a[0] - b[0] || a[1] - b[1]);
-  const cr = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
-  const lo = [], up = [];
-  for (const q of P) { while (lo.length >= 2 && cr(lo[lo.length - 2], lo[lo.length - 1], q) <= 0) lo.pop(); lo.push(q); }
-  for (const q of P.slice().reverse()) { while (up.length >= 2 && cr(up[up.length - 2], up[up.length - 1], q) <= 0) up.pop(); up.push(q); }
-  return lo.slice(0, -1).concat(up.slice(0, -1));
-}
-// keep the part of a convex polygon where sg * side(q) >= 0
-function clipPlane(poly, side, sg) {
-  const out = [];
-  for (let i = 0; i < poly.length; i++) {
-    const a = poly[i], b = poly[(i + 1) % poly.length];
-    const sa = sg * side(a), sb = sg * side(b);
-    if (sa >= 0) out.push(a);
-    if ((sa >= 0) !== (sb >= 0)) { const t = sa / (sa - sb); out.push([a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]); }
-  }
-  return out;
-}
 
 export class BoardView {
   constructor(el) {
@@ -316,7 +293,8 @@ export class BoardView {
     return `${h.terrain}${res ? ' → ' + res : ''}`;
   }
 
-  // A port is a half hex of printed terrain sitting on the sea against its coast edge, with a ratio token on it.
+  // A port is a printed piece: the hex edge it sits on becomes an organic shore with the port's scene on it.
+  // The pieces are 3D renders turned into the same halftone print as the tiles (one sprite per type and coast direction).
   port(out, B, p, target) {
     const [va, vb] = p.vertices.map((v) => B.vertices[v]);
     const mx = (va.x + vb.x) / 2, my = (va.y + vb.y) / 2;
@@ -324,42 +302,22 @@ export class BoardView {
     let nx = mx - (owner ? owner.x : 0), ny = my - (owner ? owner.y : 0);
     const nl = Math.hypot(nx, ny) || 1;
     nx /= nl; ny /= nl;
-    const ap = SQ3 / 2;
-    const cxw = mx + nx * ap, cyw = my + ny * ap; // centre of the hex this piece is half of
-    const Cx = CX + U * cxw, Cy = CY + U * K * cyw;
-    const half = [], cut = [];
-    HEXV.forEach(([hx, hy]) => {
-      const d = hx * nx + hy * ny;
-      if (d > 0.01) return;
-      const q = [S / 2 + U * hx, S / 2 - 1 + U * K * hy];
-      half.push(q);
-      if (d > -0.01) cut.push(q);
-    });
-    const down = (pts, dy) => pts.map(([x, y]) => [x, y + dy]);
-    const terr = PORT_TERR[p.type] || 'desert';
-    const lift = nl && ny > 0.01 ? (terr === 'forest' ? 26 : terr === 'mountains' ? 14 : 0) : 0;
-    let sil = hull([...half, ...down(half, PIECE_T), ...down(half, -lift)]);
-    let wall = '';
-    if (ny > 0.01 && cut.length === 2) {
-      const [c1, c2] = cut;
-      const keep = half.find((q) => Math.abs(q[0] - c1[0]) + Math.abs(q[1] - c1[1]) > 1 && Math.abs(q[0] - c2[0]) + Math.abs(q[1] - c2[1]) > 1);
-      const side = (q) => (c2[0] - c1[0]) * (q[1] - c1[1]) - (c2[1] - c1[1]) * (q[0] - c1[0]);
-      const sg = Math.sign(side(keep));
-      sil = clipPlane(sil, side, sg);
-      wall = `<i class="pp-wall" style="background-color:${PORT_WALL[terr]};clip-path:polygon(${[c1, c2, ...down([c2, c1], PIECE_T)].map(([x, y]) => `${f1(x)}px ${f1(y)}px`).join(',')})"></i>`;
-    }
-    const poly = sil.map(([x, y]) => `${f1(x)}px ${f1(y)}px`).join(',');
-    const gx = half.reduce((t, q) => t + q[0], 0) / half.length, gy = half.reduce((t, q) => t + q[1], 0) / half.length;
-    const tx = Cx - S / 2 + gx, ty = Cy - S / 2 + gy; // token centre in world px
-    const z = this.zAt(Cy + (ny > 0 ? 0 : 20));
+    const k = (((Math.round((Math.atan2(ny, nx) * 180) / Math.PI / 60) % 6) + 6) % 6);
+    const at = PORT_ATLAS[`${p.type}:${k}`];
+    const Mx = CX + U * mx, My = CY + U * K * my;
+    const z = this.zAt(My) - 6;
     const generic = p.type === 'generic';
     const num = (t) => `<u class="pc${t.length >= 3 ? ' l3' : ''}">${t}</u>`;
     const up = [p.up.overflow ? 'overflow' : '', p.up.bigger ? num(`+${p.up.bigger}`) : '', p.up.smaller ? num(`−${p.up.smaller}`) : '', p.up.free ? 'free' : ''].filter(Boolean).join('');
     const title = generic ? 'Generic port: trade 3:1' : `${p.type} port: trade 2:1`;
-    out.push(`<div class="pport${target ? ' target' : ''}" style="left:${f1(Cx - S / 2)}px;top:${f1(Cy - S / 2)}px;z-index:${z}"><i class="pp-top" style="background-position:${cellPos(TERR[terr])};clip-path:polygon(${poly})"></i>${wall}</div>`);
+    const tx = Mx + nx * 0.34 * U, ty = My + ny * 0.34 * U * K;
+    const c = PORT_SCALE;
+    const [sx, sy, w, h] = at.s;
+    const left = Mx + at.o[0] * c, top = My + at.o[1] * c;
+    out.push(`<div class="pport${target ? ' target' : ''}" style="left:${f1(left)}px;top:${f1(top)}px;width:${f1(w * c)}px;height:${f1(h * c)}px;background-size:${f1(PORT_SHEET[0] * c)}px ${f1(PORT_SHEET[1] * c)}px;background-position:${f1(-sx * c)}px ${f1(-sy * c)}px;z-index:${z}"></div>`);
     out.push(`<div class="tok ptok ${generic ? 'any' : p.type}" style="left:${f1(tx - 24)}px;top:${f1(ty - 20 * K)}px;height:${f1(40 * K)}px;z-index:${z + 4}"><div class="in" style="transform:scaleY(${K})"><span class="n">${generic ? '3:1' : '2:1'}</span><small>${generic ? 'any' : p.type}</small></div></div>`);
     if (up) out.push(`<em class="pup" style="left:${f1(tx)}px;top:${f1(ty - 40)}px;z-index:${z + 6}">${up}</em>`);
-    const svgPts = sil.map(([x, y]) => `${f1(x)},${f1(y)}`).join(' ');
-    out.push(`<svg class="phit${target ? ' target' : ''}" ${target ? `data-k="port" data-id="${p.id}"` : ''} style="left:${f1(Cx - S / 2)}px;top:${f1(Cy - S / 2)}px;z-index:${z + 8}" width="${S}" height="${S}" viewBox="0 0 ${S} ${S}"><polygon points="${svgPts}"><title>${esc(title)}</title></polygon></svg>`);
+    const pts = at.p.map(([x, y]) => `${f1(x * c)},${f1(y * c)}`).join(' ');
+    out.push(`<svg class="phit${target ? ' target' : ''}" ${target ? `data-k="port" data-id="${p.id}"` : ''} style="left:${f1(left)}px;top:${f1(top)}px;z-index:${z + 8}" width="${f1(w * c)}" height="${f1(h * c)}" viewBox="0 0 ${f1(w * c)} ${f1(h * c)}"><polygon points="${pts}"><title>${esc(title)}</title></polygon></svg>`);
   }
 }

@@ -195,9 +195,9 @@ select, input { font: inherit; color: var(--ink); background: var(--inset); bord
 .pop { position: absolute; transform: translateX(-50%); display: flex; align-items: center; gap: 7px; height: 32px; padding: 0 14px 0 10px; border-radius: 16px; background: var(--ink); color: #0c0d0f; font: 700 13px/1 var(--sans); white-space: nowrap; pointer-events: none; box-shadow: 0 10px 20px rgba(0, 0, 0, .6); animation: rise .5s ease-out both; }
 .pop i { width: 12px; height: 12px; border-radius: 50%; }
 @keyframes rise { from { opacity: 0; margin-top: 10px; } to { opacity: 1; margin-top: 0; } }
-.pport, .phit { position: absolute; width: 250px; height: 250px; pointer-events: none; }
-.pp-top, .pp-wall { position: absolute; inset: 0; }
-.pp-top { background: url(../assets/terrain.webp) no-repeat; background-size: 400% 400%; }
+.pport, .phit { position: absolute; pointer-events: none; }
+.pport { background-image: url(../assets/ports.webp); background-repeat: no-repeat; transition: filter .2s; }
+.pport.target { filter: drop-shadow(0 0 1px var(--accent)) drop-shadow(0 0 2px var(--accent)) drop-shadow(0 0 6px rgba(255, 74, 28, .8)); }
 .phit polygon { fill: transparent; stroke: none; }
 .phit.target { pointer-events: auto; cursor: pointer; }
 .phit.target polygon { fill: rgba(255, 74, 28, .22); stroke: var(--accent); stroke-width: 3; stroke-linejoin: round; pointer-events: all; }
