@@ -48,7 +48,7 @@ export class BoardView {
     this.tilesEl = el.querySelector('.tiles');
     this.layer = el.querySelector('.layer');
     this.pan = { x: 0, y: 0 };
-    this.insets = { top: 64, right: 16, bottom: 190, left: 16 };
+    this.insets = { top: 108, right: 16, bottom: 190, left: 16 };
     this.tileKey = '';
     this.moved = false;
     this.bindPan();

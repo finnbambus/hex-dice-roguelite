@@ -8,8 +8,8 @@
   <meta name="theme-color" content="#0c0d0f">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><polygon points='50,5 90,27 90,73 50,95 10,73 10,27' fill='%23ff4a1c'/></svg>">
   <link rel="preload" href="assets/fonts/grenze-gotisch-latin-600-normal.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="css/fonts.css?v=11">
-  <link rel="stylesheet" href="css/style.css?v=11">
+  <link rel="stylesheet" href="css/fonts.css?v=12">
+  <link rel="stylesheet" href="css/style.css?v=12">
 </head>
 <body>
   <div class="app">
@@ -20,6 +20,7 @@
       </div>
       <div id="status" class="rail-body"></div>
       <nav class="rail-foot">
+        <label class="switch" title="Shake the table on big hits"><input id="opt-shake" type="checkbox" checked><span>Screen shake on big hits</span></label>
         <button data-top="log" title="Show the game log">Log</button>
         <button data-top="help" title="How to play">Help</button>
         <button data-top="dev" title="Testing tools">Dev</button>
@@ -31,11 +32,17 @@
         <div id="board" class="board" role="img" aria-label="Game board"></div>
         <div class="lamp" aria-hidden="true"></div>
         <div class="stage-top">
-          <nav id="stepper" class="stepper" aria-label="Round steps"></nav>
+          <div class="top-l">
+            <nav id="stepper" class="stepper" aria-label="Round steps"></nav>
+            <section id="tribute" class="tribute" aria-label="Tribute"></section>
+          </div>
           <div id="guilds" class="guilds"></div>
         </div>
         <div id="prompt" class="board-prompt" hidden></div>
-        <aside id="tray" class="tray" aria-label="Your dice"></aside>
+        <aside id="score" class="score" aria-label="Rolls and score"></aside>
+        <div class="corner">
+          <aside id="tray" class="tray" aria-label="Your dice"></aside>
+        </div>
         <footer id="hand" class="hand"></footer>
         <div id="overlay" class="stage-overlay" hidden></div>
       </section>
@@ -45,6 +52,6 @@
   <div id="drawer"></div>
   <div id="modal-root"></div>
   <noscript>This game needs JavaScript.</noscript>
-  <script type="module" src="js/main.js?v=11"></script>
+  <script type="module" src="js/main.js?v=12"></script>
 </body>
 </html>

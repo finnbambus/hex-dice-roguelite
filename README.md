@@ -22,10 +22,11 @@ No build step, no dependencies. It's plain HTML, CSS and JavaScript.
 
 The interface is dark and modern: greys, one vermilion accent for things you can press, medieval display type for titles and numbers.
 
-- **Left rail:** ante and round, the tribute due (with progress bars per resource and a "Ready to pay" state), rolls left, score, running round effects, the Storehouse, the boss and your dice. Hover the boss, effects or a die for details. Log, Help, Dev and New run are at the bottom.
-- **Island** (centre): isometric halftone tiles with 3D-rendered pieces, number tokens in perspective, lying flat like printed paper on a very quiet black-and-white halftone tabletop (faint wood fibres) (nothing on the board animates). Drag to pan. Field upgrades show as a finish and rim on the hex and a ring on the token (hover for the upgrade's figure). The **stepper** on top shows where you are in the round: **Roll → Result → Build & trade → Tribute → Shop**.
+- **Left rail:** ante and round, where the run stands (Small / Big / Boss), running round effects, the Storehouse and the boss. Log, Help, Dev, New run and the screen-shake switch are at the bottom.
+- **Stations around the board:** the **tribute** hangs over the top of the island (progress bar per resource, "Ready to pay", and a PAID stamp once settled); **score and rolls left** sit in the bottom-right corner; the **dice tray** sits bottom-left. Hover any of them for details.
+- **Island** (centre): isometric halftone tiles with 3D-rendered pieces, number tokens in perspective, lying flat like printed paper on a very quiet black-and-white halftone tabletop (faint wood fibres) (the paper itself never moves, except when the table is hit). Drag to pan. Field upgrades show as a finish and rim on the hex and a ring on the token (hover for the upgrade's figure). The **stepper** on top shows where you are in the round: **Roll → Result → Build & trade → Tribute → Shop**.
 - **Hand** (bottom of the island): resources as card stacks, your single-use cards (with Play buttons), and your Guild slots top right. Cards carry rarity in their border: grey, silver-blue, or holo for legendary.
-- **Step panel** (right): what you can do right now, with one main button. Hovering a build option highlights the cards it would use. After a roll, what it changed or triggered pulses on screen and is listed under "Changed by this roll".
+- **Step panel** (right): what you can do right now, with one main button. How-to text sits in a fold-away "how it works" hint (the choice is remembered). Hovering a build option highlights the cards it would use. After a roll, what it changed or triggered pulses on screen and is listed under "Changed by this roll".
 - **Shop:** upgrades are shown as objects with the same figure they get in play (a face, die, token, hex or port modification); cards are shown as cards.
 
 | Key | Action |
@@ -113,14 +114,15 @@ Where the rulebook was open, the draft picks one reading. Each is a single spot 
 ## Known gaps
 
 - No save and resume (a refresh starts a new run with the same seed).
-- No animations or sound; placeholder graphics only.
+- No sound yet (`Feel.sound()` in `js/feel.js` is the hook for a later synthesised pass); placeholder graphics only.
 - Characters (planned in the rulebook) are not in.
 - **Balance is untested.** The naive bot rarely clears ante 1: with only two starting settlements, a Small tribute of 3 cards of one type after 4 rolls is a real hurdle. The rulebook already flags the first-ante simulation as the next open question, and the bot runs give a starting point for it.
 
 
 ## Code map (interface)
 
-- `js/ui.js`: rail, stepper, panel, hand, shop, dialogs; implements the engine's `io` (board clicks, choices).
+- `js/ui.js`: rail, stations, stepper, panel, hand, shop, dialogs; implements the engine's `io` (board clicks, choices).
+- `js/feel.js`: game feel only, no rules: table shake and lamp flare on big hits (shake has a switch in the rail; reduced-motion turns shake, flare and counting off) and numbers that count up. The UI starts them when a roll lands (cards drop onto their stacks, score counts up), when a boss or the robber hits, and when a tribute is paid.
 - `js/board-view.js`: the island (tiles, pieces, ports, tokens, tabletop, camera, targets). Draws only; no rules.
 - `js/ports-atlas.js` + `assets/ports.webp`: the port pieces (generated): six 3D-modelled ports (brick, lumber, wool, grain, ore, generic), each rendered for the six coast directions with the same camera as the tiles and printed in the same two-tone halftone.
 - `js/figures.js`: the 43 upgrade figures, exported as `figure(id, scale)` (HTML).

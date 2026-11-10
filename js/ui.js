@@ -6,8 +6,9 @@
 import { Game, COSTS, BLINDS } from './game.js';
 import { RES, TERRAIN_RES, pips } from './board.js';
 import { ITEMS, ITEM_LIST, BOSS_BY_ID, ROLLS_PER_ROUND, LOADING, START_SETTLEMENTS, ECHO_BREAK } from './content.js';
-import { BoardView } from './board-view.js?v=11';
-import { figure } from './figures.js?v=11';
+import { BoardView } from './board-view.js?v=12';
+import { figure } from './figures.js?v=12';
+import { Feel } from './feel.js?v=12';
 
 const TERRAIN_COLOR = { hills: '#c8734a', forest: '#3f7d4a', pasture: '#9ccf6a', fields: '#e8c547', mountains: '#8e939c', desert: '#e3d3a4' };
 const RES_ICON = { brick: 'B', lumber: 'L', wool: 'W', grain: 'G', ore: 'O' };
@@ -88,6 +89,16 @@ export class UI {
     this.$hand = document.getElementById('hand');
     this.$stage = document.getElementById('stage');
     this.$tray = document.getElementById('tray');
+    this.$tribute = document.getElementById('tribute');
+    this.$score = document.getElementById('score');
+    this.feel = new Feel({ board: this.$board, lamp: this.$stage.querySelector('.lamp') });
+    this.shown = null; // what the last render showed, so changes can count up and drop in
+    this.logSeen = 0;
+    this.prevPhase = null;
+    this.payout = null; // the roll payout whose drop-in animation is running
+    this.stamp = null; // a "tribute paid" moment
+    this.hintOpen = true;
+    try { this.hintOpen = localStorage.getItem('hd-hint') !== 'closed'; } catch { /* storage can be blocked */ }
     this.$drawer = document.getElementById('drawer');
     this.$modal = document.getElementById('modal-root');
     this.bindEvents();
@@ -95,7 +106,8 @@ export class UI {
 
   // ---------------------------------------------------------------- lifecycle
   newGame(seed) {
-    Object.assign(this, { boardReq: null, modal: null, dialog: null, busy: false, tributeTypes: null, tradeGive: null, preBuild: false });
+    Object.assign(this, { boardReq: null, modal: null, dialog: null, busy: false, tributeTypes: null, tradeGive: null, preBuild: false, shown: null, logSeen: 0, prevPhase: null, payout: null, stamp: null });
+    this.feel.tw.clear();
     const g = new Game({ seed, io: this });
     this.game = g;
     g.onChange = () => this.render();
@@ -204,6 +216,19 @@ export class UI {
       const id = Number(el.dataset.id);
       if (el.dataset.k === this.boardReq.kind && this.boardReq.ids.has(id)) this.resolveBoard(id);
     });
+    // The how-to hint remembers whether you folded it away (toggle does not bubble, so listen while capturing).
+    this.$panel.addEventListener('toggle', (ev) => {
+      if (!ev.target.matches?.('details.howto')) return;
+      this.hintOpen = ev.target.open;
+      try { localStorage.setItem('hd-hint', this.hintOpen ? 'open' : 'closed'); } catch { /* ignore */ }
+    }, true);
+    const sw = document.getElementById('opt-shake');
+    if (sw) {
+      sw.checked = this.feel.shakeOn;
+      sw.disabled = this.feel.reduced;
+      if (this.feel.reduced) sw.parentElement.title = 'Off: your system asks for reduced motion';
+      sw.addEventListener('change', () => this.feel.setShake(sw.checked));
+    }
     // Hovering a build option highlights the cards it would use in the hand.
     this.$panel.addEventListener('mouseover', (ev) => {
       const el = ev.target.closest('[data-cost]');
@@ -317,7 +342,10 @@ export class UI {
     if (!g || !g.board) { this.renderModal(); return; }
     this.tips = new Map();
     this.syncHighlights();
+    this.detectMoments();
     this.renderStatus();
+    this.renderTribute();
+    this.renderScore();
     this.renderStepper();
     this.renderBoard();
     this.renderPrompt();
@@ -331,6 +359,67 @@ export class UI {
     this.refreshTip();
   }
 
+  // ---------------------------------------------------------------- moments (drops, counting, shake)
+  later(fn, ms) { setTimeout(fn, Math.max(0, ms)); }
+
+  // Milliseconds until the dice of the current roll have landed (0 when none is tumbling).
+  landIn() {
+    const g = this.game;
+    if (!(g.rollSeq > 0)) return 0;
+    if (g.rollSeq !== this.seenSeq) return 880;
+    return Math.max(0, 880 - (performance.now() - (this.rollStart || 0)));
+  }
+
+  // Runs once per render, before anything is drawn: spots what just happened and starts the matching effects.
+  detectMoments() {
+    const g = this.game;
+    const now = performance.now();
+    const land = this.landIn();
+
+    // heavy hits from the log: the boss, the robber, a building lost
+    const lines = g.logLines || [];
+    if (this.logSeen > lines.length) this.logSeen = lines.length;
+    let hit = 0;
+    for (const l of lines.slice(this.logSeen)) {
+      const bad = /\bbad\b/.test(l.cls || '');
+      if (/burn|raze|sack|destroyed by lava/i.test(l.msg) || /^Tribute failed/.test(l.msg)) hit = 3;
+      else if (bad && (g.blind === 2 || /robber|Discarded|Barbarian|ERUPTION/i.test(l.msg))) hit = Math.max(hit, 2);
+      else if (bad) hit = Math.max(hit, 1);
+    }
+    this.logSeen = lines.length;
+    if (hit) this.later(() => this.feel.hit(hit, 'bad'), land + 200);
+
+    // the tribute is paid, or a boss round begins
+    if (this.prevPhase === 'tribute' && g.phase === 'shop') {
+      const boss = g.blind === 2;
+      this.stamp = { start: now + 120, hold: now + (boss ? 2000 : 1400), boss }; // the shop opens after the stamp has landed
+      this.later(() => this.feel.hit(boss ? 3 : 2, 'good'), 280);
+      this.later(() => this.render(), (boss ? 2000 : 1400) + 30);
+    } else if (this.prevPhase === 'shop' && g.phase === 'turn' && g.blind === 2) {
+      this.later(() => this.feel.hit(2, 'bad'), 200);
+    }
+    this.prevPhase = g.phase;
+
+    // numbers that change count up (cards in hand, score); a roll's payout waits for the dice to land
+    const cur = { vp: g.vpBreakdown().total };
+    for (const r of RES) cur[`hand-${r}`] = g.hand[r];
+    const fresh = this.payout?.fresh;
+    if (this.payout) this.payout.fresh = false;
+    if (this.shown) {
+      for (const [k, v] of Object.entries(cur)) {
+        const old = this.shown[k];
+        if (v > old) {
+          const from = this.feel.value(k, old);
+          if (fresh) {
+            const gain = v - old;
+            this.feel.count(k, from, v, k === 'vp' ? land + 560 : land + 330, k === 'vp' ? 360 + 110 * gain : 220 + 80 * gain);
+          } else this.feel.count(k, from, v, 0, 380);
+        } else if (v < old) this.feel.tw.delete(k);
+      }
+    }
+    this.shown = cur;
+  }
+
   // ---------------------------------------------------------------- roll highlights
   // A roll's report gets `changes` when it resolves; that starts the highlight clock.
   syncHighlights() {
@@ -338,10 +427,18 @@ export class UI {
     const key = rep && rep.changes ? rep : null;
     if (key === this.hlReport) return;
     this.hlReport = key;
-    this.hlStart = performance.now();
+    const land = key ? this.landIn() : 0;
+    this.hlStart = performance.now() + land; // pulses and +n badges wait for the dice to land
     this.hlMap = new Map();
+    this.payout = null;
     if (!key) return;
     for (const c of key.changes) this.hlMap.set(c.key, c);
+    // The payout lands when the dice do: cards drop in, VP counts up, and a big one shakes the table.
+    this.payout = { start: this.hlStart, until: this.hlStart + 1800, land, fresh: true };
+    const cards = RES.reduce((n, r) => n + Math.max(0, this.hlMap.get(`hand:${r}`)?.delta || 0), 0);
+    const vpGain = Math.max(0, this.hlMap.get('vp')?.delta || 0);
+    const level = cards >= 10 || vpGain >= 4 ? 2 : cards >= 6 || vpGain >= 2 ? 1 : 0;
+    if (level) this.later(() => this.feel.hit(level, 'good'), land + 360);
     for (const f of key.fired || []) {
       this.hlMap.set(`face:${f.die}:${f.face}`, { key: '', badge: '!' });
       this.hlMap.set(`die:${f.die}`, { key: '', badge: '!' });
@@ -422,42 +519,15 @@ export class UI {
   // ---------------------------------------------------------------- left rail (run state)
   renderStatus() {
     const g = this.game;
-    const vp = g.vpBreakdown();
     const bossNow = g.blind === 2 && g.phase !== 'shop';
     const boss = g.phase === 'shop' && g.blind === 2 ? BOSS_BY_ID[g.nextBossId] : g.boss;
     this.$eyebrow.textContent = `Ante ${g.ante} · Round ${g.blind + 1} of 3`;
     this.$title.textContent = `${BLINDS[g.blind]} Tribute`;
     const out = [];
 
-    // the tribute due at the end of the round
-    if (g.phase === 'shop') {
-      out.push(`<div class="rcard-box"><div class="eyebrow">Tribute <b class="ok">Paid</b></div><div class="note" style="margin:0">Spend your VP in the shop, then start the next round.</div></div>`);
-    } else if (g.tribute) {
-      const due = g.tributeDue();
-      const assign = g.autoAssign();
-      const ok = assign != null;
-      const lines = [];
-      const parts = due.map((p, i) => {
-        const t = p.type || (ok ? assign[i] : null);
-        const base = g.tribute[i] ? g.tribute[i].amount : p.amount;
-        const why = [`${base} base`];
-        if (i === 0 && g.oldBootExtra) why.push(`+${g.oldBootExtra} The Old Boot (dead rolls)`);
-        if (p.amount < base + (i === 0 ? g.oldBootExtra : 0)) why.push(`−${base + (i === 0 ? g.oldBootExtra : 0) - p.amount} reductions`);
-        lines.push(`${p.type ? cap(p.type) : 'Any type'}: ${p.amount} (${why.join(' ')})`);
-        const have = t ? g.available(t) : Math.max(...RES.map((r) => g.available(r)));
-        const pct = Math.min(100, Math.round((Math.min(have, p.amount) / p.amount) * 100));
-        return `<div class="tpart"><div class="t-row">${t ? resDot(t) : '<span class="res-dot" style="background:var(--dim)"></span>'}<span>${t ? cap(t) : 'Any type'}</span><span class="have">${Math.min(have, p.amount)}<span> / ${p.amount}</span></span></div><div class="bar"><i style="width:${pct}%;--c:${t ? `var(--${t})` : 'var(--muted)'}"></i></div></div>`;
-      }).join('');
-      const state = g.phase === 'setup' ? '' : ok ? '<b class="ok">Ready to pay</b>' : '<b class="no">Not yet</b>';
-      out.push(`<div class="rcard-box" ${this.tipAttr('tribute', { kind: 'Tribute', title: 'Due at round end', desc: 'Each part needs a different resource type. Storehouse cards count first, then your hand.', lines })}><div class="eyebrow">Due at round end ${state}</div>${parts}<div class="note">Each part is a different type. Shipped cards count too.</div></div>`);
-    }
-
-    // rolls and score
-    const left = ROLLS_PER_ROUND - g.rollsUsed;
-    const rollsBox = g.phase === 'turn'
-      ? `<div class="rcard-box"><div class="eyebrow">Rolls left</div><div class="rolls" title="Rolls left this round">${Array.from({ length: ROLLS_PER_ROUND }, (_, i) => `<span class="dot ${i < left ? 'left' : ''}"></span>`).join('')}<b>${left}</b></div></div>`
-      : `<div class="rcard-box"><div class="eyebrow">Survived</div><div class="big-num">${g.roundsSurvived}<small>${g.roundsSurvived === 1 ? 'round' : 'rounds'}</small></div></div>`;
-    out.push(`<div class="pair">${rollsBox}<div class="rcard-box" data-hl="vp" title="Settlements ${vp.settlements} · Cities ${vp.cities} · VP cards ${vp.vpCards} · Longest road ${vp.road} (length ${vp.longestRoad}) · Army ${vp.army} (${g.knights} knights)"><div class="eyebrow">Score</div><div class="big-num">${vp.total}<small>VP</small></div></div></div>`);
+    // where the run stands: the three rounds of this ante
+    const segs = BLINDS.map((b, i) => `<span class="${i < g.blind || (g.phase === 'shop' && i === g.blind) ? 'done' : i === g.blind ? 'on' : ''}">${b}</span>`).join('');
+    out.push(`<div class="rcard-box"><div class="eyebrow">Run <b>Ante ${g.ante}</b></div><div class="segs">${segs}</div><div class="note">Survived ${g.roundsSurvived} ${g.roundsSurvived === 1 ? 'round' : 'rounds'} so far.</div></div>`);
 
     // effects that are running this round
     const fx = this.effects();
@@ -471,6 +541,52 @@ export class UI {
     out.push(`<div class="rcard-box" ${this.tipAttr('boss', { kind: bossNow ? 'Boss · active' : 'Boss', title: boss.name, desc: boss.desc })}><div class="eyebrow">${bossNow ? 'Boss this round' : g.phase === 'shop' && g.blind === 2 ? 'Next boss' : 'Boss of this ante'}</div><div class="name">${boss.name}</div><p>${boss.desc}</p></div>`);
 
     this.$status.innerHTML = out.join('');
+  }
+
+  // The tribute hangs over the board: what is due at the end of this round, and how close the hand is.
+  renderTribute() {
+    const g = this.game;
+    const el = this.$tribute;
+    if (g.phase === 'gameover' || !g.tribute) { el.hidden = true; return; }
+    el.hidden = false;
+    const boss = g.blind === 2 && g.phase !== 'shop';
+    el.classList.toggle('boss', boss);
+    if (g.phase === 'shop') {
+      const st = this.stamp && performance.now() - this.stamp.start < 2600 ? this.stamp : null;
+      const bossDown = g.blind === 2;
+      el.innerHTML = `<div class="trib-head"><span class="eyebrow">${BLINDS[g.blind]} tribute</span></div>
+        <div class="paid ${bossDown ? 'boss' : ''} ${st ? 'slam' : ''}" ${st ? `style="animation-delay:${-Math.round(performance.now() - st.start)}ms"` : ''}><b>Paid</b><span>${bossDown ? 'The boss is beaten.' : 'Spend your VP in the shop.'}</span></div>`;
+      return;
+    }
+    const due = g.tributeDue();
+    const assign = g.autoAssign();
+    const ok = assign != null;
+    const lines = [];
+    const parts = due.map((p, i) => {
+      const t = p.type || (ok ? assign[i] : null);
+      const base = g.tribute[i] ? g.tribute[i].amount : p.amount;
+      const why = [`${base} base`];
+      if (i === 0 && g.oldBootExtra) why.push(`+${g.oldBootExtra} The Old Boot (dead rolls)`);
+      if (p.amount < base + (i === 0 ? g.oldBootExtra : 0)) why.push(`−${base + (i === 0 ? g.oldBootExtra : 0) - p.amount} reductions`);
+      lines.push(`${p.type ? cap(p.type) : 'Any type'}: ${p.amount} (${why.join(' ')})`);
+      const have = t ? g.available(t) : Math.max(...RES.map((r) => g.available(r)));
+      const pct = Math.min(100, Math.round((Math.min(have, p.amount) / p.amount) * 100));
+      return `<div class="tpart"><div class="t-row">${t ? resDot(t) : '<span class="res-dot" style="background:var(--dim)"></span>'}<span>${t ? cap(t) : 'Any type'}</span><span class="have">${Math.min(have, p.amount)}<span> / ${p.amount}</span></span></div><div class="bar ${pct >= 100 ? 'full' : ''}"><i style="width:${pct}%;--c:${t ? `var(--${t})` : 'var(--muted)'}"></i></div></div>`;
+    }).join('');
+    const state = g.phase === 'setup' ? '' : ok ? '<b class="ok">Ready to pay</b>' : '<b class="no">Not yet</b>';
+    el.innerHTML = `<div class="trib-head" ${this.tipAttr('tribute', { kind: 'Tribute', title: 'Due at round end', desc: 'Each part needs a different resource type. Storehouse cards count first, then your hand.', lines })}><span class="eyebrow">Tribute · due at round end</span>${state}</div><div class="trib-parts">${parts}</div>`;
+  }
+
+  // Rolls left and score, in a corner of the table.
+  renderScore() {
+    const g = this.game;
+    const vp = g.vpBreakdown();
+    const left = ROLLS_PER_ROUND - g.rollsUsed;
+    const rolls = g.phase === 'turn'
+      ? `<div class="sc-cell"><div class="eyebrow">Rolls left</div><div class="rolls" title="Rolls left this round">${Array.from({ length: ROLLS_PER_ROUND }, (_, i) => `<span class="dot ${i < left ? 'left' : ''}"></span>`).join('')}<b>${left}</b></div></div>`
+      : `<div class="sc-cell"><div class="eyebrow">Survived</div><div class="big-num">${g.roundsSurvived}<small>${g.roundsSurvived === 1 ? 'round' : 'rounds'}</small></div></div>`;
+    const info = { kind: 'Score', title: `${vp.total} VP`, desc: 'Your score this round. Whatever you hold when the tribute is paid becomes your shop budget.', lines: [`Settlements ${vp.settlements} · Cities ${vp.cities}`, `VP cards ${vp.vpCards}`, `Longest road ${vp.road} (length ${vp.longestRoad})`, `Army ${vp.army} (${g.knights} knights)`] };
+    this.$score.innerHTML = `<div class="sc-cell vp" data-hl="vp" ${this.tipAttr('score', info)}><div class="eyebrow">Score</div><div class="big-num"><span data-ck="vp">${this.feel.value('vp', vp.total)}</span><small>VP</small></div></div>${rolls}`;
   }
 
   renderStepper() {
@@ -606,12 +722,13 @@ export class UI {
     let cls = '';
     let style = `--final:${final};transform:${final};`;
     const el = live ? this.rollElapsed() : null;
+    const toss = el != null && !held ? ` toss" style="--td:${-Math.round(el)}ms` : '';
     if (el != null && !held) {
       const r = this.rollSpin[i];
       cls = 'rolling';
       style += `--rx0:${r[0]}deg;--ry0:${r[1]}deg;--rz0:${r[2]}deg;animation-delay:${-Math.round(el)}ms;`;
     }
-    return `<div class="die3d ${held ? 'held' : ''}" ${this.tipAttr(`die:${i}`, this.dieInfo(i))} data-hl="die:${i}"><div class="tilt"><div class="cube ${cls}" style="${style}">${sides}</div></div></div>`;
+    return `<div class="die3d ${held ? 'held' : ''}${toss}" ${this.tipAttr(`die:${i}`, this.dieInfo(i))} data-hl="die:${i}"><div class="tilt"><div class="cube ${cls}" style="${style}">${sides}</div></div></div>`;
   }
 
   // Milliseconds since the latest roll started, while its animation is still running (else null).
@@ -740,6 +857,11 @@ export class UI {
     }
   }
 
+  // The how-to text, folded away once you know it. The choice is remembered.
+  hint(title, html) {
+    return `<details class="howto" ${this.hintOpen ? 'open' : ''}><summary>${title}</summary><div>${html}</div></details>`;
+  }
+
   viewSetup() {
     const g = this.game;
     const n = Object.keys(g.buildings || {}).length;
@@ -748,11 +870,11 @@ export class UI {
     return {
       body: `<h2>Set up your island</h2>
         <p>Place <b>${what}</b> on one of the white markers.</p>
-        <div class="callout"><b>Picking a good spot</b><ul class="small" style="margin:6px 0 0;padding-left:18px">
+        ${this.hint('Picking a good spot', `<ul class="small" style="margin:6px 0 0;padding-left:18px">
           <li>Each corner touches up to three hexes. Every hex pays its resource when its number is rolled.</li>
           <li>More dots under a number = rolled more often. 6 and 8 are best.</li>
           <li>Try to touch different resources: the Boss tribute needs three different types.</li>
-          <li>Each starting settlement gives you one card per hex next to it.</li><li>Spread out: settlements need two edges of distance between them.</li></ul></div>`,
+          <li>Each starting settlement gives you one card per hex next to it.</li><li>Spread out: settlements need two edges of distance between them.</li></ul>`)}`,
       foot: '<div class="hint">Click a white marker on the board to place it.</div>',
     };
   }
@@ -762,8 +884,8 @@ export class UI {
     const pre = g.cards.filter((c) => PRE_ROLL_CARDS.includes(c.id));
     return {
       body: `<h2>${BLINDS[g.blind]} round · ante ${g.ante}</h2>
-        <p class="lead">You have <b>${ROLLS_PER_ROUND} rolls</b>. Each roll pays every hex with that number to your buildings next to it (settlement 1, city 2). Between rolls you can build and trade. At the end you pay the tribute shown at the top.</p>
         ${this.diceBlock(null, null)}
+        ${this.hint('How a round works', `You have <b>${ROLLS_PER_ROUND} rolls</b>. Each roll pays every hex with that number to your buildings next to it (settlement 1, city 2). Between rolls you can build and trade. At the end you pay the tribute shown at the top of the board.`)}
         ${this.bossCallout()}
         ${pre.length ? `<div class="callout"><b>Before rolling:</b> you can play ${pre.map((c) => ITEMS[c.id].name).join(', ')} from your hand below.</div>` : ''}`,
       foot: `<button class="primary big" data-a="roll" data-primary ${this.busy ? 'disabled' : ''}>Roll the dice</button>
@@ -871,7 +993,8 @@ export class UI {
     const secondary = rollsLeft > 0 || echo ? `<button data-a="end" ${dis ? 'disabled' : ''}>End round now${rollsLeft > 0 ? ` · +${rollsLeft} VP` : ''}</button>` : '';
     return {
       body: `<h2>Build & trade</h2>
-        <p class="lead">${g.rollsUsed === 0 ? 'Before your first roll.' : `After roll ${g.rollsUsed} of ${ROLLS_PER_ROUND}.`} Do as much as you like. Hover an option to see the cards it uses.</p>
+        <p class="lead">${g.rollsUsed === 0 ? 'Before your first roll.' : `After roll ${g.rollsUsed} of ${ROLLS_PER_ROUND}.`}</p>
+        ${this.hint('How building works', 'Do as much as you like between rolls. Hover an option to see the cards it uses.')}
         ${this.bossCallout()}
         <div class="callout ${payable ? 'good' : ''}">${payable ? '✓ You can already pay this round\'s tribute. Anything you build now comes out of the rest.' : '✗ You can\'t pay the tribute yet. Keep the cards it needs, or trade toward them.'}</div>
         <h3>Build</h3>
@@ -899,7 +1022,7 @@ export class UI {
     const canAny = g.autoAssign() != null;
     return {
       body: `<h2>Pay the tribute</h2>
-        <p class="lead">${due.length > 1 ? 'Each part needs a different resource type. ' : ''}Storehouse cards are used first, then your hand. The best choice is pre-selected.</p>
+        ${this.hint('How paying works', `${due.length > 1 ? 'Each part needs a different resource type. ' : ''}Storehouse cards are used first, then your hand. The best choice is pre-selected.`)}
         ${due.map((p, i) => `<div class="tribute-part"><span class="big-n">${p.amount}</span>
           ${p.fixed ? `<span class="row">${resDot(p.type)} <b>${p.type}</b> <span class="small muted">fixed by the boss</span></span>`
             : `<div class="choice-row">${RES.map((r) => `<button class="${types[i] === r ? 'sel' : ''}" data-a="tpick" data-i="${i}" data-r="${r}" ${g.available(r) >= p.amount ? '' : 'disabled'}>${resDot(r)} ${r} <span class="muted">${g.available(r)}</span></button>`).join('')}</div>`}
@@ -919,7 +1042,7 @@ export class UI {
     const next = g.blind === 2 ? `ante ${g.ante + 1}, Small round` : `${BLINDS[g.blind + 1]} round`;
     return {
       body: `<h2>Shop</h2>
-        <p class="lead">Spend your VP on upgrades in the shop on the left. Unspent VP is lost when you leave; buying never lowers your score.</p>
+        ${this.hint('How the shop works', 'Spend your VP on upgrades in the shop on the left. Unspent VP is lost when you leave; buying never lowers your score.')}
         <div class="callout"><div class="row between"><span>Budget</span><b style="font-size:20px">${g.budget} VP</b></div>
           <div class="small muted">Score ${g.vp} + unused rolls ${e.unusedRolls} + Storehouse surplus ${e.storehouse}${e.river ? ` + River ${e.river}` : ''}${e.twinFortune ? ` + Twin Fortune ${e.twinFortune}` : ''}</div></div>
         <div class="callout"><b>${g.blind === 2 ? 'Next boss' : 'Boss of this ante'}: ${nextBoss.name}</b><div class="small muted">${nextBoss.desc}</div>
@@ -930,7 +1053,7 @@ export class UI {
 
   renderOverlay() {
     const g = this.game;
-    const show = g.phase === 'shop' && !this.boardReq;
+    const show = g.phase === 'shop' && !this.boardReq && !(this.stamp && performance.now() < this.stamp.hold);
     this.$overlay.hidden = !show;
     if (!show) return;
     const priceTag = (price) => `<span class="price"><b>${price === Infinity ? '—' : price}</b><i>VP</i></span>`;
@@ -1002,16 +1125,25 @@ export class UI {
     const g = this.game;
     if (!g || !g.board) return;
     const cost = this.hoverCost;
+    const now = performance.now();
     // resources
     const stacks = RES.map((r) => {
       const n = g.hand[r];
       const need = cost ? cost[r] || 0 : 0;
       let cards = '';
+      const pay = this.payout && now < this.payout.until ? this.hlMap.get(`hand:${r}`) : null;
+      const drop = pay && pay.delta > 0 ? Math.min(pay.delta, 4) : 0;
+      const el = this.payout ? now - this.payout.start : 0;
+      const wasEmpty = drop > 0 && pay.delta >= n;
       if (n === 0) cards = `<div class="rcard empty" style="--c:var(--${r})"><i class="dot"></i><span class="nm">No ${r}</span></div>`;
       else {
         const under = Math.min(n - 1, 4);
         for (let k = under; k >= 1; k--) cards += `<div class="rcard under" style="left:${-3 * k}px;top:${-3 * k}px;z-index:${5 - k}"></div>`;
-        cards += rcard(r, need > 0 && n >= need ? 'need' : '', 'z-index:10');
+        cards += rcard(r, need > 0 && n >= need ? 'need' : '', `z-index:10;${wasEmpty ? `animation:cardIn .01s both;animation-delay:${Math.round(330 - el)}ms` : ''}`);
+      }
+      for (let k = 0; k < drop; k++) {
+        const side = k % 2 ? 1 : -1;
+        cards += rcard(r, 'fly', `--fx:${side * (10 + k * 6)}px;--fr:${side * (6 + k * 3)}deg;z-index:${30 + k};animation-delay:${Math.round(k * 120 - el)}ms`);
       }
       const short = need > n;
       const store = g.storehouse[r];
@@ -1023,7 +1155,7 @@ export class UI {
         lines: short ? [`Missing ${need - n} for the option you are hovering`] : [],
       };
       return `<div class="stack ${short ? 'short' : ''}" ${this.tipAttr(`res:${r}`, info)} data-hl="hand:${r} store:${r}">
-        <div class="stack-cards">${cards}${n > 0 ? `<span class="count${n >= 100 ? ' l3' : ''}">${n}</span>` : ''}</div>
+        <div class="stack-cards">${cards}${n > 0 ? `<span class="count${n >= 100 ? ' l3' : ''}" data-ck="hand-${r}">${this.feel.value(`hand-${r}`, n)}</span>` : ''}</div>
         <span class="stack-label">${short ? `<b class="bad">need ${need - n} more</b>` : ''}${g.storehouse[r] ? ` <span class="store">+${g.storehouse[r]} stored</span>` : ''}&nbsp;</span></div>`;
     }).join('');
     const total = RES.reduce((s, r) => s + g.hand[r], 0);
@@ -1059,6 +1191,7 @@ export class UI {
       <section class="zone"><div class="zone-h">Cards <b>${g.cards.length} of ${g.limits.handSlots}</b></div><div class="slots" style="--n:${g.limits.handSlots}">${cardSlots}</div></section>`;
     const lz = this.$hand.firstElementChild;
     this.$stage.style.setProperty('--hand-l', `${lz ? lz.offsetHeight : 160}px`);
+    this.$stage.style.setProperty('--hand-r', `${this.$hand.lastElementChild ? this.$hand.lastElementChild.offsetHeight : 240}px`);
     if (this.view && this.$hand.offsetHeight !== this._handH) { this._handH = this.$hand.offsetHeight; this.view.fit(); }
     this.applyHighlights();
   }
