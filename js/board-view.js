@@ -263,12 +263,12 @@ export class BoardView {
           const x2 = this.hx(o), y2 = this.hy(o), len = Math.hypot(x2 - x, y2 - y), ang = (Math.atan2(y2 - y, x2 - x) * 180) / Math.PI;
           out.push(`<i class="trail" style="left:${f1(x)}px;top:${f1(y)}px;width:${f1(len)}px;transform:rotate(${f1(ang)}deg);z-index:${z + 3}"></i>`);
         }
-        if (fx.chip) out.push(`<div class="fxchip" style="left:${f1(x + 44)}px;top:${f1(y + 8)}px;z-index:${z + 9}">${fx.chip}</div>`);
+        if (fx.chip) out.push(`<div class="fxchip${fx.chip.length >= 3 ? ' l3' : ''}" style="left:${f1(x + 44)}px;top:${f1(y + 8)}px;z-index:${z + 9}">${fx.chip}</div>`);
       }
       if (h.tokenEffect) {
         const te = TOKEN_FX[h.tokenEffect.id];
         const label = h.tokenEffect.id === 'doubleToken' ? `+${h.tokenEffect.number}` : te.chip;
-        out.push(`<div class="tokring ${te.cls}" style="left:${f1(x - 23)}px;top:${f1(y - 23 * K)}px;height:${f1(46 * K)}px;z-index:${z + 6}"></div><div class="fxchip sm" style="left:${f1(x + 14)}px;top:${f1(y - 25)}px;z-index:${z + 10}">${label}</div>`);
+        out.push(`<div class="tokring ${te.cls}" style="left:${f1(x - 23)}px;top:${f1(y - 23 * K)}px;height:${f1(46 * K)}px;z-index:${z + 6}"></div><div class="fxchip sm${label.length >= 3 ? ' l3' : ''}" style="left:${f1(x + 14)}px;top:${f1(y - 25)}px;z-index:${z + 10}">${label}</div>`);
       }
       if (opts.volcano === h.id) out.push(`<div class="fxchip wide" style="left:${f1(x - 30)}px;top:${f1(y + 26)}px;z-index:${z + 10}">Volcano</div>`);
       if (tip || h.hexEffect || h.tokenEffect) out.push(`<div class="hexhit info" ${tip} style="left:${f1(x - 40)}px;top:${f1(y - 30)}px;width:80px;height:60px;clip-path:none;z-index:${z + 11}"></div>`);
@@ -304,7 +304,8 @@ export class BoardView {
       out.push(`<i class="pier" style="left:${f1(px)}px;top:${f1(py)}px;width:${f1(len)}px;transform:rotate(${f1(ang)}deg);z-index:90"></i>`);
     }
     const generic = p.type === 'generic';
-    const up = [p.up.overflow ? 'overflow' : '', p.up.bigger ? `+${p.up.bigger}` : '', p.up.smaller ? `−${p.up.smaller}` : '', p.up.free ? 'free' : ''].filter(Boolean).join(' ');
+    const num = (t) => `<u class="pc${t.length >= 3 ? ' l3' : ''}">${t}</u>`;
+    const up = [p.up.overflow ? 'overflow' : '', p.up.bigger ? num(`+${p.up.bigger}`) : '', p.up.smaller ? num(`−${p.up.smaller}`) : '', p.up.free ? 'free' : ''].filter(Boolean).join('');
     const art = generic ? '' : `<span class="art" style="background-position:${((RES_ART[p.type] % 5) * 100) / 4}% ${(Math.floor(RES_ART[p.type] / 5) * 100) / 3}%"></span>`;
     out.push(`<div class="port ${generic ? 'generic' : p.type}${target ? ' target' : ''}" ${target ? `data-k="port" data-id="${p.id}"` : ''} style="left:${f1(px - 34)}px;top:${f1(py - 22)}px;z-index:95"><b>${generic ? '3:1' : '2:1'}</b>${art}<small>${generic ? 'any' : p.type}</small>${up ? `<em>${up}</em>` : ''}<title>${generic ? 'Generic port: trade 3:1' : `${p.type} port: trade 2:1`}</title></div>`);
   }

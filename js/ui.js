@@ -6,8 +6,8 @@
 import { Game, COSTS, BLINDS } from './game.js';
 import { RES, TERRAIN_RES, pips } from './board.js';
 import { ITEMS, ITEM_LIST, BOSS_BY_ID, ROLLS_PER_ROUND, LOADING, START_SETTLEMENTS, ECHO_BREAK } from './content.js';
-import { BoardView } from './board-view.js?v=3';
-import { figure } from './figures.js?v=3';
+import { BoardView } from './board-view.js?v=4';
+import { figure } from './figures.js?v=4';
 
 const TERRAIN_COLOR = { hills: '#c8734a', forest: '#3f7d4a', pasture: '#9ccf6a', fields: '#e8c547', mountains: '#8e939c', desert: '#e3d3a4' };
 const RES_ICON = { brick: 'B', lumber: 'L', wool: 'W', grain: 'G', ore: 'O' };
@@ -994,7 +994,7 @@ export class UI {
         lines: short ? [`Missing ${need - n} for the option you are hovering`] : [],
       };
       return `<div class="stack ${short ? 'short' : ''}" ${this.tipAttr(`res:${r}`, info)} data-hl="hand:${r} store:${r}">
-        <div class="stack-cards">${cards}${n > 0 ? `<span class="count">${n}</span>` : ''}</div>
+        <div class="stack-cards">${cards}${n > 0 ? `<span class="count${n >= 100 ? ' l3' : ''}">${n}</span>` : ''}</div>
         <span class="stack-label">${short ? `<b class="bad">need ${need - n} more</b>` : ''}${g.storehouse[r] ? ` <span class="store">+${g.storehouse[r]} stored</span>` : ''}&nbsp;</span></div>`;
     }).join('');
     const total = RES.reduce((s, r) => s + g.hand[r], 0);

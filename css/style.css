@@ -178,9 +178,11 @@ select, input { font: inherit; color: var(--ink); background: var(--inset); bord
 .tok.dim { opacity: .4; }
 .rim { position: absolute; overflow: visible; pointer-events: none; }
 .trail { position: absolute; height: 0; border-top: 3px dotted #b384ff; transform-origin: 0 0; pointer-events: none; opacity: .8; }
-.fxchip { position: absolute; min-width: 22px; height: 22px; padding: 0 6px; border-radius: 999px; background: #17181b; color: var(--bone); border: 2px solid var(--bone); font: 800 12px/18px var(--display); text-align: center; pointer-events: none; box-shadow: 0 4px 8px rgba(0, 0, 0, .55); }
-.fxchip.sm { min-width: 18px; height: 18px; font-size: 10.5px; line-height: 14px; padding: 0 4px; }
-.fxchip.wide { font: 600 9px/18px var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+.fxchip { position: absolute; box-sizing: border-box; width: 24px; height: 24px; padding: 0; display: flex; align-items: center; justify-content: center; border-radius: 50%; background: #17181b; color: var(--bone); border: 2px solid var(--bone); font: 800 12px/1 var(--display); text-align: center; pointer-events: none; box-shadow: 0 4px 8px rgba(0, 0, 0, .55); }
+.fxchip.sm { width: 20px; height: 20px; font-size: 10.5px; }
+.fxchip.l3 { font-size: 9px; }
+.fxchip.sm.l3 { font-size: 8px; }
+.fxchip.wide { width: auto; height: 22px; padding: 0 8px; border-radius: 999px; font: 600 9px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; }
 .tokring { position: absolute; width: 46px; border-radius: 50%; pointer-events: none; }
 .tokring.gold { box-shadow: 0 0 0 3px #e2bd62; }
 .tokring.silver { box-shadow: 0 0 0 3px #b9c6d6; }
@@ -197,7 +199,9 @@ select, input { font: inherit; color: var(--ink); background: var(--inset); bord
 .port { position: absolute; width: 68px; height: 44px; border-radius: 10px; background: var(--bone); color: #17181b; display: flex; flex-direction: column; align-items: center; justify-content: center; box-shadow: 0 3px 0 #8f8a7c, 0 8px 12px rgba(0, 0, 0, .55); overflow: hidden; }
 .port b { font: 800 17px/1 var(--display); }
 .port small { font: 600 7.5px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; margin-top: 3px; color: #55544e; }
-.port em { position: absolute; top: 2px; right: 4px; font: 600 7px/1 var(--mono); font-style: normal; color: #a3271a; text-transform: uppercase; }
+.port em { position: absolute; top: 2px; right: 3px; display: flex; gap: 2px; align-items: center; font: 600 7px/1 var(--mono); font-style: normal; color: #a3271a; text-transform: uppercase; }
+.port em u { text-decoration: none; box-sizing: border-box; width: 16px; height: 16px; border-radius: 50%; background: #a3271a; color: #fff; font: 800 9px/1 var(--sans); display: flex; align-items: center; justify-content: center; }
+.port em u.l3 { font-size: 7.5px; }
 .port .art { position: absolute; inset: 0; background: url(../assets/art.webp) no-repeat; background-size: 500% 400%; opacity: .0; }
 .port.brick { box-shadow: inset 0 -5px 0 var(--brick), 0 3px 0 #8f8a7c, 0 8px 12px rgba(0, 0, 0, .55); }
 .port.lumber { box-shadow: inset 0 -5px 0 var(--lumber), 0 3px 0 #8f8a7c, 0 8px 12px rgba(0, 0, 0, .55); }
@@ -353,7 +357,8 @@ select, input { font: inherit; color: var(--ink); background: var(--inset); bord
 .rcard.sm .nm { font-size: 10.5px; bottom: 6px; }
 .rcard.sm .dot { left: 6px; top: 6px; width: 5px; height: 5px; }
 .stack.short .rcard.empty { border-color: rgba(232, 130, 107, .6); }
-.count { position: absolute; bottom: -7px; right: -7px; z-index: 20; min-width: 22px; height: 22px; padding: 0 6px; border-radius: 999px; background: var(--ink); color: #0c0d0f; font: 800 12px/22px var(--sans); text-align: center; box-shadow: 0 0 0 2px #0c0d0f; }
+.count { position: absolute; bottom: -7px; right: -7px; z-index: 20; box-sizing: border-box; width: 22px; height: 22px; padding: 0; border-radius: 50%; background: var(--ink); color: #0c0d0f; font: 800 12px/1 var(--sans); display: flex; align-items: center; justify-content: center; box-shadow: 0 0 0 2px #0c0d0f; }
+.count.l3 { font-size: 9.5px; }
 .stack-label { font-size: 11px; color: var(--muted); white-space: nowrap; min-height: 14px; }
 .stack-label .store { color: var(--good); font-weight: 700; }
 .slots { display: grid; grid-template-columns: repeat(var(--n, 3), minmax(0, 1fr)); gap: 10px; align-items: end; }

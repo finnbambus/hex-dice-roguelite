@@ -12,7 +12,7 @@ function build(id) {
     // svg layer
     const sv = (x, y, w, h, vw, vh, body, extra) => ({ style: abs(x, y, w, h, 'background:' + enc(vw, vh, body) + ' center/100% 100% no-repeat;pointer-events:none;' + (extra || '')), txt: '', kids: [] });
     const txt = (x, y, w, h, t, size, color, extra) => ({ style: abs(x, y, w, h, 'display:flex;align-items:center;justify-content:center;text-align:center;font-family:' + FONT + ';font-weight:800;font-size:' + size + 'px;line-height:1;color:' + color + ';' + (extra || '')), txt: t, kids: [] });
-    const chip = (x, y, w, h, t, size, bg, fg, border, extra) => txt(x, y, w, h, t, size, fg, 'background:' + bg + ';border-radius:' + (w === h ? '50%' : '9px') + ';box-sizing:border-box;border:2px solid ' + (border || BONE) + ';' + (extra || ''));
+    const chip = (x, y, w, h, t, size, bg, fg, border, extra) => txt(x, y, w, h, t, w === h ? size * (String(t).length >= 4 ? 0.62 : String(t).length === 3 ? 0.78 : 1) : size, fg, 'background:' + bg + ';border-radius:' + (w === h ? '50%' : '9px') + ';box-sizing:border-box;border:2px solid ' + (border || BONE) + ';' + (extra || ''));
     const layers = [], dice = [];
     let rarity = 'common';
     const R = (...a) => layers.push(...a);
@@ -318,18 +318,18 @@ function build(id) {
     E.overflow = () => {
       R(...harbour(8, 40));
       R(resCard(RES.ore, 172, 98, 40, 14, 8), resCard(RES.ore, 190, 84, 40, -9, 9));
-      R(chip(176, 36, 52, 38, '+1', 22, INK, CREAM, BONE, 'z-index:10'));
+      R(chip(178, 30, 46, 46, '+1', 22, INK, CREAM, BONE, 'z-index:10'));
     };
     E.bigger = () => {
       rarity = 'rare';
       R(...harbour(8, 76));
       R(resCard(RES.ore, 150, 8, 54, 8, 8, { edge: GOLD }));
-      R(chip(172, 58, 52, 38, '+1', 22, INK, GOLD, GOLD, 'z-index:10'));
+      R(chip(174, 52, 46, 46, '+1', 22, INK, GOLD, GOLD, 'z-index:10'));
     };
     E.smaller = () => {
       rarity = 'rare';
       R(...harbour(8, 40, { n: 2, ratio: '2:1', ghostCard: true }));
-      R(chip(176, 36, 52, 38, '−1', 22, INK, CREAM, BONE, 'z-index:10'));
+      R(chip(178, 30, 46, 46, '−1', 22, INK, CREAM, BONE, 'z-index:10'));
     };
     E.freePort = () => {
       rarity = 'legendary';
