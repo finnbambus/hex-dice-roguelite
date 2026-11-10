@@ -5,30 +5,40 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Hex &amp; Dice Roguelite</title>
   <meta name="description" content="A solo hex-and-dice roguelite: build an island, bend the dice, pay the tribute.">
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><polygon points='50,5 90,27 90,73 50,95 10,73 10,27' fill='%23e8c547' stroke='%23333' stroke-width='6'/></svg>">
+  <meta name="theme-color" content="#0c0d0f">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><polygon points='50,5 90,27 90,73 50,95 10,73 10,27' fill='%23ff4a1c'/></svg>">
+  <link rel="preload" href="assets/fonts/grenze-gotisch-latin-600-normal.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="css/fonts.css">
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
   <div class="app">
-    <header class="topbar">
-      <div class="brand">Hex &amp; Dice <small>draft 0.2</small></div>
-      <div id="status" class="status"></div>
-      <nav class="menu">
+    <aside class="rail">
+      <div class="rail-head">
+        <div id="rail-eyebrow" class="eyebrow">Hex &amp; Dice</div>
+        <h1 id="rail-title">Roguelite</h1>
+      </div>
+      <div id="status" class="rail-body"></div>
+      <nav class="rail-foot">
         <button data-top="log" title="Show the game log">Log</button>
         <button data-top="help" title="How to play">Help</button>
         <button data-top="dev" title="Testing tools">Dev</button>
         <button data-top="new" title="Start a new run">New run</button>
       </nav>
-    </header>
+    </aside>
     <main class="main">
       <section id="stage" class="stage">
-        <svg id="board" viewBox="-5.3 -4.9 10.6 9.8" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Game board"></svg>
+        <div id="board" class="board" role="img" aria-label="Game board"></div>
+        <div class="stage-top">
+          <nav id="stepper" class="stepper" aria-label="Round steps"></nav>
+          <div id="guilds" class="guilds"></div>
+        </div>
         <div id="prompt" class="board-prompt" hidden></div>
+        <footer id="hand" class="hand"></footer>
         <div id="overlay" class="stage-overlay" hidden></div>
       </section>
       <aside id="panel" class="panel"></aside>
     </main>
-    <footer id="hand" class="hand"></footer>
   </div>
   <div id="drawer"></div>
   <div id="modal-root"></div>

@@ -1,16 +1,16 @@
-// Browser UI (draft 0.2).
-// Layout: status bar · board stage + step panel · hand.
+// Browser UI.
+// Layout: left rail (run state) · board stage with the hand on top of it · right panel (the current step).
 // The step panel walks the player through a round: Roll → Result → Build & trade → … → Tribute → Shop.
 // Each step shows only what is possible right now; one main button moves the game forward.
 // The UI also implements the engine's `io` interface (board clicks and choice dialogs).
 import { Game, COSTS, BLINDS } from './game.js';
 import { RES, TERRAIN_RES, pips } from './board.js';
 import { ITEMS, ITEM_LIST, BOSS_BY_ID, ROLLS_PER_ROUND, LOADING, START_SETTLEMENTS, ECHO_BREAK } from './content.js';
+import { BoardView } from './board-view.js';
+import { figure } from './figures.js';
 
 const TERRAIN_COLOR = { hills: '#c8734a', forest: '#3f7d4a', pasture: '#9ccf6a', fields: '#e8c547', mountains: '#8e939c', desert: '#e3d3a4' };
 const RES_ICON = { brick: 'B', lumber: 'L', wool: 'W', grain: 'G', ore: 'O' };
-const HEX_BADGE = { fertile: '+1', palisade: 'PAL', gold: 'GOLD', river: 'RIVER', guildDistrict: 'GUILD', volcanic: 'VOLC', sister: 'SIS', haven: 'HAVEN', capital: 'CAP' };
-const TOKEN_BADGE = { jackpot: 'JACK', twinToken: 'TWIN', sevenToken: '+7', heartland: '±1', evergreen: 'EVER' };
 const FACE_LABEL = { mirror: 'M', robber: 'R7', blank: '?' };
 const SETTER_ITEM = { mirror: 'mirror', robber: 'robberFace', blank: 'blank' };
 const TRIG_LABEL = { lucky: 'L', knightFav: 'kF', knightLucky: 'kL', robberFav: 'rF', robberLucky: 'rL', hidden: 'H' };
@@ -28,15 +28,17 @@ const resDot = (r) => `<span class="res-dot" style="background:var(--${r})"></sp
 const HL_MS = 3600; // how long a roll's highlights (pulses, +1 badges) stay lit
 const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
 
-// Simple white glyphs for the resource cards.
-const ICON = {
-  brick: '<svg viewBox="0 0 24 24" fill="#fff"><rect x="2" y="5" width="9" height="5" rx="1"/><rect x="13" y="5" width="9" height="5" rx="1"/><rect x="6" y="12" width="12" height="5" rx="1"/><rect x="2" y="12" width="2.5" height="5" rx="1"/><rect x="19.5" y="12" width="2.5" height="5" rx="1"/></svg>',
-  lumber: '<svg viewBox="0 0 24 24" fill="#fff"><path d="M12 2 5 12h4l-4 6h14l-4-6h4z"/><rect x="10.5" y="18" width="3" height="4"/></svg>',
-  wool: '<svg viewBox="0 0 24 24" fill="#fff"><circle cx="8" cy="12" r="4.5"/><circle cx="13" cy="9" r="5"/><circle cx="16.5" cy="13.5" r="4.5"/><circle cx="11" cy="15" r="4"/></svg>',
-  grain: '<svg viewBox="0 0 24 24" fill="#fff"><rect x="11.2" y="6" width="1.6" height="16"/><ellipse cx="9" cy="8" rx="2" ry="3.4" transform="rotate(-25 9 8)"/><ellipse cx="15" cy="8" rx="2" ry="3.4" transform="rotate(25 15 8)"/><ellipse cx="9" cy="13" rx="2" ry="3.4" transform="rotate(-25 9 13)"/><ellipse cx="15" cy="13" rx="2" ry="3.4" transform="rotate(25 15 13)"/><ellipse cx="12" cy="4" rx="1.8" ry="3"/></svg>',
-  ore: '<svg viewBox="0 0 24 24" fill="#fff"><path d="M2 20 9 7l4 6 3-4 6 11z"/></svg>',
-};
-const rcard = (r, cls = '', style = '') => `<div class="rcard ${cls}" style="background:var(--${r});${style}">${ICON[r]}<span>${r}</span></div>`;
+// Halftone art is printed straight onto the card stock: one cell of the 5 × 4 art sheet per subject.
+const ART_CELL = { brick: 13, lumber: 14, wool: 15, grain: 16, ore: 17 };
+const artPos = (i) => `${((i % 5) * 100) / 4}% ${(Math.floor(i / 5) * 100) / 3}%`;
+const rcard = (r, cls = '', style = '') => `<div class="rcard ${cls}" style="--c:var(--${r});${style}"><i class="dot"></i><span class="art" style="background-position:${artPos(ART_CELL[r])}"></span><span class="nm">${cap(r)}</span></div>`;
+// Art for the cards you hold, by item (falls back to the category).
+const CARD_ART = { knight: 5, marshal: 5, cartographer: 4, roadBuilding: 4, townCharter: 4, royalCharter: 3, vpCard: 3, forgery: 3, yearOfPlenty: 8, monopoly: 12, granary: 8, mathematicians: 0, twinFortune: 1, longShot: 0, firePriests: 9, squatters: 4, monoculture: 6, deepPockets: 3, guildExpansion: 3, highwayCharter: 4, lostFound: 3, taxCollector: 3, robbersFriend: 5, moneylender: 3, tradeConsul: 3 };
+const CAT_ART = { classic: 5, edict: 11, guild: 3, charter: 3, face: 0, die: 1, token: 0, hex: 7, port: 3 };
+const CAT_DOT = { classic: '#d4a845', edict: '#a8b872', guild: '#8494ad', charter: '#b5593f' };
+const CAT_SHORT = { classic: 'Card', edict: 'Edict', guild: 'Guild', charter: 'Charter' };
+const UPGRADE_CATS = ['face', 'die', 'token', 'hex', 'port'];
+const cardArt = (it) => artPos(CARD_ART[it.id] ?? CAT_ART[it.cat] ?? 3);
 
 export class UI {
   constructor() {
@@ -61,7 +63,12 @@ export class UI {
     this.$tip.hidden = true;
     document.body.appendChild(this.$tip);
     this.$status = document.getElementById('status');
+    this.$eyebrow = document.getElementById('rail-eyebrow');
+    this.$title = document.getElementById('rail-title');
+    this.$stepper = document.getElementById('stepper');
+    this.$guilds = document.getElementById('guilds');
     this.$board = document.getElementById('board');
+    this.view = new BoardView(this.$board);
     this.$prompt = document.getElementById('prompt');
     this.$overlay = document.getElementById('overlay');
     this.$panel = document.getElementById('panel');
@@ -296,6 +303,7 @@ export class UI {
     this.tips = new Map();
     this.syncHighlights();
     this.renderStatus();
+    this.renderStepper();
     this.renderBoard();
     this.renderPrompt();
     this.renderOverlay();
@@ -362,7 +370,7 @@ export class UI {
     if (!info || !el) { this.hideTip(); return; }
     const pinned = this.pinnedTip === key;
     this.$tip.classList.toggle('pinned', pinned);
-    this.$tip.innerHTML = `<div class="tip-kind">${esc(info.kind)}</div><div class="tip-title">${esc(info.title)}</div>
+    this.$tip.innerHTML = `${info.fig ? `<div class="tip-fig">${[].concat(info.fig).map((f) => figure(f, 0.7)).join('')}</div>` : ''}<div class="tip-kind">${esc(info.kind)}</div><div class="tip-title">${esc(info.title)}</div>
       ${info.desc ? `<p>${esc(info.desc)}</p>` : ''}
       ${info.now ? `<div class="tip-now">${esc(info.now)}</div>` : ''}
       ${info.lines && info.lines.length ? `<ul>${info.lines.map((l) => `<li>${esc(l)}</li>`).join('')}</ul>` : ''}
@@ -394,41 +402,70 @@ export class UI {
     this.fillTip(this.tipKey, el);
   }
 
-  // ---------------------------------------------------------------- status bar
+  // ---------------------------------------------------------------- left rail (run state)
   renderStatus() {
     const g = this.game;
     const vp = g.vpBreakdown();
+    const bossNow = g.blind === 2 && g.phase !== 'shop';
+    const boss = g.phase === 'shop' && g.blind === 2 ? BOSS_BY_ID[g.nextBossId] : g.boss;
+    this.$eyebrow.textContent = `Ante ${g.ante} · Round ${g.blind + 1} of 3`;
+    this.$title.textContent = `${BLINDS[g.blind]} Tribute`;
     const out = [];
-    out.push(`<span class="round-chip ${g.blind === 2 ? 'boss' : ''}">Ante ${g.ante} · ${BLINDS[g.blind]}</span>`);
-    if (g.phase === 'turn') {
-      const dots = Array.from({ length: ROLLS_PER_ROUND }, (_, i) => `<span class="dot ${i < g.rollsUsed ? 'used' : ''}"></span>`).join('');
-      out.push(`<span class="stat" title="Rolls this round">Rolls <span class="dots">${dots}</span></span>`);
-    }
+
+    // the tribute due at the end of the round
     if (g.phase === 'shop') {
-      out.push(`<span class="tribute"><span class="pay-state ok">✓ Tribute paid</span></span>`);
+      out.push(`<div class="rcard-box"><div class="eyebrow">Tribute <b class="ok">Paid</b></div><div class="note" style="margin:0">Spend your VP in the shop, then start the next round.</div></div>`);
     } else if (g.tribute) {
       const due = g.tributeDue();
       const assign = g.autoAssign();
       const ok = assign != null;
+      const lines = [];
       const parts = due.map((p, i) => {
         const t = p.type || (ok ? assign[i] : null);
         const base = g.tribute[i] ? g.tribute[i].amount : p.amount;
         const why = [`${base} base`];
         if (i === 0 && g.oldBootExtra) why.push(`+${g.oldBootExtra} The Old Boot (dead rolls)`);
         if (p.amount < base + (i === 0 ? g.oldBootExtra : 0)) why.push(`−${base + (i === 0 ? g.oldBootExtra : 0) - p.amount} reductions`);
-        const tip = `${p.type ? 'Must be ' + p.type : 'Any resource type (each part a different one)'} · ${why.join(' ')}`;
-        return `<span class="tpart ${ok ? 'ok' : ''}" title="${esc(tip)}">${t ? resDot(t) : ''}<b>${p.amount}</b>${p.type ? ' ' + p.type : ''}</span>`;
-      }).join('<span class="muted">+</span>');
-      const state = g.phase === 'setup' ? '' : ok ? '<span class="pay-state ok">✓ payable</span>' : '<span class="pay-state no">✗ not yet</span>';
-      out.push(`<span class="tribute" title="Pay this at the end of the round. Each part needs a different resource type."><span class="small muted">Tribute</span>${parts}${state}</span>`);
+        lines.push(`${p.type ? cap(p.type) : 'Any type'}: ${p.amount} (${why.join(' ')})`);
+        const have = t ? g.available(t) : Math.max(...RES.map((r) => g.available(r)));
+        const pct = Math.min(100, Math.round((Math.min(have, p.amount) / p.amount) * 100));
+        return `<div class="tpart"><div class="t-row">${t ? resDot(t) : '<span class="res-dot" style="background:var(--dim)"></span>'}<span>${t ? cap(t) : 'Any type'}</span><span class="have">${Math.min(have, p.amount)}<span> / ${p.amount}</span></span></div><div class="bar"><i style="width:${pct}%;--c:${t ? `var(--${t})` : 'var(--muted)'}"></i></div></div>`;
+      }).join('');
+      const state = g.phase === 'setup' ? '' : ok ? '<b class="ok">Ready to pay</b>' : '<b class="no">Not yet</b>';
+      out.push(`<div class="rcard-box" ${this.tipAttr('tribute', { kind: 'Tribute', title: 'Due at round end', desc: 'Each part needs a different resource type. Storehouse cards count first, then your hand.', lines })}><div class="eyebrow">Due at round end ${state}</div>${parts}<div class="note">Each part is a different type. Shipped cards count too.</div></div>`);
     }
+
+    // rolls and score
+    const left = ROLLS_PER_ROUND - g.rollsUsed;
+    const rollsBox = g.phase === 'turn'
+      ? `<div class="rcard-box"><div class="eyebrow">Rolls left</div><div class="rolls" title="Rolls left this round">${Array.from({ length: ROLLS_PER_ROUND }, (_, i) => `<span class="dot ${i < left ? 'left' : ''}"></span>`).join('')}<b>${left}</b></div></div>`
+      : `<div class="rcard-box"><div class="eyebrow">Survived</div><div class="big-num">${g.roundsSurvived}<small>${g.roundsSurvived === 1 ? 'round' : 'rounds'}</small></div></div>`;
+    out.push(`<div class="pair">${rollsBox}<div class="rcard-box" data-hl="vp" title="Settlements ${vp.settlements} · Cities ${vp.cities} · VP cards ${vp.vpCards} · Longest road ${vp.road} (length ${vp.longestRoad}) · Army ${vp.army} (${g.knights} knights)"><div class="eyebrow">Score</div><div class="big-num">${vp.total}<small>VP</small></div></div></div>`);
+
+    // effects that are running this round
     const fx = this.effects();
-    if (fx.length) out.push(`<span class="fx">${fx.map(([t, cls, tip, key]) => `<span class="fx-chip ${cls}" ${this.tipAttr(`fx:${t}`, { kind: 'Active this round', title: t, desc: tip })} data-hl="${key || ''}">${t}</span>`).join('')}</span>`);
-    out.push(`<span class="stat" data-hl="vp" title="Settlements ${vp.settlements} · Cities ${vp.cities} · VP cards ${vp.vpCards} · Longest road ${vp.road} (length ${vp.longestRoad}) · Army ${vp.army} (${g.knights} knights)">Score <b>${vp.total}</b> VP</span>`);
-    out.push(`<span class="stat">Survived <b>${g.roundsSurvived}</b></span>`);
-    const boss = g.phase === 'shop' && g.blind === 2 ? BOSS_BY_ID[g.nextBossId] : g.boss;
-    out.push(`<span class="boss-chip ${g.blind === 2 && g.phase !== 'shop' ? 'active' : ''}" title="${esc(boss.desc)}">${g.blind === 2 && g.phase !== 'shop' ? 'Boss active' : 'Boss'}: ${boss.name}</span>`);
+    if (fx.length) out.push(`<div class="fx">${fx.map(([t, cls, tip, key]) => `<span class="fx-chip ${cls}" ${this.tipAttr(`fx:${t}`, { kind: 'Active this round', title: t, desc: tip })} data-hl="${key || ''}">${t}</span>`).join('')}</div>`);
+
+    // storehouse
+    const stored = RES.filter((r) => g.storehouse[r] > 0);
+    if (stored.length) out.push(`<div class="rcard-box"><div class="eyebrow">Storehouse</div><div class="store-row" style="margin-top:0">${stored.map((r) => `<span data-hl="store:${r}">${resDot(r)}${g.storehouse[r]} ${r}</span>`).join('')}</div><div class="note">Shipped cards count toward the tribute.</div></div>`);
+
+    // boss
+    out.push(`<div class="rcard-box" ${this.tipAttr('boss', { kind: bossNow ? 'Boss · active' : 'Boss', title: boss.name, desc: boss.desc })}><div class="eyebrow">${bossNow ? 'Boss this round' : g.phase === 'shop' && g.blind === 2 ? 'Next boss' : 'Boss of this ante'}</div><div class="name">${boss.name}</div><p>${boss.desc}</p></div>`);
+
+    // dice
+    out.push(`<div class="rcard-box"><div class="eyebrow">Your dice <b class="muted" style="font-weight:400">hover for details</b></div><div class="mini-dice">${[0, 1].map((i) => `<div class="mini-die">${this.facesHtml(i, null)}${this.dieTags(i)}</div>`).join('')}</div></div>`);
     this.$status.innerHTML = out.join('');
+  }
+
+  renderStepper() {
+    const g = this.game;
+    const step = this.step();
+    if (step === 'setup' || step === 'gameover') { this.$stepper.hidden = true; return; }
+    this.$stepper.hidden = false;
+    const current = step === 'adjust' ? 'roll' : step;
+    const idx = STEPS.findIndex(([k]) => k === current);
+    this.$stepper.innerHTML = STEPS.map(([k, l], i) => `<span class="${i === idx ? 'on' : i < idx ? 'done' : ''}">${l}</span>`).join('');
   }
 
   // Active round effects: [label, 'bad' | 'good' | '', tooltip]
@@ -468,63 +505,25 @@ export class UI {
 
   renderBoard() {
     const g = this.game;
-    const B = g.board;
-    const req = this.boardReq;
-    const isT = (k, id) => req && req.kind === k && req.ids.has(id);
+    this.$board.classList.toggle('dimmed', g.phase === 'tribute');
     const resultStep = this.step() === 'result';
-    const showPaid = resultStep ? new Set(g.report?.hexes || []) : new Set();
+    const paid = resultStep ? new Set(g.report?.hexes || []) : new Set();
     const rolled = resultStep && g.report?.final && !g.report.final.zero ? g.report.final.sum : null;
-    const parts = [];
-    parts.push(`<polygon points="${[0, 1, 2, 3, 4, 5].map((i) => { const a = (Math.PI / 3) * i; return `${4.75 * Math.cos(a)},${4.75 * Math.sin(a)}`; }).join(' ')}" fill="#0002"/>`);
-    for (const h of B.hexes) {
-      const pts = h.vertices.map((v) => `${B.vertices[v].x},${B.vertices[v].y}`).join(' ');
-      const cls = ['hex', isT('hex', h.id) ? 'target' : '', showPaid.has(h.id) ? 'paid' : '', req && req.kind === 'hex' && !isT('hex', h.id) ? 'dim' : ''].join(' ');
-      parts.push(`<polygon class="${cls}" data-k="hex" data-id="${h.id}" points="${pts}" fill="${TERRAIN_COLOR[h.terrain]}"><title>${h.terrain}${TERRAIN_RES[h.terrain] ? ' → ' + TERRAIN_RES[h.terrain] : ''}${h.hexEffect ? ' · ' + ITEMS[h.hexEffect.id].name : ''}${h.tokenEffect ? ' · ' + ITEMS[h.tokenEffect.id].name : ''}</title></polygon>`);
-      if (h.token) {
-        const hot = h.token === 6 || h.token === 8;
-        const hit = rolled != null && h.token === rolled;
-        parts.push(`<g pointer-events="none"><circle class="token ${hit ? 'hit' : ''}" cx="${h.x}" cy="${h.y}" r=".33"/><text class="token-num ${hot && !h.hidden ? 'hot' : ''}" x="${h.x}" y="${h.y - 0.03}">${h.hidden ? '?' : h.token}</text>`);
-        if (!h.hidden) {
-          const n = pips(h.token);
-          for (let i = 0; i < n; i++) parts.push(`<circle cx="${h.x + (i - (n - 1) / 2) * 0.07}" cy="${h.y + 0.2}" r=".022" fill="${hot ? '#c0392b' : '#333'}"/>`);
-        }
-        parts.push('</g>');
-      }
-      if (h.tokenEffect) {
-        const lbl = h.tokenEffect.id === 'doubleToken' ? `+${h.tokenEffect.number}` : TOKEN_BADGE[h.tokenEffect.id];
-        parts.push(`<text class="badge" x="${h.x}" y="${h.y - 0.48}" pointer-events="none">${lbl}</text>`);
-      }
-      if (h.hexEffect) {
-        let lbl = HEX_BADGE[h.hexEffect.id];
-        if (h.hexEffect.id === 'sister') lbl += `→${B.hexes[h.hexEffect.link].terrain.slice(0, 3)}`;
-        parts.push(`<text class="badge" x="${h.x}" y="${h.y + 0.58}" pointer-events="none">${lbl}</text>`);
-      }
-      if (g.volcanoHex === h.id) parts.push(`<text class="badge" x="${h.x}" y="${h.y + 0.58}" pointer-events="none">VOLCANO</text>`);
-    }
-    for (const p of B.ports) {
-      for (const v of p.vertices) parts.push(`<line x1="${p.x}" y1="${p.y}" x2="${B.vertices[v].x}" y2="${B.vertices[v].y}" stroke="#f7efd9" stroke-width=".03" stroke-dasharray=".06 .05"/>`);
-      const lbl = p.type === 'generic' ? '3:1' : `2:1${RES_ICON[p.type]}`;
-      const up = [p.up.overflow ? 'O' : '', p.up.bigger ? `+${p.up.bigger}` : '', p.up.smaller ? `−${p.up.smaller}` : '', p.up.free ? 'F' : ''].join('');
-      parts.push(`<g class="port ${isT('port', p.id) ? 'target' : ''}" data-k="port" data-id="${p.id}"><circle cx="${p.x}" cy="${p.y}" r=".27" ${p.type !== 'generic' ? `style="fill:var(--${p.type})"` : ''}/><text x="${p.x}" y="${p.y - (up ? 0.05 : 0)}">${lbl}</text>${up ? `<text x="${p.x}" y="${p.y + 0.13}" style="font-size:.12px">${up}</text>` : ''}<title>${p.type === 'generic' ? 'Generic port: trade 3:1' : p.type + ' port: trade 2:1'}</title></g>`);
-    }
-    for (const e of B.edges) {
-      const [a, b] = e.v.map((v) => B.vertices[v]);
-      if (g.roads.has(e.id)) parts.push(`<line class="road" x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}"/>`);
-      else if (isT('edge', e.id)) {
-        const sx = a.x + (b.x - a.x) * 0.18, sy = a.y + (b.y - a.y) * 0.18, ex = a.x + (b.x - a.x) * 0.82, ey = a.y + (b.y - a.y) * 0.82;
-        parts.push(`<line class="edge target" data-k="edge" data-id="${e.id}" x1="${sx}" y1="${sy}" x2="${ex}" y2="${ey}"/>`);
-      }
-    }
-    const rh = B.hexes[g.robber];
-    parts.push(`<g pointer-events="none"><circle class="robber" cx="${rh.x + 0.42}" cy="${rh.y - 0.1}" r=".17"/><text x="${rh.x + 0.42}" y="${rh.y - 0.1}" class="token-num" style="fill:#fff;font-size:.18px">R</text></g>`);
-    for (const v of B.vertices) {
-      const b = g.buildings[v.id];
-      const t = isT('vertex', v.id);
-      if (b === 'settlement') parts.push(`<polygon class="bld ${t ? 'vtx target' : ''}" data-k="vertex" data-id="${v.id}" points="${v.x - 0.13},${v.y + 0.11} ${v.x + 0.13},${v.y + 0.11} ${v.x + 0.13},${v.y - 0.04} ${v.x},${v.y - 0.16} ${v.x - 0.13},${v.y - 0.04}"/>`);
-      else if (b === 'city') parts.push(`<polygon class="bld ${t ? 'vtx target' : ''}" data-k="vertex" data-id="${v.id}" points="${v.x - 0.2},${v.y + 0.14} ${v.x + 0.2},${v.y + 0.14} ${v.x + 0.2},${v.y - 0.06} ${v.x + 0.05},${v.y - 0.06} ${v.x + 0.05},${v.y - 0.16} ${v.x - 0.07},${v.y - 0.24} ${v.x - 0.2},${v.y - 0.16}"/>`);
-      else if (t) parts.push(`<circle class="vtx target" data-k="vertex" data-id="${v.id}" cx="${v.x}" cy="${v.y}" r=".13" fill="#fff"/>`);
-    }
-    this.$board.innerHTML = parts.join('');
+    const B = g.board;
+    this.view.render(g, {
+      req: this.boardReq,
+      paid,
+      rolled,
+      volcano: g.volcanoHex,
+      tip: (h) => {
+        const parts = [];
+        if (h.hexEffect) parts.push(ITEMS[h.hexEffect.id]);
+        if (h.tokenEffect) parts.push(ITEMS[h.tokenEffect.id]);
+        if (!parts.length) return '';
+        const it = parts[0];
+        return this.tipAttr(`hx:${h.id}`, { kind: `${cap(h.terrain)} · ${parts.map((p) => CAT_LABEL[p.cat]).join(' + ')}`, title: parts.map((p) => p.name).join(' + '), desc: parts.map((p) => p.desc).join(' '), fig: parts.map((p) => p.id) });
+      },
+    });
   }
 
   // ---------------------------------------------------------------- step panel
@@ -540,12 +539,10 @@ export class UI {
       shop: () => this.viewShop(),
       gameover: () => this.viewGameOver(),
     }[step]();
-    const current = step === 'adjust' ? 'roll' : step;
-    const idx = STEPS.findIndex(([k]) => k === current);
-    const stepper = step === 'setup' || step === 'gameover' ? '' : `<ol class="stepper">${STEPS.map(([k, l], i) => `<li class="${i === idx ? 'on' : i < idx ? 'done' : ''}">${l}</li>`).join('')}</ol>`;
     const scroll = this.$panel.querySelector('.panel-body')?.scrollTop || 0;
-    this.$panel.innerHTML = `${stepper}<div class="panel-body">${view.body}</div>${view.foot ? `<div class="panel-foot">${view.foot}</div>` : ''}`;
+    this.$panel.innerHTML = `<div class="panel-body">${view.body}</div>${view.foot ? `<div class="panel-foot">${view.foot}</div>` : ''}`;
     if (this.lastStep === step) this.$panel.querySelector('.panel-body').scrollTop = scroll;
+    for (const b of this.$panel.querySelectorAll('.panel-foot button.primary[data-primary]')) b.insertAdjacentHTML('beforeend', '<kbd>Space</kbd>');
     this.lastStep = step;
   }
 
@@ -576,12 +573,19 @@ export class UI {
     const SIDE = ['front', 'right', 'top', 'bottom', 'left', 'back']; // physical face k → cube side (opposites: 0-5, 1-4, 2-3)
     const TURN = { front: 'rotateX(0deg) rotateY(0deg)', right: 'rotateY(-90deg)', top: 'rotateX(-90deg)', bottom: 'rotateX(90deg)', left: 'rotateY(90deg)', back: 'rotateY(180deg)' };
     const PIPS = { 1: [5], 2: [1, 9], 3: [1, 5, 9], 4: [1, 3, 7, 9], 5: [1, 3, 5, 7, 9], 6: [1, 3, 4, 6, 7, 9] };
+    const TONE = { front: '#e4dfd0', right: '#d6d0c0', top: '#efeadc', bottom: '#bdb7a7', left: '#d6d0c0', back: '#e4dfd0' };
+    const PP = { 1: [[50, 50]], 2: [[28, 28], [72, 72]], 3: [[28, 28], [50, 50], [72, 72]], 4: [[28, 28], [72, 28], [28, 72], [72, 72]], 5: [[28, 28], [72, 28], [50, 50], [28, 72], [72, 72]], 6: [[28, 26], [72, 26], [28, 50], [72, 50], [28, 74], [72, 74]] };
+    const pr = 4.6;
+    const pipBg = (v, ink) => PP[v].map((q) => `radial-gradient(circle at ${q[0]}% ${q[1]}%, ${ink} 0 ${pr}px, transparent ${pr + 0.8}px)`).join(', ');
     const sides = d.faces.map((f, k) => {
-      const inner = f.setter
-        ? `<span class="lbl">${FACE_LABEL[f.setter]}</span>`
-        : PIPS[f.value].map((c) => `<span class="dpip" style="grid-area:${Math.ceil(c / 3)}/${((c - 1) % 3) + 1}"></span>`).join('');
       const loaded = d.loaded && d.loaded.face === k;
-      return `<div class="side ${SIDE[k]} ${loaded ? 'loaded' : ''}">${inner}${f.triggers.length ? `<span class="trg">${f.triggers.map((t) => TRIG_LABEL[t]).join('')}</span>` : ''}</div>`;
+      const tone = loaded ? '#e6cf8c' : TONE[SIDE[k]];
+      let bg = `${pipBg(f.value, '#17181b')}, ${tone}`;
+      let inner = '';
+      if (f.setter === 'mirror') bg = `radial-gradient(circle at 50% 50%, #17181b 0 9px, ${tone} 10px 15px, #17181b 16px)`;
+      else if (f.setter === 'robber') { bg = '#17181b'; inner = '<span class="lbl lt">R</span>'; }
+      else if (f.setter === 'blank') { bg = '#17181b'; inner = '<span class="lbl lt">?</span>'; }
+      return `<div class="side ${SIDE[k]}" style="background:${bg}">${inner}${f.triggers.length ? `<span class="trg">${f.triggers.map((t) => TRIG_LABEL[t]).join('')}</span>` : ''}</div>`;
     }).join('');
     const final = TURN[SIDE[fi]];
     let cls = '';
@@ -675,6 +679,7 @@ export class UI {
     const d = this.game.dice[i];
     return {
       kind: 'Dice · upgrade',
+      fig: u,
       title: ITEMS[u].name,
       desc: ITEMS[u].desc,
       now: d.used[u] ? 'Used this round.' : null,
@@ -762,7 +767,7 @@ export class UI {
         <p class="lead">Your dice upgrades can change this roll before it pays out.</p>
         ${this.diceBlock(v, pr.faces, { held: pr.hold.map((h) => h != null), notes: g.report?.dice.map((d) => d.notes) })}
         <h3>Change the roll (optional)</h3>
-        <div class="tiles">${mods.map((m) => `<button class="tile" data-a="mod" data-die="${m.die}" data-id="${m.id}" ${this.busy ? 'disabled' : ''}><span class="t-name">${MOD_INFO[m.id][0]} · die ${m.die + 1}</span><span class="t-desc">${MOD_INFO[m.id][1]}${m.id === 'twin' ? ` Other result: ${g.dice[m.die].faces[pr.alt[m.die]].value}.` : ''}</span></button>`).join('')}</div>`,
+        <div class="tiles">${mods.map((m) => `<button class="tile-btn" data-a="mod" data-die="${m.die}" data-id="${m.id}" ${this.busy ? 'disabled' : ''}><span class="t-name">${MOD_INFO[m.id][0]} · die ${m.die + 1}</span><span class="t-desc">${MOD_INFO[m.id][1]}${m.id === 'twin' ? ` Other result: ${g.dice[m.die].faces[pr.alt[m.die]].value}.` : ''}</span></button>`).join('')}</div>`,
       foot: `<button class="primary big" data-a="resolve" data-primary ${this.busy ? 'disabled' : ''}>Use this roll (${v[0] + v[1] || '?'})</button>`,
     };
   }
@@ -791,9 +796,9 @@ export class UI {
       ? `No hex with a ${f.sum} touches your buildings${g.board.hexes.some((h) => h.token === f.sum && h.id === g.robber) ? ', or the robber blocks it' : ''}.`
       : '';
     const gainCards = [
-      ...gains.map((r) => `<div class="pick" style="border:0;padding:0">${rcard(r, '', 'position:static;width:54px;height:72px')}<b class="good">+${rep.gains[r]}</b></div>`),
-      ...losses.map((r) => `<div class="pick" style="border:0;padding:0">${rcard(r, '', 'position:static;width:54px;height:72px;opacity:.6')}<b class="bad">${rep.gains[r]}</b></div>`),
-      ...store.map((r) => `<div class="pick" style="border:0;padding:0">${rcard(r, '', 'position:static;width:54px;height:72px')}<b class="${rep.storeGains[r] > 0 ? 'good' : 'bad'}">${rep.storeGains[r] > 0 ? '+' : ''}${rep.storeGains[r]} store</b></div>`),
+      ...gains.map((r) => `<div class="pick" style="border:0;padding:0">${rcard(r, 'sm', '')}<b class="good">+${rep.gains[r]}</b></div>`),
+      ...losses.map((r) => `<div class="pick" style="border:0;padding:0">${rcard(r, 'sm', 'opacity:.6')}<b class="bad">${rep.gains[r]}</b></div>`),
+      ...store.map((r) => `<div class="pick" style="border:0;padding:0">${rcard(r, 'sm', '')}<b class="${rep.storeGains[r] > 0 ? 'good' : 'bad'}">${rep.storeGains[r] > 0 ? '+' : ''}${rep.storeGains[r]} store</b></div>`),
     ].join('');
     const echoNext = g.echoQueue.length > 0;
     return {
@@ -816,7 +821,7 @@ export class UI {
     const pipRow = (cost) => `<span class="cost">${RES.flatMap((r) => Array.from({ length: cost[r] || 0 }, (_, i) => `<span class="pip ${g.hand[r] > i ? '' : 'missing'}" style="background:var(--${r})" title="${r}"></span>`)).join('')}</span>`;
     const tile = (kind, name, effect) => {
       const why = g.whyNot(kind);
-      return `<button class="tile ${why ? '' : 'ok'}" data-a="build" data-kind="${kind}" data-cost="${kind}" ${why || dis ? 'disabled' : ''}>
+      return `<button class="tile-btn ${why ? '' : 'ok'}" data-a="build" data-kind="${kind}" data-cost="${kind}" ${why || dis ? 'disabled' : ''}>
         <span class="t-name">${name}</span>${pipRow(COSTS[kind])}
         <span class="${why ? 't-why' : 't-desc'}">${why ? esc(why) : effect}</span></button>`;
     };
@@ -913,21 +918,32 @@ export class UI {
     const show = g.phase === 'shop' && !this.boardReq;
     this.$overlay.hidden = !show;
     if (!show) return;
+    const priceTag = (price) => `<span class="price"><b>${price === Infinity ? '—' : price}</b><i>VP</i></span>`;
     const offers = g.shop.map((s, i) => {
       const price = g.slotPrice(s);
       const afford = g.budget >= price;
-      const btn = `<button class="${!s.sold && afford ? 'primary' : ''}" data-a="buy" data-i="${i}" ${!s.sold && afford && !this.busy ? '' : 'disabled'}>${s.sold ? 'Bought' : `Buy · ${price === Infinity ? 'max' : price} VP`}</button>`;
+      const can = !s.sold && afford && !this.busy;
+      const btn = `<button class="${can ? 'primary' : ''} buy" data-a="buy" data-i="${i}" ${can ? '' : 'disabled'}>${s.sold ? 'Bought' : afford ? `Buy · ${price === Infinity ? 'max' : price} VP` : `${price} VP · need ${price - g.budget} more`}</button>`;
       if (s.kind === 'pack') {
-        return `<div class="offer pack ${s.sold ? 'sold' : ''}"><span class="kind">Pack · ${s.group}</span><span class="name">Choose 1 of 3</span>
-          <div class="desc">${s.options.map((o) => `${o.name} <span class="rarity-${o.rarity}">(${o.rarity})</span>`).join('<br>')}</div>${btn}</div>`;
+        return `<div class="offer pack ${s.sold ? 'sold' : ''}"><div class="o-top"><span>Pack · ${esc(s.group)}</span><span>Choose 1 of 3</span></div>
+          <div class="o-stage"><div class="booster">${s.options.map((o) => `<div class="b-row"><span>${esc(o.name)}</span><em class="rarity-${o.rarity}">${o.rarity}</em></div>`).join('')}</div></div>
+          <div class="o-name">A pack of three</div><div class="o-desc">Pick the one you want after you buy.</div>${priceTag(price)}${btn}</div>`;
       }
       const it = s.item;
-      return `<div class="offer ${it.rarity} ${s.sold ? 'sold' : ''}"><span class="kind">${CAT_LABEL[it.cat]} · <span class="rarity-${it.rarity}">${it.rarity}</span></span><span class="name">${it.name}</span>
-        <div class="desc">${it.desc}${it.id === 'loaded' ? ' Price rises with the level.' : ''}</div>${btn}</div>`;
+      const desc = `${it.desc}${it.id === 'loaded' ? ' Price rises with the level.' : ''}`;
+      const top = `<div class="o-top"><span>${esc(CAT_LABEL[it.cat])}</span><span class="rarity-${it.rarity}">${it.rarity}</span></div>`;
+      if (UPGRADE_CATS.includes(it.cat)) {
+        return `<div class="offer obj ${it.rarity} ${s.sold ? 'sold' : ''}">${top}<div class="o-stage">${figure(it.id, 0.86)}</div><div class="o-name">${esc(it.name)}</div><div class="o-desc">${esc(desc)}</div>${priceTag(price)}${btn}</div>`;
+      }
+      return `<div class="offer card-o ${it.rarity} ${s.sold ? 'sold' : ''}"><div class="o-stage"><div class="pcard big ${it.rarity}"><i class="dot" style="background:${CAT_DOT[it.cat] || '#a6a59e'}"></i><span class="k">${esc(CAT_SHORT[it.cat])}</span><span class="r rarity-${it.rarity}">${it.rarity}</span><span class="art" style="background-position:${cardArt(it)}"></span><span class="nm">${esc(it.name)}</span><span class="tx">${esc(desc)}</span></div></div>${priceTag(price)}${btn}</div>`;
     }).join('');
-    this.$overlay.innerHTML = `<div class="shop-head"><div><h2>Shop</h2><div class="muted small">Dice upgrades · field upgrades · cards · a pack</div></div><div class="budget">${g.budget} VP</div></div>
+    const guilds = g.guilds.map((gd) => `<div class="pcard ${ITEMS[gd.id].rarity}" ${this.tipAttr(`sg:${gd.uid}`, { kind: 'Guild · always on', title: ITEMS[gd.id].name, desc: ITEMS[gd.id].desc })}><i class="dot" style="background:${CAT_DOT.guild}"></i><span class="art" style="background-position:${cardArt(ITEMS[gd.id])}"></span><span class="nm">${esc(ITEMS[gd.id].name)}</span></div>`).join('');
+    this.$overlay.innerHTML = `<div class="shop">
+      <div class="shop-head"><div><div class="eyebrow">Between rounds</div><h2>The Shop</h2></div><div class="budget-box"><div class="eyebrow">Budget · unspent VP is lost</div><div class="budget">${g.budget}<small>VP</small></div></div></div>
       <div class="shop-grid">${offers}</div>
-      <div class="shop-foot"><button data-a="reroll" ${g.budget >= g.rerollPrice ? '' : 'disabled'}>Reroll offers · ${g.rerollPrice} VP</button><span class="small muted">Items that need a target (a face, a die, a hex, a port) ask you to pick it after you buy.</span></div>`;
+      <div class="shop-foot"><button data-a="reroll" ${g.budget >= g.rerollPrice ? '' : 'disabled'}>Reroll offers · ${g.rerollPrice} VP</button><span class="small muted">Dice, field and port upgrades ask you to pick their target after you buy.</span></div>
+      <div class="shop-have"><div class="rcard-box"><div class="eyebrow">Your dice</div><div class="mini-dice">${[0, 1].map((i) => `<div class="mini-die">${this.facesHtml(i, null)}${this.dieTags(i)}</div>`).join('')}</div></div>
+      <div class="rcard-box"><div class="eyebrow">Guilds <b>${g.guilds.length} of ${g.limits.guildSlots}</b></div><div class="slots">${guilds || '<span class="small muted">None yet.</span>'}</div></div></div></div>`;
   }
 
   viewGameOver() {
@@ -948,12 +964,12 @@ export class UI {
     const stacks = RES.map((r) => {
       const n = g.hand[r];
       const need = cost ? cost[r] || 0 : 0;
-      const shown = Math.min(n, 7);
       let cards = '';
-      if (n === 0) cards = `<div class="rcard empty" style="top:0">${ICON[r].replace('fill="#fff"', 'fill="currentColor"')}<span>${r}</span></div>`;
-      for (let i = 0; i < shown; i++) {
-        const isNeed = need > 0 && i >= shown - Math.min(need, shown);
-        cards += rcard(r, isNeed ? 'need' : '', `top:${i * 7}px;z-index:${i}`);
+      if (n === 0) cards = `<div class="rcard empty" style="--c:var(--${r})"><i class="dot"></i><span class="nm">No ${r}</span></div>`;
+      else {
+        const under = Math.min(n - 1, 4);
+        for (let k = under; k >= 1; k--) cards += `<div class="rcard under" style="left:${-3 * k}px;top:${-3 * k}px;z-index:${5 - k}"></div>`;
+        cards += rcard(r, need > 0 && n >= need ? 'need' : '', 'z-index:10');
       }
       const short = need > n;
       const store = g.storehouse[r];
@@ -966,15 +982,16 @@ export class UI {
       };
       return `<div class="stack ${short ? 'short' : ''}" ${this.tipAttr(`res:${r}`, info)} data-hl="hand:${r} store:${r}">
         <div class="stack-cards">${cards}${n > 0 ? `<span class="count">${n}</span>` : ''}</div>
-        <span class="stack-label">${short ? `<b class="bad">need ${need}</b>` : ''}${g.storehouse[r] ? ` <span class="store">+${g.storehouse[r]} stored</span>` : ''}&nbsp;</span></div>`;
+        <span class="stack-label">${short ? `<b class="bad">need ${need - n} more</b>` : ''}${g.storehouse[r] ? ` <span class="store">+${g.storehouse[r]} stored</span>` : ''}&nbsp;</span></div>`;
     }).join('');
     const total = RES.reduce((s, r) => s + g.hand[r], 0);
     const countable = g.handCountable();
     // card slots
     const canPlay = g.canAct() && !this.busy;
+    const pcard = (it, name, tipKey, info, extra = '', hl = '') => `<div class="pcard ${it.rarity}" ${this.tipAttr(tipKey, info)} ${hl}><i class="dot" style="background:${CAT_DOT[it.cat] || '#a6a59e'}"></i><span class="art" style="background-position:${cardArt(it)}"></span><span class="nm">${esc(name)}</span>${extra}</div>`;
     const cardSlots = Array.from({ length: g.limits.handSlots }, (_, i) => {
       const c = g.cards[i];
-      if (!c) return '<div class="slot empty">Empty card slot</div>';
+      if (!c) return '<div class="slot empty">Empty<br>card slot</div>';
       const it = ITEMS[c.id];
       const info = {
         kind: CAT_LABEL[it.cat] || 'Card',
@@ -983,29 +1000,21 @@ export class UI {
         now: canPlay ? 'Playable now.' : 'Playable on your turn, when no roll is pending.',
         lines: [`Rarity: ${it.rarity}`],
       };
-      return `<div class="slot card ${it.rarity}" ${this.tipAttr(`card:${c.uid}`, info)} data-hl="card:${c.uid}"><span class="s-kind">${it.cat === 'edict' ? 'Edict' : 'Card'} · single use</span><span class="s-name">${it.name}</span><span class="s-desc">${it.desc}</span>
-        <button class="small ${canPlay ? 'primary' : ''}" data-a="play" data-uid="${c.uid}" ${canPlay ? '' : 'disabled'} title="${canPlay ? 'Play this card' : 'Cards can be played during your turn, when no roll is pending'}">Play</button></div>`;
+      return `<div class="slot-wrap">${pcard(it, it.name, `card:${c.uid}`, info, '', `data-hl="card:${c.uid}"`)}<button class="small play ${canPlay ? 'primary' : ''}" data-a="play" data-uid="${c.uid}" ${canPlay ? '' : 'disabled'} title="${canPlay ? 'Play this card' : 'Cards can be played during your turn, when no roll is pending'}">Play</button></div>`;
     }).join('');
     const guildSlots = Array.from({ length: g.limits.guildSlots }, (_, i) => {
       const gd = g.guilds[i];
-      if (!gd) return '<div class="slot empty">Empty guild slot</div>';
+      if (!gd) return '<div class="slot empty small-slot">Empty<br>guild slot</div>';
       const it = ITEMS[gd.id];
       const now = this.guildNow(gd.id);
-      const info = {
-        kind: 'Guild · always on',
-        title: `${it.name}${gd.data.terrain ? ` (${gd.data.terrain})` : ''}`,
-        desc: it.desc,
-        now,
-        lines: [`Rarity: ${it.rarity}`],
-      };
-      return `<div class="slot card ${it.rarity}" ${this.tipAttr(`guild:${gd.uid}`, info)}><span class="s-kind">Guild · always on</span><span class="s-name">${it.name}${gd.data.terrain ? ` (${gd.data.terrain})` : ''}</span><span class="s-desc">${it.desc}</span>${now ? `<span class="s-now">${now}</span>` : ''}</div>`;
+      const nm = `${it.name}${gd.data.terrain ? ` (${gd.data.terrain})` : ''}`;
+      const info = { kind: 'Guild · always on', title: nm, desc: it.desc, now, lines: [`Rarity: ${it.rarity}`] };
+      return `<div class="slot-wrap">${pcard(it, nm, `guild:${gd.uid}`, info)}</div>`;
     }).join('');
-    const dice = [0, 1].map((i) => `<div class="mini-die"><span class="small muted">Die ${i + 1}</span>${this.facesHtml(i, null)}${this.dieTags(i)}</div>`).join('');
+    this.$guilds.innerHTML = `<div><div class="zone-h" style="justify-content:flex-end">Guilds <b>${g.guilds.length} of ${g.limits.guildSlots}</b></div><div class="slots">${guildSlots}</div></div>`;
     this.$hand.innerHTML = `
-      <section class="zone"><div class="zone-h">Resources <b>${total} card${total === 1 ? '' : 's'}${countable > 7 ? ' · <span class="bad">over 7: a 7 makes you discard</span>' : ''}</b></div><div class="res-row">${stacks}</div></section>
-      <section class="zone"><div class="zone-h">Cards in hand <b>${g.cards.length}/${g.limits.handSlots}</b></div><div class="slots" style="--n:${g.limits.handSlots}">${cardSlots}</div></section>
-      <section class="zone"><div class="zone-h">Guilds <b>${g.guilds.length}/${g.limits.guildSlots}</b></div><div class="slots" style="--n:${g.limits.guildSlots}">${guildSlots}</div></section>
-      <section class="zone"><div class="zone-h">Dice <b>hover or click for details</b></div><div class="mini-dice">${dice}</div></section>`;
+      <section class="zone"><div class="zone-h">Hand <b>${total} card${total === 1 ? '' : 's'}${countable > 7 ? ' · <span class="bad">over 7: a 7 makes you discard</span>' : ' · safe from the robber up to 7'}</b></div><div class="res-row">${stacks}</div></section>
+      <section class="zone"><div class="zone-h">Cards <b>${g.cards.length} of ${g.limits.handSlots}</b></div><div class="slots">${cardSlots}</div></section>`;
     this.applyHighlights();
   }
 
@@ -1054,7 +1063,7 @@ export class UI {
     if (m.type === 'resources') {
       const total = RES.reduce((s, r) => s + m.counts[r], 0);
       return `<div class="modal" role="dialog" aria-modal="true"><h2>${esc(m.prompt)}</h2><p class="muted">${m.discard ? 'Discard' : 'Choose'} ${m.n} · selected <b>${total}</b></p>
-        <div class="picker">${RES.map((r) => `<div class="pick">${rcard(r)}<span class="n">${m.counts[r]}</span><div class="pm"><button data-a="res-dec" data-r="${r}" aria-label="less ${r}">−</button><button data-a="res-inc" data-r="${r}" aria-label="more ${r}" ${total >= m.n || (m.max && m.counts[r] >= m.max[r]) ? 'disabled' : ''}>+</button></div>${m.max ? `<span class="small muted">have ${m.max[r]}</span>` : ''}</div>`).join('')}</div>
+        <div class="picker">${RES.map((r) => `<div class="pick">${rcard(r, 'sm', '')}<span class="n">${m.counts[r]}</span><div class="pm"><button data-a="res-dec" data-r="${r}" aria-label="less ${r}">−</button><button data-a="res-inc" data-r="${r}" aria-label="more ${r}" ${total >= m.n || (m.max && m.counts[r] >= m.max[r]) ? 'disabled' : ''}>+</button></div>${m.max ? `<span class="small muted">have ${m.max[r]}</span>` : ''}</div>`).join('')}</div>
         <div class="modal-foot">${cancel}<button class="primary" data-a="res-ok" ${total === m.n ? '' : 'disabled'}>Confirm</button></div></div>`;
     }
     return '';

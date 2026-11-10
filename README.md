@@ -2,7 +2,7 @@
 
 A solo roguelite built on hex-and-dice settlement rules: develop one island across an endless run, bend the **dice** and the **fields**, and pay an escalating **tribute** after every round. Miss one and the run ends.
 
-This is draft 0.1, built to **test the workflows** of the rulebook (*Hex & Dice Roguelite — Rulebook, working title*). Graphics are deliberately plain placeholders.
+This is draft 0.1, built to **test the workflows** of the rulebook (*Hex & Dice Roguelite — Rulebook, working title*). The interface is a full design pass (see below); the art is generated and still placeholder-grade for a public release.
 
 > Working title and placeholder theme. The resource names and board follow a well-known base game only so the rules are easy to test; a public release needs its own name, theme and art.
 
@@ -20,12 +20,13 @@ No build step, no dependencies. It's plain HTML, CSS and JavaScript.
 
 ### How the screen works
 
-The game fills the browser window:
+The interface is dark and modern: greys, one vermilion accent for things you can press, medieval display type for titles and numbers.
 
-- **Top bar:** current ante and round, rolls left, the tribute due (with a ✓ when you can already pay it), score, rounds survived and the boss. Hover the boss for its drawback.
-- **Board** (centre) with the **step panel** beside it. The panel walks you through each round: **Roll → Result → Build & trade → … → Tribute → Shop**. It shows only what you can do right now, explains anything unavailable (e.g. "Need 1 lumber more"), and has one main button at the bottom to move on. Hovering a build option highlights the cards it would use in your hand.
-- **Hand** (bottom): your resources as card stacks, your single-use card slots (with Play buttons), your Guild slots, and both dice with their faces and upgrades. Hover or click any card, die, face or upgrade for its details and current stacking (e.g. Loaded level, stacked triggers, what a Guild does right now). After a roll, whatever it changed or triggered pulses on screen and is listed under "Changed by this roll".
-- **Log** and **Dev tools** open in a side drawer from the top bar.
+- **Left rail:** ante and round, the tribute due (with progress bars per resource and a "Ready to pay" state), rolls left, score, running round effects, the Storehouse, the boss and your dice. Hover the boss, effects or a die for details. Log, Help, Dev and New run are at the bottom.
+- **Island** (centre): isometric halftone tiles with 3D-rendered pieces, number tokens in perspective, and a printed halftone sea that is the only animated part. Drag to pan. Field upgrades show as a finish and rim on the hex and a ring on the token (hover for the upgrade's figure). The **stepper** on top shows where you are in the round: **Roll → Result → Build & trade → Tribute → Shop**.
+- **Hand** (bottom of the island): resources as card stacks, your single-use cards (with Play buttons), and your Guild slots top right. Cards carry rarity in their border: grey, silver-blue, or holo for legendary.
+- **Step panel** (right): what you can do right now, with one main button. Hovering a build option highlights the cards it would use. After a roll, what it changed or triggered pulses on screen and is listed under "Changed by this roll".
+- **Shop:** upgrades are shown as objects with the same figure they get in play (a face, die, token, hex or port modification); cards are shown as cards.
 
 | Key | Action |
 | --- | --- |
@@ -115,3 +116,12 @@ Where the rulebook was open, the draft picks one reading. Each is a single spot 
 - No animations or sound; placeholder graphics only.
 - Characters (planned in the rulebook) are not in.
 - **Balance is untested.** The naive bot rarely clears ante 1: with only two starting settlements, a Small tribute of 3 cards of one type after 4 rolls is a real hurdle. The rulebook already flags the first-ante simulation as the next open question, and the bot runs give a starting point for it.
+
+
+## Code map (interface)
+
+- `js/ui.js`: rail, stepper, panel, hand, shop, dialogs; implements the engine's `io` (board clicks, choices).
+- `js/board-view.js`: the island (tiles, pieces, tokens, sea canvas, camera, targets). Draws only; no rules.
+- `js/figures.js`: the 43 upgrade figures, exported as `figure(id, scale)` (HTML).
+- `css/fonts.css`, `css/style.css`: fonts (self-hosted in `assets/fonts`) and the theme.
+- `assets/`: `terrain.webp` (6 single-ink terrains), `pieces.webp` (settlement, city, robber, roads), `art.webp` (halftone card art), `hexprint.webp` (cardboard hex print).
