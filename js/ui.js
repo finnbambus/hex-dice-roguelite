@@ -6,9 +6,9 @@
 import { Game, COSTS, BLINDS } from './game.js';
 import { RES, TERRAIN_RES, pips } from './board.js';
 import { ITEMS, ITEM_LIST, BOSS_BY_ID, ROLLS_PER_ROUND, LOADING, START_SETTLEMENTS, ECHO_BREAK } from './content.js';
-import { BoardView } from './board-view.js?v=13';
-import { figure } from './figures.js?v=13';
-import { Feel } from './feel.js?v=13';
+import { BoardView } from './board-view.js?v=15';
+import { figure } from './figures.js?v=15';
+import { Feel } from './feel.js?v=15';
 
 const TERRAIN_COLOR = { hills: '#c8734a', forest: '#3f7d4a', pasture: '#9ccf6a', fields: '#e8c547', mountains: '#8e939c', desert: '#e3d3a4' };
 const RES_ICON = { brick: 'B', lumber: 'L', wool: 'W', grain: 'G', ore: 'O' };
@@ -79,10 +79,8 @@ export class UI {
     this.$tip.className = 'card-tip';
     this.$tip.hidden = true;
     document.body.appendChild(this.$tip);
-    this.$status = document.getElementById('status');
-    this.$eyebrow = document.getElementById('rail-eyebrow');
-    this.$title = document.getElementById('rail-title');
-    this.$stepper = document.getElementById('stepper');
+    this.dieSheet = null; // which die's face sheet is open (0 | 1 | null)
+    this.$boss = document.getElementById('boss');
     this.$guilds = document.getElementById('guilds');
     this.$board = document.getElementById('board');
     this.view = new BoardView(this.$board);
@@ -91,7 +89,6 @@ export class UI {
     this.$panel = document.getElementById('panel');
     this.$hand = document.getElementById('hand');
     this.$stage = document.getElementById('stage');
-    this.$tray = document.getElementById('tray');
     this.$tribute = document.getElementById('tribute');
     this.$score = document.getElementById('score');
     this.feel = new Feel({ board: this.$board, lamp: this.$stage.querySelector('.lamp') });
@@ -225,6 +222,11 @@ export class UI {
       this.hintOpen = ev.target.open;
       try { localStorage.setItem('hd-hint', this.hintOpen ? 'open' : 'closed'); } catch { /* ignore */ }
     }, true);
+    const mb = document.getElementById('menu-btn');
+    const mp = document.getElementById('menu-pop');
+    this.setMenu = (open) => { mp.hidden = !open; mb.setAttribute('aria-expanded', String(open)); };
+    mb.addEventListener('click', (ev) => { ev.stopPropagation(); this.setMenu(mp.hidden); });
+    document.addEventListener('click', (ev) => { if (!mp.hidden && (!ev.target.closest('.menu') || ev.target.closest('[data-top]'))) this.setMenu(false); });
     const sw = document.getElementById('opt-shake');
     if (sw) {
       sw.checked = this.feel.shakeOn;
@@ -245,7 +247,9 @@ export class UI {
         return;
       }
       if (ev.key === 'Escape') {
-        if (this.pinnedTip) this.unpinTip();
+        if (!document.getElementById('menu-pop').hidden) this.setMenu(false);
+        else if (this.dieSheet != null) { this.dieSheet = null; this.render(); }
+        else if (this.pinnedTip) this.unpinTip();
         else if (this.boardReq?.cancel) this.resolveBoard(null);
         else if (this.modal?.cancel) this.resolveModal(null);
         else if (this.dialog) { this.dialog = null; this.render(); }
@@ -269,6 +273,10 @@ export class UI {
   }
 
   onAction(a, d) {
+    if (a !== 'die-sheet' && a !== 'die-open') this.dieSheet = null;
+    if (a === 'die-sheet') { this.dieSheet = this.dieSheet === Number(d.die) ? null : Number(d.die); return this.render(); }
+    if (a === 'die-open') { this.dieSheet = Number(d.die); return this.render(); }
+    if (a === 'die-close') return this.render();
     const g = this.game;
     switch (a) {
       // dialogs & choices
@@ -346,16 +354,14 @@ export class UI {
     this.tips = new Map();
     this.syncHighlights();
     this.detectMoments();
-    this.renderStatus();
+    this.renderBoss();
     this.renderTribute();
     this.renderScore();
-    this.renderStepper();
     this.renderBoard();
     this.renderPrompt();
     this.renderOverlay();
     this.renderPanel();
     this.renderHand();
-    this.renderTray();
     this.renderMood();
     this.renderDrawer();
     this.renderModal();
@@ -519,31 +525,16 @@ export class UI {
     this.fillTip(this.tipKey, el);
   }
 
-  // ---------------------------------------------------------------- left rail (run state)
-  renderStatus() {
+  // ---------------------------------------------------------------- boss plaque (beside the tribute)
+  renderBoss() {
     const g = this.game;
+    const el = this.$boss;
+    if (g.phase === 'gameover' || !g.boss) { el.hidden = true; return; }
+    el.hidden = false;
     const bossNow = g.blind === 2 && g.phase !== 'shop';
     const boss = g.phase === 'shop' && g.blind === 2 ? BOSS_BY_ID[g.nextBossId] : g.boss;
-    this.$eyebrow.textContent = `Ante ${g.ante} · Round ${g.blind + 1} of 3`;
-    this.$title.textContent = `${BLINDS[g.blind]} Tribute`;
-    const out = [];
-
-    // where the run stands: the three rounds of this ante
-    const segs = BLINDS.map((b, i) => `<span class="${i < g.blind || (g.phase === 'shop' && i === g.blind) ? 'done' : i === g.blind ? 'on' : ''}">${b}</span>`).join('');
-    out.push(`<div class="rcard-box"><div class="eyebrow">Run <b>Ante ${g.ante}</b></div><div class="segs">${segs}</div><div class="note">Survived ${g.roundsSurvived} ${g.roundsSurvived === 1 ? 'round' : 'rounds'} so far.</div></div>`);
-
-    // effects that are running this round
-    const fx = this.effects();
-    if (fx.length) out.push(`<div class="fx">${fx.map(([t, cls, tip, key]) => `<span class="fx-chip ${cls}" ${this.tipAttr(`fx:${t}`, { kind: 'Active this round', title: t, desc: tip })} data-hl="${key || ''}">${t}</span>`).join('')}</div>`);
-
-    // storehouse
-    const stored = RES.filter((r) => g.storehouse[r] > 0);
-    if (stored.length) out.push(`<div class="rcard-box"><div class="eyebrow">Storehouse</div><div class="store-row" style="margin-top:0">${stored.map((r) => `<span data-hl="store:${r}">${resDot(r)}${g.storehouse[r]} ${r}</span>`).join('')}</div><div class="note">Shipped cards count toward the tribute.</div></div>`);
-
-    // boss
-    out.push(`<div class="rcard-box" ${this.tipAttr('boss', { kind: bossNow ? 'Boss · active' : 'Boss', title: boss.name, desc: boss.desc })}><div class="eyebrow">${bossNow ? 'Boss this round' : g.phase === 'shop' && g.blind === 2 ? 'Next boss' : 'Boss of this ante'}</div><div class="name">${boss.name}</div><p>${boss.desc}</p></div>`);
-
-    this.$status.innerHTML = out.join('');
+    el.classList.toggle('boss', bossNow);
+    el.innerHTML = `<div class="trib-head" ${this.tipAttr('boss', { kind: bossNow ? 'Boss · active' : 'Boss', title: boss.name, desc: boss.desc })}><span class="eyebrow">${bossNow ? 'Boss this round' : g.phase === 'shop' && g.blind === 2 ? 'Next boss' : 'Boss of this ante'}</span></div><div class="name">${boss.name}</div><p>${boss.desc}</p>`;
   }
 
   // The tribute hangs over the board: what is due at the end of this round, and how close the hand is.
@@ -577,7 +568,7 @@ export class UI {
       return `<div class="tpart"><div class="t-row">${t ? resDot(t) : '<span class="res-dot" style="background:var(--dim)"></span>'}<span>${t ? cap(t) : 'Any type'}</span><span class="have">${Math.min(have, p.amount)}<span> / ${p.amount}</span></span></div><div class="bar ${pct >= 100 ? 'full' : ''}"><i style="width:${pct}%;--c:${t ? `var(--${t})` : 'var(--muted)'}"></i></div></div>`;
     }).join('');
     const state = g.phase === 'setup' ? '' : ok ? '<b class="ok">Ready to pay</b>' : '<b class="no">Not yet</b>';
-    el.innerHTML = `<div class="trib-head" ${this.tipAttr('tribute', { kind: 'Tribute', title: 'Due at round end', desc: 'Each part needs a different resource type. Storehouse cards count first, then your hand.', lines })}><span class="eyebrow">Tribute · due at round end</span>${state}</div><div class="trib-parts">${parts}</div>`;
+    el.innerHTML = `<div class="trib-head" ${this.tipAttr('tribute', { kind: 'Tribute', title: 'Due at round end', desc: 'Each part needs a different resource type. Storehouse cards count first, then your hand.', lines })}><span class="eyebrow">${BLINDS[g.blind]} tribute · due at round end</span>${state}</div><div class="trib-parts">${parts}</div>`;
   }
 
   // Rolls left and score, in a corner of the table.
@@ -587,19 +578,22 @@ export class UI {
     const left = ROLLS_PER_ROUND - g.rollsUsed;
     const rolls = g.phase === 'turn'
       ? `<div class="sc-cell"><div class="eyebrow">Rolls left</div><div class="rolls" title="Rolls left this round">${Array.from({ length: ROLLS_PER_ROUND }, (_, i) => `<span class="dot ${i < left ? 'left' : ''}"></span>`).join('')}<b>${left}</b></div></div>`
-      : `<div class="sc-cell"><div class="eyebrow">Survived</div><div class="big-num">${g.roundsSurvived}<small>${g.roundsSurvived === 1 ? 'round' : 'rounds'}</small></div></div>`;
+      : '';
     const info = { kind: 'Score', title: `${vp.total} VP`, desc: 'Your score this round. Whatever you hold when the tribute is paid becomes your shop budget.', lines: [`Settlements ${vp.settlements} · Cities ${vp.cities}`, `VP cards ${vp.vpCards}`, `Longest road ${vp.road} (length ${vp.longestRoad})`, `Army ${vp.army} (${g.knights} knights)`] };
     this.$score.innerHTML = `<div class="sc-cell vp" data-hl="vp" ${this.tipAttr('score', info)}><div class="eyebrow">Score</div><div class="big-num"><span data-ck="vp">${this.feel.value('vp', vp.total)}</span><small>VP</small></div></div>${rolls}`;
   }
 
-  renderStepper() {
+  // Top of the action card: where the run stands (ante, Small / Big / Boss) and which step of the round you are on.
+  actHead(step) {
     const g = this.game;
-    const step = this.step();
-    if (step === 'setup' || step === 'gameover') { this.$stepper.hidden = true; return; }
-    this.$stepper.hidden = false;
-    const current = step === 'adjust' ? 'roll' : step;
-    const idx = STEPS.findIndex(([k]) => k === current);
-    this.$stepper.innerHTML = STEPS.map(([k, l], i) => `<span class="${i === idx ? 'on' : i < idx ? 'done' : ''}">${l}</span>`).join('');
+    const segs = BLINDS.map((b, i) => `<span class="${i < g.blind || (g.phase === 'shop' && i === g.blind) ? 'done' : i === g.blind ? 'on' : ''}">${b}</span>`).join('');
+    let stepper = '';
+    if (step !== 'setup' && step !== 'gameover') {
+      const current = step === 'adjust' ? 'roll' : step;
+      const idx = STEPS.findIndex(([k]) => k === current);
+      stepper = `<nav class="stepper" aria-label="Round steps">${STEPS.map(([k, l], i) => `<span class="${i === idx ? 'on' : i < idx ? 'done' : ''}">${l}</span>`).join('')}</nav>`;
+    }
+    return `<div class="act-head"><div class="ante"><b>Ante ${g.ante}</b><span class="segs">${segs}</span><span class="surv" title="Rounds survived this run">${g.roundsSurvived} survived</span></div>${stepper}</div>`;
   }
 
   // Active round effects: [label, 'bad' | 'good' | '', tooltip]
@@ -674,31 +668,53 @@ export class UI {
       gameover: () => this.viewGameOver(),
     }[step]();
     const scroll = this.$panel.querySelector('.panel-body')?.scrollTop || 0;
-    this.$panel.innerHTML = `<div class="panel-body">${view.body}</div>${view.foot ? `<div class="panel-foot">${view.foot}</div>` : ''}`;
+    this.$panel.innerHTML = `${this.actHead(step)}<div class="panel-body">${view.body}</div>${this.diceArea(step)}${view.foot ? `<div class="panel-foot">${view.foot}</div>` : ''}`;
     if (this.lastStep === step) this.$panel.querySelector('.panel-body').scrollTop = scroll;
     for (const b of this.$panel.querySelectorAll('.panel-foot button.primary[data-primary]')) b.insertAdjacentHTML('beforeend', '<kbd>Space</kbd>');
     this.lastStep = step;
   }
 
-  diceBlock(values, faces, opts = {}) {
+  // The one place the dice live: both cubes, the roll's values, running effects, and a face sheet that opens on click.
+  diceArea(step) {
+    if (!['roll', 'adjust', 'result', 'build'].includes(step)) return '';
     const g = this.game;
-    return `<div class="dice2">${[0, 1].map((i) => {
-      const d = g.dice[i];
-      const ups = g.dieUps(i);
+    let values = null, faces = null, opts = {};
+    if (step === 'adjust') {
+      const pr = g.pendingRoll;
+      values = g.valuesOf(pr).v;
+      faces = pr.faces;
+      opts = { held: pr.hold.map((h) => h != null), notes: g.report?.dice.map((d) => d.notes) };
+    } else if (step === 'result') {
+      values = g.report.final.values;
+      faces = g.lastRoll.faces;
+      opts = { notes: g.report.dice.map((d) => d.notes) };
+    } else if (g.lastRoll) faces = g.lastRoll.faces;
+    const live = step === 'adjust' || step === 'result';
+    const fx = this.effects();
+    const fxHtml = fx.length ? `<div class="fx">${fx.map(([t, cls, tip, key]) => `<span class="fx-chip ${cls}" ${this.tipAttr(`fx:${t}`, { kind: 'Active this round', title: t, desc: tip })} data-hl="${key || ''}">${t}</span>`).join('')}</div>` : '';
+    const dice = [0, 1].map((i) => {
       const held = opts.held && opts.held[i];
       const notes = opts.notes ? opts.notes[i] : [];
-      const fi = faces ? faces[i] : (g.lastRoll ? g.lastRoll.faces[i] : 0);
-      const face = d.faces[fi];
+      const fi = faces ? faces[i] : 0;
+      const face = g.dice[i].faces[fi];
       const shownNum = face.setter ? null : face.value;
       const diff = values && values[i] !== shownNum;
-      return `<div class="die-box">
-        <div class="die-top">${this.cube(i, fi, held, faces != null)}
-          <div class="small muted">Die ${i + 1}${held ? '<br>held from last roll' : ''}${values ? `<div class="die-val ${diff ? 'changed' : ''}" title="${diff ? 'The face was changed by an upgrade' : ''}">${diff ? '= ' : ''}${values[i] || 0}</div>` : ''}</div></div>
-        ${this.facesHtml(i, faces ? faces[i] : null)}
-        ${ups.length || d.loaded ? this.dieTags(i) : ''}
+      return `<div class="die-box ${this.dieSheet === i ? 'open' : ''}" role="button" tabindex="0" data-a="die-sheet" data-die="${i}" title="Click to see this die's six faces">
+        <div class="die-top">${this.cube(i, fi, held, live)}
+          <div class="small muted">Die ${i + 1}${held ? '<br>held from last roll' : ''}${values ? `<div class="die-val ${diff ? 'changed' : ''}" title="${diff ? 'The face was changed by an upgrade' : ''}">${diff ? '= ' : ''}${values[i] || 0}</div>` : ''}<span class="faces-hint">faces ▴</span></div></div>
         ${notes && notes.length ? `<ul class="notes">${notes.map((n) => `<li>${esc(n)}</li>`).join('')}</ul>` : ''}
       </div>`;
-    }).join('')}</div>`;
+    }).join('');
+    return `<div class="dice-area">${fxHtml}<div class="dice2">${dice}</div>${this.dieSheet != null ? this.faceSheet(this.dieSheet) : ''}</div>`;
+  }
+
+  // All six faces of one die, with its upgrades. Opens above the dice on click.
+  faceSheet(i) {
+    const g = this.game;
+    const shown = g.lastRoll ? g.lastRoll.faces[i] : null;
+    return `<div class="die-sheet"><div class="ds-head"><span class="ds-tabs">${[0, 1].map((k) => `<button class="${k === i ? 'on' : ''}" data-a="die-open" data-die="${k}">Die ${k + 1}</button>`).join('')}</span><button class="small" data-a="die-close">Close</button></div>
+      ${this.facesHtml(i, shown)}${this.dieTags(i)}
+      <p class="small muted">Hover a face for what it does${shown != null ? '. The outlined one showed last' : ''}.</p></div>`;
   }
 
   // A CSS 3D cube showing the die's six real faces, turned to face `fi`. Tumbles after each new roll.
@@ -731,7 +747,7 @@ export class UI {
       cls = 'rolling';
       style += `--rx0:${r[0]}deg;--ry0:${r[1]}deg;--rz0:${r[2]}deg;animation-delay:${-Math.round(el)}ms;`;
     }
-    return `<div class="die3d ${held ? 'held' : ''}${toss}" ${this.tipAttr(`die:${i}`, this.dieInfo(i))} data-hl="die:${i}"><div class="tilt"><div class="cube ${cls}" style="${style}">${sides}</div></div></div>`;
+    return `<div class="die3d ${held ? 'held' : ''}${toss}" data-hl="die:${i}"><div class="tilt"><div class="cube ${cls}" style="${style}">${sides}</div></div></div>`;
   }
 
   // Milliseconds since the latest roll started, while its animation is still running (else null).
@@ -887,7 +903,6 @@ export class UI {
     const pre = g.cards.filter((c) => PRE_ROLL_CARDS.includes(c.id));
     return {
       body: `<h2>${BLINDS[g.blind]} round · ante ${g.ante}</h2>
-        ${this.diceBlock(null, null)}
         ${this.hint('How a round works', `You have <b>${ROLLS_PER_ROUND} rolls</b>. Each roll pays every hex with that number to your buildings next to it (settlement 1, city 2). Between rolls you can build and trade. At the end you pay the tribute shown at the top of the board.`)}
         ${this.bossCallout()}
         ${pre.length ? `<div class="callout"><b>Before rolling:</b> you can play ${pre.map((c) => ITEMS[c.id].name).join(', ')} from your hand below.</div>` : ''}`,
@@ -905,7 +920,6 @@ export class UI {
     return {
       body: `<h2>You rolled ${v[0] || '?'} + ${v[1] || '?'}</h2>
         <p class="lead">Your dice upgrades can change this roll before it pays out.</p>
-        ${this.diceBlock(v, pr.faces, { held: pr.hold.map((h) => h != null), notes: g.report?.dice.map((d) => d.notes) })}
         <h3>Change the roll (optional)</h3>
         <div class="tiles">${mods.map((m) => `<button class="tile-btn" data-a="mod" data-die="${m.die}" data-id="${m.id}" ${this.busy ? 'disabled' : ''}><span class="t-name">${MOD_INFO[m.id][0]} · die ${m.die + 1}</span><span class="t-desc">${MOD_INFO[m.id][1]}${m.id === 'twin' ? ` Other result: ${g.dice[m.die].faces[pr.alt[m.die]].value}.` : ''}</span></button>`).join('')}</div>`,
       foot: `<button class="primary big" data-a="resolve" data-primary ${this.busy ? 'disabled' : ''}>Use this roll (${v[0] + v[1] || '?'})</button>`,
@@ -942,8 +956,7 @@ export class UI {
     ].join('');
     const echoNext = g.echoQueue.length > 0;
     return {
-      body: `${this.diceBlock(f.values, g.lastRoll.faces, { notes: rep.dice.map((d) => d.notes) })}
-        <div class="sum-line" ${this.revealStyle()}>${head} ${tags.join(' ')}</div>
+      body: `<div class="sum-line" ${this.revealStyle()}>${head} ${tags.join(' ')}</div>
         <div ${this.revealStyle(120)}>${changes.length ? `<h3>Changed by this roll</h3><div class="changes">${changes.map((c) => `<span class="chg ${c.cls}">${esc(c.text)}</span>`).join('')}</div>` : ''}<h3>You got</h3>
         ${gainCards ? `<div class="gains">${gainCards}</div>` : `<p class="muted">Nothing this time. ${nothingWhy}</p>`}
         ${lines.length ? `<h3>What happened</h3><ul class="events">${lines.map((l) => `<li class="${l.cls}">${esc(l.msg)}</li>`).join('')}</ul>` : ''}</div>
@@ -1045,7 +1058,7 @@ export class UI {
     const next = g.blind === 2 ? `ante ${g.ante + 1}, Small round` : `${BLINDS[g.blind + 1]} round`;
     return {
       body: `<h2>Shop</h2>
-        ${this.hint('How the shop works', 'Spend your VP on upgrades in the shop on the left. Unspent VP is lost when you leave; buying never lowers your score.')}
+        ${this.hint('How the shop works', 'Spend your VP on upgrades in the shop. Unspent VP is lost when you leave; buying never lowers your score.')}
         <div class="callout"><div class="row between"><span>Budget</span><b style="font-size:20px">${g.budget} VP</b></div>
           <div class="small muted">Score ${g.vp} + unused rolls ${e.unusedRolls} + Storehouse surplus ${e.storehouse}${e.river ? ` + River ${e.river}` : ''}${e.twinFortune ? ` + Twin Fortune ${e.twinFortune}` : ''}</div></div>
         <div class="callout"><b>${g.blind === 2 ? 'Next boss' : 'Boss of this ante'}: ${nextBoss.name}</b><div class="small muted">${nextBoss.desc}</div>
@@ -1096,14 +1109,7 @@ export class UI {
     };
   }
 
-  // ---------------------------------------------------------------- the table: dice tray and lamp
-  renderTray() {
-    const g = this.game;
-    if (!g || !g.board) return;
-    this.$tray.innerHTML = `<div class="zone-h">Dice <b class="muted">hover for details</b></div><div class="tray-dice">${[0, 1].map((i) => `<div class="mini-die">${this.facesHtml(i, null)}${this.dieTags(i)}</div>`).join('')}</div>`;
-    this.applyHighlights();
-  }
-
+  // ---------------------------------------------------------------- the table: lamp
   // One lamp over the board. Its colour drifts from amber toward ember over the antes, and the boss round turns it vermilion.
   renderMood() {
     const g = this.game;
@@ -1142,12 +1148,12 @@ export class UI {
       else {
         const under = Math.min(n - 1, 4);
         const seed = hs(r);
-        for (let k = under; k >= 1; k--) cards += `<div class="rcard under" style="left:${(-3 * k + tilt(seed + k * 7, 2.2)).toFixed(1)}px;top:${(-3 * k + tilt(seed + k * 13, 1.6)).toFixed(1)}px;z-index:${5 - k};--rot:${tilt(seed + k * 3, 3.2)}deg"></div>`;
-        cards += rcard(r, need > 0 && n >= need ? 'need' : '', `z-index:10;--rot:${tilt(seed, 1.8)}deg;${wasEmpty ? `animation:cardIn .01s both;animation-delay:${Math.round(330 - el)}ms` : ''}`);
+        for (let k = under; k >= 1; k--) cards += `<div class="rcard under" style="left:${(-3 * k + tilt(seed + k * 7, .9)).toFixed(1)}px;top:${(-3 * k + tilt(seed + k * 13, .7)).toFixed(1)}px;z-index:${5 - k};--rot:${tilt(seed + k * 3, 1.2)}deg"></div>`;
+        cards += rcard(r, need > 0 && n >= need ? 'need' : '', `z-index:10;--rot:${tilt(seed, .7)}deg;${wasEmpty ? `animation:cardIn .01s both;animation-delay:${Math.round(330 - el)}ms` : ''}`);
       }
       for (let k = 0; k < drop; k++) {
         const side = k % 2 ? 1 : -1;
-        cards += rcard(r, 'fly', `--rot:${tilt(hs(r), 1.8)}deg;--fx:${side * (10 + k * 6)}px;--fr:${side * (6 + k * 3)}deg;z-index:${30 + k};animation-delay:${Math.round(k * 120 - el)}ms`);
+        cards += rcard(r, 'fly', `--rot:${tilt(hs(r), .7)}deg;--fx:${side * (10 + k * 6)}px;--fr:${side * (6 + k * 3)}deg;z-index:${30 + k};animation-delay:${Math.round(k * 120 - el)}ms`);
       }
       const short = need > n;
       const store = g.storehouse[r];
@@ -1162,11 +1168,13 @@ export class UI {
         <div class="stack-cards">${cards}${n > 0 ? `<span class="count${n >= 100 ? ' l3' : ''}" data-ck="hand-${r}">${this.feel.value(`hand-${r}`, n)}</span>` : ''}</div>
         <span class="stack-label">${short ? `<b class="bad">need ${need - n} more</b>` : ''}${g.storehouse[r] ? ` <span class="store">+${g.storehouse[r]} stored</span>` : ''}&nbsp;</span></div>`;
     }).join('');
+    const stored = RES.filter((r) => g.storehouse[r] > 0);
+    const storeBox = stored.length ? `<div class="storebox"><div class="eyebrow">Storehouse</div>${stored.map((r) => `<span data-hl="store:${r}">${resDot(r)}${g.storehouse[r]} ${r}</span>`).join('')}<small>counts toward the tribute</small></div>` : '';
     const total = RES.reduce((s, r) => s + g.hand[r], 0);
     const countable = g.handCountable();
     // card slots
     const canPlay = g.canAct() && !this.busy;
-    const pcard = (it, name, tipKey, info, extra = '', hl = '') => `<div class="pcard ${it.rarity}" style="rotate:${tilt(hs(tipKey), 2)}deg" ${this.tipAttr(tipKey, info)} ${hl}><i class="dot" style="background:${CAT_DOT[it.cat] || '#a6a59e'}"></i><span class="art" style="background-position:${cardArt(it)}"></span><span class="nm">${esc(name)}</span>${extra}</div>`;
+    const pcard = (it, name, tipKey, info, extra = '', hl = '') => `<div class="pcard ${it.rarity}" style="rotate:${tilt(hs(tipKey), .8)}deg" ${this.tipAttr(tipKey, info)} ${hl}><i class="dot" style="background:${CAT_DOT[it.cat] || '#a6a59e'}"></i><span class="art" style="background-position:${cardArt(it)}"></span><span class="nm">${esc(name)}</span>${extra}</div>`;
     const cardSlots = Array.from({ length: g.limits.handSlots }, (_, i) => {
       const c = g.cards[i];
       if (!c) return '<div class="slot empty">Empty<br>card slot</div>';
@@ -1191,11 +1199,10 @@ export class UI {
     }).join('');
     this.$guilds.innerHTML = `<div><div class="zone-h" style="justify-content:flex-end">Guilds <b>${g.guilds.length} of ${g.limits.guildSlots}</b></div><div class="slots" style="--n:${g.limits.guildSlots}">${guildSlots}</div></div>`;
     this.$hand.innerHTML = `
-      <section class="zone"><div class="zone-h">Hand <b>${total} card${total === 1 ? '' : 's'}${countable > 7 ? ' · <span class="bad">over 7: a 7 makes you discard</span>' : ' · safe from the robber up to 7'}</b></div><div class="res-row">${stacks}</div></section>
+      <section class="zone"><div class="zone-h">Hand <b>${total} card${total === 1 ? '' : 's'}${countable > 7 ? ' · <span class="bad">over 7: a 7 makes you discard</span>' : ' · safe from the robber up to 7'}</b></div><div class="res-row">${stacks}${storeBox}</div></section>
       <section class="zone"><div class="zone-h">Cards <b>${g.cards.length} of ${g.limits.handSlots}</b></div><div class="slots" style="--n:${g.limits.handSlots}">${cardSlots}</div></section>`;
     const lz = this.$hand.firstElementChild;
     this.$stage.style.setProperty('--hand-l', `${lz ? lz.offsetHeight : 160}px`);
-    this.$stage.style.setProperty('--hand-r', `${this.$hand.lastElementChild ? this.$hand.lastElementChild.offsetHeight : 240}px`);
     if (this.view && this.$hand.offsetHeight !== this._handH) { this._handH = this.$hand.offsetHeight; this.view.fit(); }
     this.applyHighlights();
   }

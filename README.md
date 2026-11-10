@@ -22,12 +22,16 @@ No build step, no dependencies. It's plain HTML, CSS and JavaScript.
 
 The interface is dark and modern: greys, one vermilion accent for things you can press, medieval display type for titles and numbers.
 
-- **Left rail:** ante and round, where the run stands (Small / Big / Boss), running round effects, the Storehouse and the boss. Log, Help, Dev, New run and the screen-shake switch are at the bottom.
-- **Stations around the board:** the **tribute** hangs over the top of the island (progress bar per resource, "Ready to pay", and a PAID stamp once settled); **score and rolls left** sit in the bottom-right corner; the **dice tray** sits bottom-left. Hover any of them for details.
-- **Island** (centre): isometric halftone tiles with 3D-rendered pieces, number tokens in perspective, lying flat like printed paper on a very quiet black-and-white halftone tabletop (faint wood fibres) (the paper itself never moves, except when the table is hit). Drag to pan. Field upgrades show as a finish and rim on the hex and a ring on the token (hover for the upgrade's figure). The **stepper** on top shows where you are in the round: **Roll → Result → Build & trade → Tribute → Shop**.
-- **Hand** (bottom of the island): resources as card stacks, your single-use cards (with Play buttons), and your Guild slots top right. Cards carry rarity in their border: grey, silver-blue, or holo for legendary.
-- **Step panel** (right): what you can do right now, with one main button. How-to text sits in a fold-away "how it works" hint (the choice is remembered). Hovering a build option highlights the cards it would use. After a roll, what it changed or triggered pulses on screen and is listed under "Changed by this roll".
-- **Printed, not rendered:** cards, dice, number tokens and pieces look like things printed on stock: each card sits a little off-axis (stacks are uneven), the art plate is printed slightly out of register, the board pieces have a red/cyan plate fringe, there is paper tooth over cards and dice, and cards carry a thin warm bone outline. All of it is CSS (`--tooth`, `--bone-line`, `rotate: var(--rot)`); the tilt is steady per card, never random per frame.
+- **One stage, no side columns.** Everything sits on the table around the island:
+  - **Tribute** (top-left): progress bar per resource, "Ready to pay", and a PAID stamp once settled. The **boss** sits right beside it, since both are the pressure you play against.
+  - **Guilds** (top, before the menu) and the **menu** button (top-right): Log, Help, Dev tools, New run and the screen-shake switch.
+  - **Score and rolls left** (bottom-left, above your hand). The **Storehouse** sits beside the resource stacks it was shipped from.
+  - **Action card** (right, floating): Ante and Small / Big / Boss on top with the step indicator (Roll → Result → Build & trade → Tribute → Shop), the current step in the middle, then the one **dice area** (running effects as chips, both cubes, and the main button right below).
+  - **Dice:** click a die to open a sheet with its six faces and upgrades (hover a face for what it does).
+- **Island** (centre): isometric halftone tiles with 3D-rendered pieces, number tokens in perspective, lying flat like printed paper on a very quiet black-and-white halftone tabletop (faint wood fibres) (the paper itself never moves, except when the table is hit). Drag to pan. Field upgrades show as a finish and rim on the hex and a ring on the token (hover for the upgrade's figure).
+- **Hand** (bottom of the island): resources as card stacks, your single-use cards (with Play buttons). Guild slots are at the top. Cards carry rarity in their border: grey, silver-blue, or holo for legendary.
+- **Action card** (right): what you can do right now, with one main button. How-to text sits in a fold-away "how it works" hint (the choice is remembered). Hovering a build option highlights the cards it would use. After a roll, what it changed or triggered pulses on screen and is listed under "Changed by this roll".
+- **Printed, not rendered:** cards, dice, number tokens and pieces look like things printed on stock: each card sits a hair off-axis (stacks are slightly uneven), the art plate is printed barely out of register, the board pieces have a faint red/cyan plate fringe, there is a light paper tooth over cards and dice, and cards carry a thin warm bone outline. It is deliberately only slightly noticeable. All of it is CSS (`--tooth`, `--bone-line`, `rotate: var(--rot)`); the tilt is steady per card, never random per frame.
 - **Shop:** upgrades are shown as objects with the same figure they get in play (a face, die, token, hex or port modification); cards are shown as cards.
 
 | Key | Action |
@@ -122,8 +126,8 @@ Where the rulebook was open, the draft picks one reading. Each is a single spot 
 
 ## Code map (interface)
 
-- `js/ui.js`: rail, stations, stepper, panel, hand, shop, dialogs; implements the engine's `io` (board clicks, choices).
-- `js/feel.js`: game feel only, no rules: table shake and lamp flare on big hits (shake has a switch in the rail; reduced-motion turns shake, flare and counting off) and numbers that count up. The UI starts them when a roll lands (cards drop onto their stacks, score counts up), when a boss or the robber hits, and when a tribute is paid.
+- `js/ui.js`: stations, action card (step indicator, step, dice area), hand, shop, dialogs; implements the engine's `io` (board clicks, choices).
+- `js/feel.js`: game feel only, no rules: table shake and lamp flare on big hits (shake has a switch in the menu; reduced-motion turns shake, flare and counting off) and numbers that count up. The UI starts them when a roll lands (cards drop onto their stacks, score counts up), when a boss or the robber hits, and when a tribute is paid.
 - `js/board-view.js`: the island (tiles, pieces, ports, tokens, tabletop, camera, targets). Draws only; no rules.
 - `js/ports-atlas.js` + `assets/ports.webp`: the port pieces (generated): six 3D-modelled ports (brick, lumber, wool, grain, ore, generic), each rendered for the six coast directions with the same camera as the tiles and printed in the same two-tone halftone.
 - `js/figures.js`: the 43 upgrade figures, exported as `figure(id, scale)` (HTML).

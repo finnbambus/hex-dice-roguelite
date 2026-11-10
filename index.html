@@ -8,50 +8,43 @@
   <meta name="theme-color" content="#0c0d0f">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><polygon points='50,5 90,27 90,73 50,95 10,73 10,27' fill='%23ff4a1c'/></svg>">
   <link rel="preload" href="assets/fonts/grenze-gotisch-latin-600-normal.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="css/fonts.css?v=13">
-  <link rel="stylesheet" href="css/style.css?v=13">
+  <link rel="stylesheet" href="css/fonts.css?v=15">
+  <link rel="stylesheet" href="css/style.css?v=15">
 </head>
 <body>
   <div class="app">
-    <aside class="rail">
-      <div class="rail-head">
-        <div id="rail-eyebrow" class="eyebrow">Hex &amp; Dice</div>
-        <h1 id="rail-title">Roguelite</h1>
-      </div>
-      <div id="status" class="rail-body"></div>
-      <nav class="rail-foot">
-        <label class="switch" title="Shake the table on big hits"><input id="opt-shake" type="checkbox" checked><span>Screen shake on big hits</span></label>
-        <button data-top="log" title="Show the game log">Log</button>
-        <button data-top="help" title="How to play">Help</button>
-        <button data-top="dev" title="Testing tools">Dev</button>
-        <button data-top="new" title="Start a new run">New run</button>
-      </nav>
-    </aside>
     <main class="main">
       <section id="stage" class="stage">
         <div id="board" class="board" role="img" aria-label="Game board"></div>
         <div class="lamp" aria-hidden="true"></div>
         <div class="stage-top">
           <div class="top-l">
-            <nav id="stepper" class="stepper" aria-label="Round steps"></nav>
             <section id="tribute" class="tribute" aria-label="Tribute"></section>
+            <section id="boss" class="bossbox" aria-label="Boss"></section>
           </div>
           <div id="guilds" class="guilds"></div>
         </div>
+        <div class="menu">
+          <button id="menu-btn" class="menu-btn" aria-haspopup="true" aria-expanded="false" title="Menu" aria-label="Menu"><i></i><i></i><i></i></button>
+          <div id="menu-pop" class="menu-pop" hidden>
+            <button data-top="log" title="Show the game log">Log</button>
+            <button data-top="help" title="How to play">Help</button>
+            <button data-top="dev" title="Testing tools">Dev tools</button>
+            <button data-top="new" title="Start a new run">New run</button>
+            <label class="switch" title="Shake the table on big hits"><input id="opt-shake" type="checkbox" checked><span>Screen shake on big hits</span></label>
+          </div>
+        </div>
         <div id="prompt" class="board-prompt" hidden></div>
         <aside id="score" class="score" aria-label="Rolls and score"></aside>
-        <div class="corner">
-          <aside id="tray" class="tray" aria-label="Your dice"></aside>
-        </div>
         <footer id="hand" class="hand"></footer>
         <div id="overlay" class="stage-overlay" hidden></div>
+        <aside id="panel" class="panel"></aside>
       </section>
-      <aside id="panel" class="panel"></aside>
     </main>
   </div>
   <div id="drawer"></div>
   <div id="modal-root"></div>
   <noscript>This game needs JavaScript.</noscript>
-  <script type="module" src="js/main.js?v=13"></script>
+  <script type="module" src="js/main.js?v=15"></script>
 </body>
 </html>

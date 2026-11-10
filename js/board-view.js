@@ -63,7 +63,9 @@ export class BoardView {
     const r = this.el.getBoundingClientRect();
     if (!r.width) return;
     const hand = document.getElementById('hand');
-    const { top, right, left } = this.insets;
+    const { top, left } = this.insets;
+    const panel = document.getElementById('panel');
+    const right = this.insets.right + (panel && getComputedStyle(panel).position === 'absolute' ? panel.offsetWidth + 16 : 0); // the action card floats over the right edge
     const bottom = Math.max(this.insets.bottom, hand ? hand.offsetHeight + 14 : 0);
     const aw = Math.max(200, r.width - left - right), ah = Math.max(200, r.height - top - bottom);
     this.scale = Math.min(aw / 1075, ah / 730);
@@ -184,7 +186,7 @@ export class BoardView {
       const dim = resultMode && !hit && !match;
       const n = pips(h.token);
       const dots = h.hidden ? '' : `<b class="pips">${'<i></i>'.repeat(n)}</b>`;
-      out.push(`<div class="tok${hot && !h.hidden ? ' hot' : ''}${hit || match ? ' lit' : ''}${dim ? ' dim' : ''}" style="left:${f1(this.hx(h) - 20)}px;top:${f1(this.hy(h) - 20 * K)}px;height:${f1(40 * K)}px;z-index:${this.zRow(h) + 7}"><div class="in" style="transform:scaleY(${K}) rotate(${tilt(h.id + 3, 5)}deg)"><span class="n">${h.hidden ? '?' : h.token}</span>${dots}</div></div>`);
+      out.push(`<div class="tok${hot && !h.hidden ? ' hot' : ''}${hit || match ? ' lit' : ''}${dim ? ' dim' : ''}" style="left:${f1(this.hx(h) - 20)}px;top:${f1(this.hy(h) - 20 * K)}px;height:${f1(40 * K)}px;z-index:${this.zRow(h) + 7}"><div class="in" style="transform:scaleY(${K}) rotate(${tilt(h.id + 3, 1.8)}deg)"><span class="n">${h.hidden ? '?' : h.token}</span>${dots}</div></div>`);
     }
     // field upgrades: a finish and rim on the hex, a ring and a chip on the token (same palette as the upgrade figures)
     for (const h of B.hexes) {
@@ -249,7 +251,7 @@ export class BoardView {
     const [sx, sy, w, h] = at.s;
     const left = Mx + at.o[0] * c, top = My + at.o[1] * c;
     out.push(`<div class="pport${target ? ' target' : ''}" style="left:${f1(left)}px;top:${f1(top)}px;width:${f1(w * c)}px;height:${f1(h * c)}px;background-size:${f1(PORT_SHEET[0] * c)}px ${f1(PORT_SHEET[1] * c)}px;background-position:${f1(-sx * c)}px ${f1(-sy * c)}px;z-index:${z}"></div>`);
-    out.push(`<div class="tok ptok ${generic ? 'any' : p.type}" style="left:${f1(tx - 24)}px;top:${f1(ty - 20 * K)}px;height:${f1(40 * K)}px;z-index:${z + 4}"><div class="in" style="transform:scaleY(${K}) rotate(${tilt((p.id ?? 0) + 40, 4)}deg)"><span class="n">${generic ? '3:1' : '2:1'}</span><small>${generic ? 'any' : p.type}</small></div></div>`);
+    out.push(`<div class="tok ptok ${generic ? 'any' : p.type}" style="left:${f1(tx - 24)}px;top:${f1(ty - 20 * K)}px;height:${f1(40 * K)}px;z-index:${z + 4}"><div class="in" style="transform:scaleY(${K}) rotate(${tilt((p.id ?? 0) + 40, 1.4)}deg)"><span class="n">${generic ? '3:1' : '2:1'}</span><small>${generic ? 'any' : p.type}</small></div></div>`);
     if (up) out.push(`<em class="pup" style="left:${f1(tx)}px;top:${f1(ty - 40)}px;z-index:${z + 6}">${up}</em>`);
     const pts = at.p.map(([x, y]) => `${f1(x * c)},${f1(y * c)}`).join(' ');
     out.push(`<svg class="phit${target ? ' target' : ''}" ${target ? `data-k="port" data-id="${p.id}"` : ''} style="left:${f1(left)}px;top:${f1(top)}px;z-index:${z + 8}" width="${f1(w * c)}" height="${f1(h * c)}" viewBox="0 0 ${f1(w * c)} ${f1(h * c)}"><polygon points="${pts}"><title>${esc(title)}</title></polygon></svg>`);
