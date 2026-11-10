@@ -61,7 +61,9 @@ export class BoardView {
   fit() {
     const r = this.el.getBoundingClientRect();
     if (!r.width) return;
-    const { top, right, bottom, left } = this.insets;
+    const hand = document.getElementById('hand');
+    const { top, right, left } = this.insets;
+    const bottom = Math.max(this.insets.bottom, hand ? hand.offsetHeight + 14 : 0);
     const aw = Math.max(200, r.width - left - right), ah = Math.max(200, r.height - top - bottom);
     this.scale = Math.min(aw / 1075, ah / 700);
     this.cx = left + aw / 2;

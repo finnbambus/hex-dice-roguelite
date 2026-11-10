@@ -6,8 +6,8 @@
 import { Game, COSTS, BLINDS } from './game.js';
 import { RES, TERRAIN_RES, pips } from './board.js';
 import { ITEMS, ITEM_LIST, BOSS_BY_ID, ROLLS_PER_ROUND, LOADING, START_SETTLEMENTS, ECHO_BREAK } from './content.js';
-import { BoardView } from './board-view.js';
-import { figure } from './figures.js';
+import { BoardView } from './board-view.js?v=3';
+import { figure } from './figures.js?v=3';
 
 const TERRAIN_COLOR = { hills: '#c8734a', forest: '#3f7d4a', pasture: '#9ccf6a', fields: '#e8c547', mountains: '#8e939c', desert: '#e3d3a4' };
 const RES_ICON = { brick: 'B', lumber: 'L', wool: 'W', grain: 'G', ore: 'O' };
@@ -37,6 +37,19 @@ const CARD_ART = { knight: 5, marshal: 5, cartographer: 4, roadBuilding: 4, town
 const CAT_ART = { classic: 5, edict: 11, guild: 3, charter: 3, face: 0, die: 1, token: 0, hex: 7, port: 3 };
 const CAT_DOT = { classic: '#d4a845', edict: '#a8b872', guild: '#8494ad', charter: '#b5593f' };
 const CAT_SHORT = { classic: 'Card', edict: 'Edict', guild: 'Guild', charter: 'Charter' };
+// A die face drawn as a face: pips for numbers, the special marks for mirror / robber / blank faces.
+const PIP_AT = { 1: [[50, 50]], 2: [[28, 28], [72, 72]], 3: [[28, 28], [50, 50], [72, 72]], 4: [[28, 28], [72, 28], [28, 72], [72, 72]], 5: [[28, 28], [72, 28], [50, 50], [28, 72], [72, 72]], 6: [[28, 26], [72, 26], [28, 50], [72, 50], [28, 74], [72, 74]] };
+const svgUrl = (body) => `url('data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'>${body}</svg>`).replace(/'/g, '%27').replace(/\(/g, '%28').replace(/\)/g, '%29')}')`;
+const faceArt = (f, loaded) => {
+  const tone = loaded ? '#e6cf8c' : '#e9e4d6';
+  let bg = tone, inner = '';
+  if (f.setter === 'mirror') bg = `${svgUrl("<circle cx='50' cy='50' r='27' fill='#e9e4d6'/><circle cx='50' cy='50' r='17' fill='#17181b'/>")} center/100% 100% no-repeat, #17181b`;
+  else if (f.setter === 'robber') { bg = '#17181b'; inner = '<span class="lbl">R</span>'; }
+  else if (f.setter === 'blank') { bg = '#17181b'; inner = '<span class="lbl">?</span>'; }
+  else bg = `${svgUrl(PIP_AT[f.value].map((q) => `<circle cx='${q[0]}' cy='${q[1]}' r='8.5' fill='#17181b'/>`).join(''))} center/100% 100% no-repeat, ${tone}`;
+  const marks = f.triggers.length ? `<i class="trg">${[...new Set(f.triggers)].map((t) => TRIG_LABEL[t]).join('')}</i>` : '';
+  return `<span class="fa" style="background:${bg}">${inner}${marks}</span>`;
+};
 const UPGRADE_CATS = ['face', 'die', 'token', 'hex', 'port'];
 const cardArt = (it) => artPos(CARD_ART[it.id] ?? CAT_ART[it.cat] ?? 3);
 
@@ -623,7 +636,7 @@ export class UI {
     const d = this.game.dice[i];
     return `<div class="faces">${d.faces.map((f, k) => {
       const loaded = d.loaded && d.loaded.face === k;
-      return `<span class="face ${loaded ? 'loaded' : ''} ${shownFace === k ? 'shown' : ''}" ${this.tipAttr(`face:${i}:${k}`, this.faceInfo(i, k))} data-hl="face:${i}:${k}">${f.setter ? FACE_LABEL[f.setter] : f.value}${f.triggers.length ? `<i>${this.triggerCounts(f).map(([t, n]) => `${TRIG_LABEL[t]}${n > 1 ? '×' + n : ''}`).join('')}</i>` : ''}</span>`;
+      return `<span class="face ${loaded ? 'loaded' : ''} ${shownFace === k ? 'shown' : ''}" ${this.tipAttr(`face:${i}:${k}`, this.faceInfo(i, k))} data-hl="face:${i}:${k}">${faceArt(f, loaded)}</span>`;
     }).join('')}</div>`;
   }
 
@@ -943,7 +956,7 @@ export class UI {
       <div class="shop-grid">${offers}</div>
       <div class="shop-foot"><button data-a="reroll" ${g.budget >= g.rerollPrice ? '' : 'disabled'}>Reroll offers · ${g.rerollPrice} VP</button><span class="small muted">Dice, field and port upgrades ask you to pick their target after you buy.</span></div>
       <div class="shop-have"><div class="rcard-box"><div class="eyebrow">Your dice</div><div class="mini-dice">${[0, 1].map((i) => `<div class="mini-die">${this.facesHtml(i, null)}${this.dieTags(i)}</div>`).join('')}</div></div>
-      <div class="rcard-box"><div class="eyebrow">Guilds <b>${g.guilds.length} of ${g.limits.guildSlots}</b></div><div class="slots">${guilds || '<span class="small muted">None yet.</span>'}</div></div></div></div>`;
+      <div class="rcard-box"><div class="eyebrow">Guilds <b>${g.guilds.length} of ${g.limits.guildSlots}</b></div><div class="slots" style="--n:${Math.max(1, g.limits.guildSlots)}">${guilds || '<span class="small muted">None yet.</span>'}</div></div></div></div>`;
   }
 
   viewGameOver() {
@@ -1011,10 +1024,11 @@ export class UI {
       const info = { kind: 'Guild · always on', title: nm, desc: it.desc, now, lines: [`Rarity: ${it.rarity}`] };
       return `<div class="slot-wrap">${pcard(it, nm, `guild:${gd.uid}`, info)}</div>`;
     }).join('');
-    this.$guilds.innerHTML = `<div><div class="zone-h" style="justify-content:flex-end">Guilds <b>${g.guilds.length} of ${g.limits.guildSlots}</b></div><div class="slots">${guildSlots}</div></div>`;
+    this.$guilds.innerHTML = `<div><div class="zone-h" style="justify-content:flex-end">Guilds <b>${g.guilds.length} of ${g.limits.guildSlots}</b></div><div class="slots" style="--n:${g.limits.guildSlots}">${guildSlots}</div></div>`;
     this.$hand.innerHTML = `
       <section class="zone"><div class="zone-h">Hand <b>${total} card${total === 1 ? '' : 's'}${countable > 7 ? ' · <span class="bad">over 7: a 7 makes you discard</span>' : ' · safe from the robber up to 7'}</b></div><div class="res-row">${stacks}</div></section>
-      <section class="zone"><div class="zone-h">Cards <b>${g.cards.length} of ${g.limits.handSlots}</b></div><div class="slots">${cardSlots}</div></section>`;
+      <section class="zone"><div class="zone-h">Cards <b>${g.cards.length} of ${g.limits.handSlots}</b></div><div class="slots" style="--n:${g.limits.handSlots}">${cardSlots}</div></section>`;
+    if (this.view && this.$hand.offsetHeight !== this._handH) { this._handH = this.$hand.offsetHeight; this.view.fit(); }
     this.applyHighlights();
   }
 
@@ -1056,7 +1070,7 @@ export class UI {
       const dieBlock = (d) => `<div class="small muted">Die ${d + 1}</div><div class="face-grid">${m.options.map((o, i) => {
         if (o.die !== d) return '';
         const f = g.dice[d].faces[o.face];
-        return `<button data-a="face" data-i="${i}" title="${esc(f.triggers.map((t) => ITEMS[t].name).join(', '))}">${f.setter ? FACE_LABEL[f.setter] : f.value}<small>${f.triggers.map((t) => TRIG_LABEL[t]).join(' ') || '&nbsp;'}</small></button>`;
+        return `<button data-a="face" data-i="${i}" title="${esc(f.triggers.map((t) => ITEMS[t].name).join(', ') || (f.setter ? ITEMS[SETTER_ITEM[f.setter]].name : 'Shows ' + f.value))}">${faceArt(f, d.loaded && d.loaded.face === o.face)}</button>`;
       }).join('')}</div>`;
       return `<div class="modal" role="dialog" aria-modal="true"><h2>${esc(m.prompt)}</h2><p class="small muted">Upgrades stay on the physical face, not on its number. A new value-setter replaces the old one; triggers stack.</p>${dieBlock(0)}${dieBlock(1)}<div class="modal-foot">${cancel}</div></div>`;
     }
