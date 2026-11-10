@@ -9,23 +9,28 @@
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-  <header class="top">
-    <h1>Hex &amp; Dice <small>roguelite · draft 0.1</small></h1>
-    <div class="top-actions">
-      <label class="seed">Seed <input id="seed" type="number" min="1"></label>
-      <button data-top="new">New run</button>
-      <button data-top="help">How to play</button>
-      <button data-top="dev" class="ghost">Dev tools</button>
-    </div>
-  </header>
-  <main class="layout">
-    <section class="board-col">
-      <div id="prompt" class="prompt" hidden></div>
-      <svg id="board" viewBox="-5.3 -4.9 10.6 9.8" role="img" aria-label="Game board"></svg>
-      <div id="below" class="below"></div>
-    </section>
-    <aside id="side" class="side"></aside>
-  </main>
+  <div class="app">
+    <header class="topbar">
+      <div class="brand">Hex &amp; Dice <small>draft 0.2</small></div>
+      <div id="status" class="status"></div>
+      <nav class="menu">
+        <button data-top="log" title="Show the game log">Log</button>
+        <button data-top="help" title="How to play">Help</button>
+        <button data-top="dev" title="Testing tools">Dev</button>
+        <button data-top="new" title="Start a new run">New run</button>
+      </nav>
+    </header>
+    <main class="main">
+      <section id="stage" class="stage">
+        <svg id="board" viewBox="-5.3 -4.9 10.6 9.8" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Game board"></svg>
+        <div id="prompt" class="board-prompt" hidden></div>
+        <div id="overlay" class="stage-overlay" hidden></div>
+      </section>
+      <aside id="panel" class="panel"></aside>
+    </main>
+    <footer id="hand" class="hand"></footer>
+  </div>
+  <div id="drawer"></div>
   <div id="modal-root"></div>
   <noscript>This game needs JavaScript.</noscript>
   <script type="module" src="js/main.js"></script>

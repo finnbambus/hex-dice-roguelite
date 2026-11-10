@@ -20,14 +20,19 @@ No build step, no dependencies. It's plain HTML, CSS and JavaScript.
 
 ### How the screen works
 
-The board is on the left with the log underneath. The right side walks you through each round one step at a time: **Roll → Result → Build & trade → … → Tribute → Shop**. Each step shows only what you can do right now; unavailable actions say why (e.g. "Need 1 brick more"). The header always shows the tribute due, whether you can pay it yet, rolls left and your resources.
+The game fills the browser window:
+
+- **Top bar:** current ante and round, rolls left, the tribute due (with a ✓ when you can already pay it), score, rounds survived and the boss. Hover the boss for its drawback.
+- **Board** (centre) with the **step panel** beside it. The panel walks you through each round: **Roll → Result → Build & trade → … → Tribute → Shop**. It shows only what you can do right now, explains anything unavailable (e.g. "Need 1 lumber more"), and has one main button at the bottom to move on. Hovering a build option highlights the cards it would use in your hand.
+- **Hand** (bottom): your resources as card stacks, your single-use card slots (with Play buttons), your Guild slots, and both dice with their faces and upgrades.
+- **Log** and **Dev tools** open in a side drawer from the top bar.
 
 | Key | Action |
 | --- | --- |
 | `Enter` / `Space` | The step's main button (roll, continue, pay, next round) |
-| `Esc` | Cancel the current choice / close a dialog |
+| `Esc` | Cancel the current choice / close a dialog or drawer |
 
-Every run has a **seed** (shown top right and in the URL, e.g. `?seed=4242`). The same seed gives the same board and the same dice, as long as you make the same choices, so a bug or a fun situation can be shared as a link.
+Every run has a **seed** (shown top right and in the URL, e.g. `?seed=4242`). The same seed gives the same board and the same dice (start one from New run), as long as you make the same choices, so a bug or a fun situation can be shared as a link.
 
 ### Dev tools
 
@@ -47,7 +52,7 @@ The `.nojekyll` file stops GitHub from running Jekyll over the files. All paths 
 index.html          page shell
 css/style.css       placeholder styling (light and dark mode)
 js/main.js          bootstraps the UI, reads ?seed=
-js/ui.js            rendering (SVG board, step-by-step panel, dialogs) and the browser `io`
+js/ui.js            rendering (status bar, SVG board, step panel, hand, dialogs) and the browser `io`
 js/game.js          the rules engine (no DOM access)
 js/content.js       all shop items, bosses and tables as data
 js/board.js         board geometry and random board generation
