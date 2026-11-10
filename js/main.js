@@ -1,4 +1,4 @@
-import { UI } from './ui.js?v=10';
+import { UI } from './ui.js?v=11';
 
 const ui = new UI();
 const params = new URLSearchParams(location.search);
