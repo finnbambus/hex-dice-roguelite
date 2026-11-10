@@ -939,8 +939,8 @@ export class UI {
       const btn = `<button class="${can ? 'primary' : ''} buy" data-a="buy" data-i="${i}" ${can ? '' : 'disabled'}>${s.sold ? 'Bought' : afford ? `Buy · ${price === Infinity ? 'max' : price} VP` : `${price} VP · need ${price - g.budget} more`}</button>`;
       if (s.kind === 'pack') {
         return `<div class="offer pack ${s.sold ? 'sold' : ''}"><div class="o-top"><span>Pack · ${esc(s.group)}</span><span>Choose 1 of 3</span></div>
-          <div class="o-stage"><div class="booster">${s.options.map((o) => `<div class="b-row"><span>${esc(o.name)}</span><em class="rarity-${o.rarity}">${o.rarity}</em></div>`).join('')}</div></div>
-          <div class="o-name">A pack of three</div><div class="o-desc">Pick the one you want after you buy.</div>${priceTag(price)}${btn}</div>`;
+          <div class="o-stage"><div class="sealed"><i></i><i></i><i><b>?</b></i></div></div>
+          <div class="o-name">A pack of three</div><div class="o-desc">Open it after you buy, then keep one.</div>${priceTag(price)}${btn}</div>`;
       }
       const it = s.item;
       const desc = `${it.desc}${it.id === 'loaded' ? ' Price rises with the level.' : ''}`;

@@ -443,3 +443,11 @@ select, input { font: inherit; color: var(--ink); background: var(--inset); bord
   .hand { position: static; background: var(--rail); padding: 14px; flex-wrap: wrap; border-top: 1px solid var(--line); }
 }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; } }
+
+/* sealed pack: three face-down cards, contents hidden until bought */
+.sealed { position: relative; width: 150px; height: 190px; }
+.sealed i { position: absolute; top: 14px; left: 22px; width: 104px; height: 144px; border-radius: 10px; border: 1.5px solid var(--line2); background: #1d1e22 radial-gradient(rgba(255, 255, 255, .06) .9px, transparent 1.4px) 0 0 / 5px 5px; box-shadow: 0 8px 14px -8px rgba(0, 0, 0, .8); display: flex; align-items: center; justify-content: center; }
+.sealed i:nth-child(1) { transform: rotate(-11deg) translateX(-18px); }
+.sealed i:nth-child(2) { transform: rotate(-3deg) translateX(-2px); }
+.sealed i:nth-child(3) { transform: rotate(7deg) translateX(14px); border-color: var(--accent); }
+.sealed b { font: 800 44px/1 var(--display); color: var(--accent); }
