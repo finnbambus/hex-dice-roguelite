@@ -6,9 +6,9 @@
 import { Game, COSTS, BLINDS } from './game.js';
 import { RES, TERRAIN_RES, pips } from './board.js';
 import { ITEMS, ITEM_LIST, BOSS_BY_ID, ROLLS_PER_ROUND, LOADING, START_SETTLEMENTS, ECHO_BREAK } from './content.js';
-import { BoardView } from './board-view.js?v=12';
-import { figure } from './figures.js?v=12';
-import { Feel } from './feel.js?v=12';
+import { BoardView } from './board-view.js?v=13';
+import { figure } from './figures.js?v=13';
+import { Feel } from './feel.js?v=13';
 
 const TERRAIN_COLOR = { hills: '#c8734a', forest: '#3f7d4a', pasture: '#9ccf6a', fields: '#e8c547', mountains: '#8e939c', desert: '#e3d3a4' };
 const RES_ICON = { brick: 'B', lumber: 'L', wool: 'W', grain: 'G', ore: 'O' };
@@ -28,6 +28,9 @@ const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&l
 const resDot = (r) => `<span class="res-dot" style="background:var(--${r})"></span>`;
 const HL_MS = 3600; // how long a roll's highlights (pulses, +1 badges) stay lit
 const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+// Printed things sit a little off-axis. The tilt is steady: the same card always leans the same way.
+const hs = (str) => [...String(str)].reduce((a, c) => (a * 31 + c.charCodeAt(0)) | 0, 7);
+const tilt = (n, amp) => { const r = Math.sin(n * 127.1 + 311.7) * 43758.5453; return +((r - Math.floor(r) - 0.5) * 2 * amp).toFixed(2); };
 
 // Halftone art is printed straight onto the card stock: one cell of the 5 × 4 art sheet per subject.
 const ART_CELL = { brick: 13, lumber: 14, wool: 15, grain: 16, ore: 17 };
@@ -1138,12 +1141,13 @@ export class UI {
       if (n === 0) cards = `<div class="rcard empty" style="--c:var(--${r})"><i class="dot"></i><span class="nm">No ${r}</span></div>`;
       else {
         const under = Math.min(n - 1, 4);
-        for (let k = under; k >= 1; k--) cards += `<div class="rcard under" style="left:${-3 * k}px;top:${-3 * k}px;z-index:${5 - k}"></div>`;
-        cards += rcard(r, need > 0 && n >= need ? 'need' : '', `z-index:10;${wasEmpty ? `animation:cardIn .01s both;animation-delay:${Math.round(330 - el)}ms` : ''}`);
+        const seed = hs(r);
+        for (let k = under; k >= 1; k--) cards += `<div class="rcard under" style="left:${(-3 * k + tilt(seed + k * 7, 2.2)).toFixed(1)}px;top:${(-3 * k + tilt(seed + k * 13, 1.6)).toFixed(1)}px;z-index:${5 - k};--rot:${tilt(seed + k * 3, 3.2)}deg"></div>`;
+        cards += rcard(r, need > 0 && n >= need ? 'need' : '', `z-index:10;--rot:${tilt(seed, 1.8)}deg;${wasEmpty ? `animation:cardIn .01s both;animation-delay:${Math.round(330 - el)}ms` : ''}`);
       }
       for (let k = 0; k < drop; k++) {
         const side = k % 2 ? 1 : -1;
-        cards += rcard(r, 'fly', `--fx:${side * (10 + k * 6)}px;--fr:${side * (6 + k * 3)}deg;z-index:${30 + k};animation-delay:${Math.round(k * 120 - el)}ms`);
+        cards += rcard(r, 'fly', `--rot:${tilt(hs(r), 1.8)}deg;--fx:${side * (10 + k * 6)}px;--fr:${side * (6 + k * 3)}deg;z-index:${30 + k};animation-delay:${Math.round(k * 120 - el)}ms`);
       }
       const short = need > n;
       const store = g.storehouse[r];
@@ -1162,7 +1166,7 @@ export class UI {
     const countable = g.handCountable();
     // card slots
     const canPlay = g.canAct() && !this.busy;
-    const pcard = (it, name, tipKey, info, extra = '', hl = '') => `<div class="pcard ${it.rarity}" ${this.tipAttr(tipKey, info)} ${hl}><i class="dot" style="background:${CAT_DOT[it.cat] || '#a6a59e'}"></i><span class="art" style="background-position:${cardArt(it)}"></span><span class="nm">${esc(name)}</span>${extra}</div>`;
+    const pcard = (it, name, tipKey, info, extra = '', hl = '') => `<div class="pcard ${it.rarity}" style="rotate:${tilt(hs(tipKey), 2)}deg" ${this.tipAttr(tipKey, info)} ${hl}><i class="dot" style="background:${CAT_DOT[it.cat] || '#a6a59e'}"></i><span class="art" style="background-position:${cardArt(it)}"></span><span class="nm">${esc(name)}</span>${extra}</div>`;
     const cardSlots = Array.from({ length: g.limits.handSlots }, (_, i) => {
       const c = g.cards[i];
       if (!c) return '<div class="slot empty">Empty<br>card slot</div>';

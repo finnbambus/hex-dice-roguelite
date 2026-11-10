@@ -22,6 +22,10 @@
   --common: #a6a59e;
   --rare: #9cc0e6;
   --legendary: #e3b95f;
+  --bone-line: rgba(226, 218, 196, .55);
+  /* paper tooth: sparse flecks, warm on dark stock (cards), dark on cream stock (dice, tokens) */
+  --tooth: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='170' height='170'%3E%3Cfilter id='n' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' seed='7' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .92 0 0 0 0 .88 0 0 0 0 .76 0 0 0 5 -2.55'/%3E%3C/filter%3E%3Crect width='170' height='170' filter='url(%23n)'/%3E%3C/svg%3E");
+  --tooth-dk: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='170' height='170'%3E%3Cfilter id='n' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='2' seed='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .12 0 0 0 0 .1 0 0 0 0 .08 0 0 0 5 -2.55'/%3E%3C/filter%3E%3Crect width='170' height='170' filter='url(%23n)'/%3E%3C/svg%3E");
   --brick: #b5593f;
   --lumber: #5c8a55;
   --wool: #a8b872;
@@ -229,7 +233,11 @@ select, input { font: inherit; color: var(--ink); background: var(--inset); bord
 @keyframes ring { 0% { box-shadow: 0 0 0 0 rgba(255, 74, 28, .6); } 100% { box-shadow: 0 0 0 14px rgba(255, 74, 28, 0); } }
 .tok { position: absolute; width: 40px; border-radius: 50%; background: var(--bone); box-shadow: 0 3px 0 #8f8a7c, 0 7px 10px rgba(0, 0, 0, .6); pointer-events: none; transition: opacity .25s; }
 .tok .in { position: absolute; left: 0; top: 50%; width: 40px; height: 40px; margin-top: -20px; display: flex; align-items: center; justify-content: center; color: #17181b; }
-.tok .n { font: 800 23px/40px var(--display); display: block; transform: translateY(-3px); }
+.tok .n { font: 800 23px/40px var(--display); display: block; transform: translateY(-3px); text-shadow: 1.4px .9px 0 rgba(255, 74, 28, .5); }
+.tok::after { content: ""; position: absolute; inset: 0; border-radius: 50%; background: var(--tooth-dk); opacity: .3; pointer-events: none; }
+.tok { outline: 1px solid rgba(23, 24, 27, .75); }
+/* the pieces are printed from two plates that never quite agree */
+.sprite, .pport:not(.target) { filter: drop-shadow(2.8px 1.6px 0 rgba(255, 74, 28, .5)) drop-shadow(-2px -1px 0 rgba(96, 170, 200, .38)); }
 .tok .pips { position: absolute; left: 0; right: 0; top: 28px; display: flex; justify-content: center; gap: 1.5px; }
 .tok .pips i { width: 2.6px; height: 2.6px; border-radius: 50%; background: currentColor; opacity: .75; }
 .tok.hot { color: #a3271a; }
@@ -300,7 +308,8 @@ select, input { font: inherit; color: var(--ink); background: var(--inset); bord
 .cube.rolling { animation: tumble .85s cubic-bezier(.15, .75, .25, 1) both; }
 @keyframes tumble { from { transform: rotateX(var(--rx0)) rotateY(var(--ry0)) rotateZ(var(--rz0)); } to { transform: var(--final); } }
 @keyframes reveal { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
-.side { position: absolute; inset: 0; border-radius: 0; background: var(--bone); border: 1px solid rgba(0, 0, 0, .32); backface-visibility: hidden; display: flex; align-items: center; justify-content: center; }
+.side::after, .fa::after { content: ""; position: absolute; inset: 0; background: var(--tooth-dk); opacity: .26; pointer-events: none; }
+.side { position: absolute; inset: 0; border-radius: 0; background: var(--bone); border: 1px solid rgba(23, 24, 27, .55); backface-visibility: hidden; display: flex; align-items: center; justify-content: center; }
 .side.front { transform: translateZ(28px); }
 .side.back { transform: rotateY(180deg) translateZ(28px); }
 .side.right { transform: rotateY(90deg) translateZ(28px); }
@@ -315,7 +324,10 @@ select, input { font: inherit; color: var(--ink); background: var(--inset); bord
 .die-val.changed { color: var(--accent); }
 .faces { display: flex; gap: 4px; }
 .face { flex: 1; min-width: 0; aspect-ratio: 1; padding: 0; position: relative; }
-.fa { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; border: 1px solid rgba(0, 0, 0, .4); container-type: inline-size; }
+.face:nth-child(3n+1) .fa { rotate: -2.2deg; }
+.face:nth-child(3n+2) .fa { rotate: 1.6deg; }
+.face:nth-child(3n) .fa { rotate: -.6deg; }
+.fa { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; border: 1px solid rgba(23, 24, 27, .6); container-type: inline-size; }
 .fa .lbl { font: 800 62cqw/1 var(--display); color: var(--bone); }
 .fa .trg { position: absolute; right: 8%; bottom: 6%; font: 600 22cqw/1 var(--mono); font-style: normal; color: #a3271a; }
 .face.loaded .fa { box-shadow: inset 0 0 0 2px var(--legendary); }
@@ -412,11 +424,12 @@ select, input { font: inherit; color: var(--ink); background: var(--inset); bord
 @media (max-width: 1100px) { .res-row { zoom: .56; } }
 .stack { position: relative; width: 94px; padding: 12px 0 0 12px; display: flex; flex-direction: column; align-items: center; gap: 4px; }
 .stack-cards { position: relative; width: 82px; height: 112px; }
-.rcard { position: absolute; left: 0; top: 0; width: 82px; height: 112px; border-radius: 9px; border: 1px solid var(--line2); background-color: #1d1e22; background-image: radial-gradient(rgba(255, 255, 255, .035) .8px, transparent 1.3px); background-size: 5px 5px; box-shadow: 0 1px 0 #0b0b0d, 0 14px 16px -8px rgba(0, 0, 0, .9); overflow: hidden; color: var(--ink); }
+.rcard { position: absolute; left: 0; top: 0; width: 82px; height: 112px; rotate: var(--rot, 0deg); border-radius: 9px; border: 1px solid var(--bone-line); background-color: #1d1e22; background-image: radial-gradient(rgba(255, 255, 255, .035) .8px, transparent 1.3px); background-size: 5px 5px; box-shadow: 0 1px 0 #0b0b0d, 0 14px 16px -8px rgba(0, 0, 0, .9); overflow: hidden; color: var(--ink); }
 .rcard .dot { position: absolute; left: 9px; top: 9px; width: 6px; height: 6px; border-radius: 50%; background: var(--c); }
 .rcard .art { position: absolute; left: 8%; right: 8%; top: 13%; height: 54%; background: url(../assets/art.webp) no-repeat; background-size: 500% 400%; }
 .rcard .nm { position: absolute; left: 0; right: 0; bottom: 9px; text-align: center; font: 600 14px/1 var(--display); }
-.rcard.under { background-image: none; box-shadow: 0 1px 0 #0b0b0d; }
+.rcard.under { background-image: none; border-color: rgba(226, 218, 196, .3); box-shadow: 0 1px 0 #0b0b0d; }
+.rcard.empty::after { display: none; }
 .rcard.empty { background: transparent; border: 1px dashed var(--line2); box-shadow: none; }
 .rcard.empty .nm { top: 50%; bottom: auto; transform: translateY(-50%); font: 600 8.5px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--dim); }
 .rcard.need { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent), 0 8px 14px -8px rgba(0, 0, 0, .8); }
@@ -433,6 +446,12 @@ select, input { font: inherit; color: var(--ink); background: var(--inset); bord
 .slot-wrap { display: flex; flex-direction: column; align-items: stretch; gap: 7px; min-width: 0; }
 .pcard { position: relative; width: 100%; aspect-ratio: 78 / 108; container-type: inline-size; border-radius: 10px; border: 3px solid transparent; background: linear-gradient(#1d1e22, #1d1e22) padding-box, var(--band, #3a3c42) border-box; box-shadow: 0 1px 0 #0b0b0d, 0 14px 18px -8px rgba(0, 0, 0, .9); overflow: hidden; }
 .pcard.common { border-width: 1.5px; --band: #3a3c42; }
+.pcard { outline: 1px solid var(--bone-line); }
+/* printed on stock: paper tooth over every card, and the art plate printed a hair off register */
+.rcard::after, .pcard::after { content: ""; position: absolute; inset: 0; border-radius: inherit; background: var(--tooth); opacity: .2; pointer-events: none; }
+.rcard .art::before, .pcard .art::before { content: ""; position: absolute; inset: 0; background: inherit; filter: sepia(1) saturate(4) hue-rotate(-34deg) brightness(.8); mix-blend-mode: screen; transform: translate(2.4px, 1.6px); opacity: .42; pointer-events: none; }
+.pcard .art::before { transform: translate(2.4cqw, 1.5cqw); }
+.pcard.big .art::before { transform: translate(2.6px, 1.6px); }
 .pcard.rare { --band: linear-gradient(135deg, #e6edf6, #7f93ad 45%, #dbe5f2); }
 .pcard.legendary { --band: linear-gradient(135deg, #ff7a5c, #f3c14b 28%, #6fd6a6 52%, #6aa8ff 76%, #c78aff); }
 .pcard .dot { position: absolute; left: 8cqw; top: 8cqw; width: 6cqw; height: 6cqw; border-radius: 50%; }
