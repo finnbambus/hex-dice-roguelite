@@ -64,8 +64,8 @@ export class BoardView {
     if (!r.width) return;
     const hand = document.getElementById('hand');
     const { top, left } = this.insets;
-    const panel = document.getElementById('panel');
-    const right = this.insets.right + (panel && getComputedStyle(panel).position === 'absolute' ? panel.offsetWidth + 56 : 0); // the action card floats over the right edge
+    const col = document.querySelector('.rcol');
+    const right = this.insets.right + (col && getComputedStyle(col).position === 'absolute' ? col.offsetWidth + 24 : 0); // the right column floats over the right edge
     const bottom = Math.max(this.insets.bottom, hand ? hand.offsetHeight + 14 : 0);
     const aw = Math.max(200, r.width - left - right), ah = Math.max(200, r.height - top - bottom);
     this.scale = Math.min(aw / 1075, ah / 730);

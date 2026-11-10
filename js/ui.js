@@ -6,9 +6,9 @@
 import { Game, COSTS, BLINDS } from './game.js';
 import { RES, TERRAIN_RES, pips } from './board.js';
 import { ITEMS, ITEM_LIST, BOSS_BY_ID, ROLLS_PER_ROUND, LOADING, START_SETTLEMENTS, ECHO_BREAK } from './content.js';
-import { BoardView } from './board-view.js?v=16';
-import { figure } from './figures.js?v=16';
-import { Feel } from './feel.js?v=16';
+import { BoardView } from './board-view.js?v=17';
+import { figure } from './figures.js?v=17';
+import { Feel } from './feel.js?v=17';
 
 const TERRAIN_COLOR = { hills: '#c8734a', forest: '#3f7d4a', pasture: '#9ccf6a', fields: '#e8c547', mountains: '#8e939c', desert: '#e3d3a4' };
 const RES_ICON = { brick: 'B', lumber: 'L', wool: 'W', grain: 'G', ore: 'O' };
@@ -23,7 +23,7 @@ const MOD_INFO = {
 };
 const CAT_LABEL = { face: 'Dice · face', die: 'Dice · whole die', token: 'Field · number token', hex: 'Field · hex', port: 'Field · port', classic: 'Card · single use', edict: 'Edict · single use', guild: 'Guild · always on', charter: 'Charter · instant' };
 const PRE_ROLL_CARDS = ['bumper', 'omen', 'monopoly'];
-const STEPS = [['roll', 'Roll'], ['result', 'Result'], ['build', 'Build & trade'], ['tribute', 'Tribute'], ['shop', 'Shop']];
+const STEPS = [['roll', 'Roll'], ['build', 'Build & trade'], ['tribute', 'Tribute']]; // the result of a roll is part of the Roll step
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const resDot = (r) => `<span class="res-dot" style="background:var(--${r})"></span>`;
 const HL_MS = 3600; // how long a roll's highlights (pulses, +1 badges) stay lit
@@ -81,7 +81,6 @@ export class UI {
     this.$tip.hidden = true;
     document.body.appendChild(this.$tip);
     this.dieSheet = null; // which die's face sheet is open (0 | 1 | null)
-    this.$boss = document.getElementById('boss');
     this.$board = document.getElementById('board');
     this.view = new BoardView(this.$board);
     this.$prompt = document.getElementById('prompt');
@@ -90,15 +89,15 @@ export class UI {
     this.$hand = document.getElementById('hand');
     this.$stage = document.getElementById('stage');
     this.$tribute = document.getElementById('tribute');
-    this.$score = document.getElementById('score');
     this.feel = new Feel({ board: this.$board, lamp: this.$stage.querySelector('.lamp') });
     this.shown = null; // what the last render showed, so changes can count up and drop in
     this.logSeen = 0;
     this.prevPhase = null;
     this.payout = null; // the roll payout whose drop-in animation is running
     this.stamp = null; // a "tribute paid" moment
-    this.hintOpen = true;
-    try { this.hintOpen = localStorage.getItem('hd-hint') !== 'closed'; } catch { /* storage can be blocked */ }
+    this.tipsOpen = false;
+    this.tipsSeen = false;
+    try { this.tipsSeen = localStorage.getItem('hd-tips') === 'seen'; } catch { /* storage can be blocked */ }
     this.$drawer = document.getElementById('drawer');
     this.$modal = document.getElementById('modal-root');
     this.bindEvents();
@@ -216,12 +215,10 @@ export class UI {
       const id = Number(el.dataset.id);
       if (el.dataset.k === this.boardReq.kind && this.boardReq.ids.has(id)) this.resolveBoard(id);
     });
-    // The how-to hint remembers whether you folded it away (toggle does not bubble, so listen while capturing).
-    this.$panel.addEventListener('toggle', (ev) => {
-      if (!ev.target.matches?.('details.howto')) return;
-      this.hintOpen = ev.target.open;
-      try { localStorage.setItem('hd-hint', this.hintOpen ? 'open' : 'closed'); } catch { /* ignore */ }
-    }, true);
+    // The ? tips popover closes when you click anywhere else.
+    document.addEventListener('click', (ev) => {
+      if (this.tipsOpen && !ev.target.closest('.tips-pop, .tip-btn')) { this.tipsOpen = false; this.render(); }
+    });
     const mb = document.getElementById('menu-btn');
     const mp = document.getElementById('menu-pop');
     this.setMenu = (open) => { mp.hidden = !open; mb.setAttribute('aria-expanded', String(open)); };
@@ -248,6 +245,7 @@ export class UI {
       }
       if (ev.key === 'Escape') {
         if (!document.getElementById('menu-pop').hidden) this.setMenu(false);
+        else if (this.tipsOpen) { this.tipsOpen = false; this.render(); }
         else if (this.dieSheet != null) { this.dieSheet = null; this.render(); }
         else if (this.pinnedTip) this.unpinTip();
         else if (this.boardReq?.cancel) this.resolveBoard(null);
@@ -258,7 +256,7 @@ export class UI {
       }
       if (this.busy || this.modal || this.dialog || this.boardReq) return;
       if (ev.key === 'Enter' || ev.key === ' ') {
-        const btn = this.$panel.querySelector('[data-primary]:not([disabled])');
+        const btn = this.$panel.querySelector('[data-primary]:not([disabled])') || (this.$overlay.hidden ? null : this.$overlay.querySelector('[data-primary]:not([disabled])'));
         if (btn) { ev.preventDefault(); btn.click(); }
       }
     });
@@ -273,6 +271,13 @@ export class UI {
   }
 
   onAction(a, d) {
+    if (a === 'tips') {
+      this.tipsOpen = !this.tipsOpen;
+      this.tipsSeen = true;
+      try { localStorage.setItem('hd-tips', 'seen'); } catch { /* ignore */ }
+      return this.render();
+    }
+    this.tipsOpen = false;
     if (a !== 'die-sheet' && a !== 'die-open') this.dieSheet = null;
     if (a === 'die-sheet') { this.dieSheet = this.dieSheet === Number(d.die) ? null : Number(d.die); return this.render(); }
     if (a === 'die-open') { this.dieSheet = Number(d.die); return this.render(); }
@@ -354,9 +359,7 @@ export class UI {
     this.tips = new Map();
     this.syncHighlights();
     this.detectMoments();
-    this.renderBoss();
     this.renderTribute();
-    this.renderScore();
     this.renderBoard();
     this.renderPrompt();
     this.renderOverlay();
@@ -525,16 +528,21 @@ export class UI {
     this.fillTip(this.tipKey, el);
   }
 
-  // ---------------------------------------------------------------- boss plaque (beside the tribute)
-  renderBoss() {
+  // ---------------------------------------------------------------- run card: ante, tribute and boss in one plaque
+  // Where the run stands: the ante and Small / Big / Boss.
+  anteRow() {
     const g = this.game;
-    const el = this.$boss;
-    if (g.phase === 'gameover' || !g.boss) { el.hidden = true; return; }
-    el.hidden = false;
+    const segs = BLINDS.map((b, i) => `<span class="${i < g.blind || (g.phase === 'shop' && i === g.blind) ? 'done' : i === g.blind ? 'on' : ''}">${b}</span>`).join('');
+    return `<div class="ante"><b>Ante ${g.ante}</b><span class="segs">${segs}</span><span class="surv" title="Rounds survived this run">${g.roundsSurvived} survived</span></div>`;
+  }
+
+  // The boss of this round, or the next one while you shop.
+  bossRow() {
+    const g = this.game;
+    if (!g.boss) return '';
     const bossNow = g.blind === 2 && g.phase !== 'shop';
     const boss = g.phase === 'shop' && g.blind === 2 ? BOSS_BY_ID[g.nextBossId] : g.boss;
-    el.classList.toggle('boss', bossNow);
-    el.innerHTML = `<div class="trib-head" ${this.tipAttr('boss', { kind: bossNow ? 'Boss · active' : 'Boss', title: boss.name, desc: boss.desc })}><span class="eyebrow">${bossNow ? 'Boss this round' : g.phase === 'shop' && g.blind === 2 ? 'Next boss' : 'Boss of this ante'}</span></div><div class="name">${boss.name}</div><p>${boss.desc}</p>`;
+    return `<div class="boss-row"><div class="name" ${this.tipAttr('boss', { kind: bossNow ? 'Boss · active' : 'Boss', title: boss.name, desc: boss.desc })}>${boss.name}<span class="eyebrow">${bossNow ? 'Boss this round' : g.phase === 'shop' && g.blind === 2 ? 'Next boss' : 'Boss of this ante'}</span></div><p>${boss.desc}</p></div>`;
   }
 
   // The tribute hangs over the board: what is due at the end of this round, and how close the hand is.
@@ -548,8 +556,8 @@ export class UI {
     if (g.phase === 'shop') {
       const st = this.stamp && performance.now() - this.stamp.start < 2600 ? this.stamp : null;
       const bossDown = g.blind === 2;
-      el.innerHTML = `<div class="trib-head"><span class="eyebrow">${BLINDS[g.blind]} tribute</span></div>
-        <div class="paid ${bossDown ? 'boss' : ''} ${st ? 'slam' : ''}" ${st ? `style="animation-delay:${-Math.round(performance.now() - st.start)}ms"` : ''}><b>Paid</b><span>${bossDown ? 'The boss is beaten.' : 'Spend your VP in the shop.'}</span></div>`;
+      el.innerHTML = `${this.anteRow()}<div class="trib-head"><span class="eyebrow">${BLINDS[g.blind]} tribute</span></div>
+        <div class="paid ${bossDown ? 'boss' : ''} ${st ? 'slam' : ''}" ${st ? `style="animation-delay:${-Math.round(performance.now() - st.start)}ms"` : ''}><b>Paid</b><span>${bossDown ? 'The boss is beaten.' : 'Spend your VP in the shop.'}</span></div>${this.bossRow()}`;
       return;
     }
     const due = g.tributeDue();
@@ -569,31 +577,33 @@ export class UI {
     }).join('');
     const state = g.phase === 'setup' ? '' : ok ? '<b class="ok">Ready to pay</b>' : '<b class="no">Not yet</b>';
     el.innerHTML = `<div class="trib-head" ${this.tipAttr('tribute', { kind: 'Tribute', title: 'Due at round end', desc: 'Each part needs a different resource type. Storehouse cards count first, then your hand.', lines })}><span class="eyebrow">${BLINDS[g.blind]} tribute · due at round end</span>${state}</div><div class="trib-parts">${parts}</div>`;
+    el.innerHTML = this.anteRow() + el.innerHTML + this.bossRow();
   }
 
-  // Rolls left and score, in a corner of the table.
-  renderScore() {
+  // The score, as a chip in the hand row's header.
+  vpChip() {
     const g = this.game;
     const vp = g.vpBreakdown();
-    const left = ROLLS_PER_ROUND - g.rollsUsed;
-    const rolls = g.phase === 'turn'
-      ? `<div class="sc-cell"><div class="eyebrow">Rolls left</div><div class="rolls" title="Rolls left this round">${Array.from({ length: ROLLS_PER_ROUND }, (_, i) => `<span class="dot ${i < left ? 'left' : ''}"></span>`).join('')}<b>${left}</b></div></div>`
-      : '';
     const info = { kind: 'Score', title: `${vp.total} VP`, desc: 'Your score this round. Whatever you hold when the tribute is paid becomes your shop budget.', lines: [`Settlements ${vp.settlements} · Cities ${vp.cities}`, `VP cards ${vp.vpCards}`, `Longest road ${vp.road} (length ${vp.longestRoad})`, `Army ${vp.army} (${g.knights} knights)`] };
-    this.$score.innerHTML = `<div class="sc-cell vp" data-hl="vp" ${this.tipAttr('score', info)}><div class="eyebrow">Score</div><div class="big-num"><span data-ck="vp">${this.feel.value('vp', vp.total)}</span><small>VP</small></div></div>${rolls}`;
+    return `<span class="vp-chip" data-hl="vp" ${this.tipAttr('score', info)}><span data-ck="vp">${this.feel.value('vp', vp.total)}</span><small>VP</small></span>`;
   }
 
-  // Top of the action card: where the run stands (ante, Small / Big / Boss) and which step of the round you are on.
+  // Rolls left, shown inside the roll buttons.
+  rollsLeft() {
+    const left = ROLLS_PER_ROUND - this.game.rollsUsed;
+    return `<span class="rl" title="Rolls left this round">${Array.from({ length: ROLLS_PER_ROUND }, (_, i) => `<i class="${i < left ? 'on' : ''}"></i>`).join('')}<b>${left} left</b></span>`;
+  }
+
+  // Top of the action card: which step of the round you are on, and the ? that opens the tips for it.
   actHead(step) {
-    const g = this.game;
-    const segs = BLINDS.map((b, i) => `<span class="${i < g.blind || (g.phase === 'shop' && i === g.blind) ? 'done' : i === g.blind ? 'on' : ''}">${b}</span>`).join('');
     let stepper = '';
-    if (step !== 'setup' && step !== 'gameover') {
-      const current = step === 'adjust' ? 'roll' : step;
+    if (['roll', 'adjust', 'result', 'build', 'tribute'].includes(step)) {
+      const current = step === 'adjust' || step === 'result' ? 'roll' : step;
       const idx = STEPS.findIndex(([k]) => k === current);
       stepper = `<nav class="stepper" aria-label="Round steps">${STEPS.map(([k, l], i) => `<span class="${i === idx ? 'on' : i < idx ? 'done' : ''}">${l}</span>`).join('')}</nav>`;
     }
-    return `<div class="act-head"><div class="ante"><b>Ante ${g.ante}</b><span class="segs">${segs}</span><span class="surv" title="Rounds survived this run">${g.roundsSurvived} survived</span></div>${stepper}</div>`;
+    const tip = this._tip ? `<button class="tip-btn ${this.tipsOpen ? 'on' : ''} ${this.tipsSeen ? '' : 'new'}" data-a="tips" aria-expanded="${this.tipsOpen}" title="How this step works">?</button>` : '';
+    return stepper || tip ? `<div class="act-head">${stepper}${tip}</div>` : '';
   }
 
   // Active round effects: [label, 'bad' | 'good' | '', tooltip]
@@ -615,12 +625,6 @@ export class UI {
     if (g.phase === 'turn' && g.rollsUsed > 0 && g.roundProduced === 0 && !g.streakGiven) fx.push([`Dry ${g.rollsUsed}/${ROLLS_PER_ROUND}`, '', `Losing streak: no resources from ${g.rollsUsed} roll(s) so far. If all ${ROLLS_PER_ROUND} rolls come up empty, you get a free development card.`]);
     if (g.brokeGame) fx.push(['Game broken!', 'good', 'Echo chain of 10: this round\'s tribute counts as paid.']);
     return fx;
-  }
-
-  bossCallout() {
-    const g = this.game;
-    if (g.blind !== 2) return '';
-    return `<div class="callout bad"><b>Boss round: ${g.boss.name}</b><div class="small">${g.boss.desc} This applies for this round only.</div></div>`;
   }
 
   // ---------------------------------------------------------------- board
@@ -657,6 +661,11 @@ export class UI {
   // ---------------------------------------------------------------- step panel
   renderPanel() {
     const step = this.step();
+    if (this.lastStep !== step) this.tipsOpen = false;
+    // The shop is a popup over the board; the action card steps aside while it is open.
+    this.$panel.hidden = step === 'shop';
+    if (step === 'shop') { this._tip = null; this.lastStep = step; return; }
+    this._tip = null;
     const view = {
       setup: () => this.viewSetup(),
       roll: () => this.viewRoll(),
@@ -664,11 +673,11 @@ export class UI {
       result: () => this.viewResult(),
       build: () => this.viewBuild(),
       tribute: () => this.viewTribute(),
-      shop: () => this.viewShop(),
       gameover: () => this.viewGameOver(),
     }[step]();
     const scroll = this.$panel.querySelector('.panel-body')?.scrollTop || 0;
-    this.$panel.innerHTML = `${this.actHead(step)}<div class="panel-body">${view.body}</div>${this.diceArea(step)}${view.foot ? `<div class="panel-foot">${view.foot}</div>` : ''}`;
+    const tips = this.tipsOpen && this._tip ? `<div class="tips-pop" role="dialog" aria-label="How this step works"><div class="eyebrow">${this._tip.title}</div><div class="tp-body">${this._tip.html}</div></div>` : '';
+    this.$panel.innerHTML = `${this.actHead(step)}<div class="panel-body">${view.body}</div>${this.diceArea(step)}${view.foot ? `<div class="panel-foot">${view.foot}</div>` : ''}${tips}`;
     if (this.lastStep === step) this.$panel.querySelector('.panel-body').scrollTop = scroll;
     for (const b of this.$panel.querySelectorAll('.panel-foot button.primary[data-primary]')) b.insertAdjacentHTML('beforeend', '<kbd>Space</kbd>');
     this.lastStep = step;
@@ -877,8 +886,10 @@ export class UI {
   }
 
   // The how-to text, folded away once you know it. The choice is remembered.
+  // How-to text no longer sits in the card: it is kept for the ? button in the card's header.
   hint(title, html) {
-    return `<details class="howto" ${this.hintOpen ? 'open' : ''}><summary>${title}</summary><div>${html}</div></details>`;
+    this._tip = { title, html };
+    return '';
   }
 
   viewSetup() {
@@ -904,9 +915,8 @@ export class UI {
     return {
       body: `<h2>${BLINDS[g.blind]} round · ante ${g.ante}</h2>
         ${this.hint('How a round works', `You have <b>${ROLLS_PER_ROUND} rolls</b>. Each roll pays every hex with that number to your buildings next to it (settlement 1, city 2). Between rolls you can build and trade. At the end you pay the tribute shown at the top of the board.`)}
-        ${this.bossCallout()}
         ${pre.length ? `<div class="callout"><b>Before rolling:</b> you can play ${pre.map((c) => ITEMS[c.id].name).join(', ')} from your hand below.</div>` : ''}`,
-      foot: `<button class="primary big" data-a="roll" data-primary ${this.busy ? 'disabled' : ''}>Roll the dice</button>
+      foot: `<button class="primary big" data-a="roll" data-primary ${this.busy ? 'disabled' : ''}>Roll the dice${this.rollsLeft()}</button>
         <div class="row" style="justify-content:center"><button class="small ghost" data-a="prebuild" ${this.busy ? 'disabled' : ''}>Build or trade first</button>
         <button class="small ghost" data-a="end" ${this.busy ? 'disabled' : ''}>Skip all rolls (+${ROLLS_PER_ROUND} VP)</button></div>`,
     };
@@ -974,7 +984,7 @@ export class UI {
     const pipRow = (cost) => `<span class="cost">${RES.flatMap((r) => Array.from({ length: cost[r] || 0 }, (_, i) => `<span class="pip ${g.hand[r] > i ? '' : 'missing'}" style="background:var(--${r})" title="${r}"></span>`)).join('')}</span>`;
     const tile = (kind, name, effect) => {
       const why = g.whyNot(kind);
-      return `<button class="tile-btn ${why ? '' : 'ok'}" data-a="build" data-kind="${kind}" data-cost="${kind}" ${why || dis ? 'disabled' : ''}>
+      return `<button class="tile-btn ${why ? '' : 'ok'}" data-a="build" data-kind="${kind}" data-cost="${kind}" ${why ? `title="${esc(why)}"` : ''} ${why || dis ? 'disabled' : ''}>
         <span class="t-name">${name}</span>${pipRow(COSTS[kind])}
         <span class="${why ? 't-why' : 't-desc'}">${why ? esc(why) : effect}</span></button>`;
     };
@@ -990,7 +1000,7 @@ export class UI {
     const ports = g.ownedPorts();
     let ship;
     if (g.bossIs('pirate')) ship = '<p class="small bad">The Pirate: no shipping this round.</p>';
-    else if (!ports.length) ship = '<p class="small muted">Build on a port (3:1 or 2:1 circle on the coast) to trade cheaper and ship cards to the Storehouse for a tribute bonus.</p>';
+    else if (!ports.length) ship = '<p class="small muted">Needs a port: build on a 3:1 or 2:1 circle on the coast.</p>';
     else {
       ship = ports.map((port) => {
         const { input, bonus } = g.storehouseRate(port);
@@ -1004,16 +1014,11 @@ export class UI {
     const primary = echo
       ? `<button class="primary big" data-a="roll" data-primary ${dis ? 'disabled' : ''}>Free Echo roll (die ${g.echoQueue[0] + 1})</button>`
       : rollsLeft > 0
-        ? `<button class="primary big" data-a="roll" data-primary ${dis ? 'disabled' : ''}>Roll again · ${rollsLeft} left</button>`
+        ? `<button class="primary big" data-a="roll" data-primary ${dis ? 'disabled' : ''}>Roll again${this.rollsLeft()}</button>`
         : `<button class="primary big" data-a="end" data-primary ${dis ? 'disabled' : ''}>Go to the tribute</button>`;
     const secondary = rollsLeft > 0 || echo ? `<button data-a="end" ${dis ? 'disabled' : ''}>End round now${rollsLeft > 0 ? ` · +${rollsLeft} VP` : ''}</button>` : '';
     return {
-      body: `<h2>Build & trade</h2>
-        <p class="lead">${g.rollsUsed === 0 ? 'Before your first roll.' : `After roll ${g.rollsUsed} of ${ROLLS_PER_ROUND}.`}</p>
-        ${this.hint('How building works', 'Do as much as you like between rolls. Hover an option to see the cards it uses.')}
-        ${this.bossCallout()}
-        <div class="callout ${payable ? 'good' : ''}">${payable ? '✓ You can already pay this round\'s tribute. Anything you build now comes out of the rest.' : '✗ You can\'t pay the tribute yet. Keep the cards it needs, or trade toward them.'}</div>
-        <h3>Build</h3>
+      body: `${this.hint('How building and trading work', `<p>${g.rollsUsed === 0 ? 'Before your first roll.' : `After roll ${g.rollsUsed} of ${ROLLS_PER_ROUND}.`} Do as much as you like between rolls. Hover an option to see the cards it uses. The tribute card above says whether you can pay it now; anything you build comes out of the rest.</p><p><b>Trade</b> gives you one card of any type for ${Math.min(...RES.map(rate))} of another (less with ports). <b>Ship</b> sends cards to the Storehouse from a port; they count toward the tribute with a bonus.</p>`)}
         <div class="tiles">
           ${tile('settlement', 'Settlement', `+1 VP · produces 1 · ${c.settlement}/${g.limits.settlement}`)}
           ${tile('city', 'City', `Upgrade: +1 VP · produces 2 · ${c.city}/${g.limits.city}`)}
@@ -1021,10 +1026,10 @@ export class UI {
           ${tile('dev', 'Development card', 'Random card for your hand')}
         </div>
         <h3>Trade with the bank</h3>
-        <div class="small muted">Give</div><div class="trade-grid">${giveRow}</div>
-        <div class="small muted">Get 1</div><div class="trade-grid">${getRow}</div>
-        <p class="small muted">${tradeHint}</p>
-        <h3>Ship to the Storehouse</h3>${ship}`,
+        <div class="trade-line"><span>Give</span><div class="trade-grid">${giveRow}</div></div>
+        <div class="trade-line"><span>Get 1</span><div class="trade-grid">${getRow}</div></div>
+        ${give || !RES.some((r) => g.hand[r] >= rate(r)) ? `<p class="small muted">${tradeHint}</p>` : ''}
+        ${ports.length || g.bossIs('pirate') ? `<h3>Ship to the Storehouse</h3>${ship}` : ship}`,
       foot: `${primary}${secondary}`,
     };
   }
@@ -1051,27 +1056,11 @@ export class UI {
     };
   }
 
-  viewShop() {
-    const g = this.game;
-    const e = g.earned;
-    const nextBoss = g.blind === 2 ? BOSS_BY_ID[g.nextBossId] : g.boss;
-    const next = g.blind === 2 ? `ante ${g.ante + 1}, Small round` : `${BLINDS[g.blind + 1]} round`;
-    return {
-      body: `<h2>Shop</h2>
-        ${this.hint('How the shop works', 'Spend your VP on upgrades in the shop. Unspent VP is lost when you leave; buying never lowers your score.')}
-        <div class="callout"><div class="row between"><span>Budget</span><b style="font-size:20px">${g.budget} VP</b></div>
-          <div class="small muted">Score ${g.vp} + unused rolls ${e.unusedRolls} + Storehouse surplus ${e.storehouse}${e.river ? ` + River ${e.river}` : ''}${e.twinFortune ? ` + Twin Fortune ${e.twinFortune}` : ''}</div></div>
-        <div class="callout"><b>${g.blind === 2 ? 'Next boss' : 'Boss of this ante'}: ${nextBoss.name}</b><div class="small muted">${nextBoss.desc}</div>
-          <button class="small" data-a="reroll-boss" ${g.budget >= g.bossRerollPrice ? '' : 'disabled'} style="margin-top:6px">Reroll boss · ${g.bossRerollPrice} VP</button></div>`,
-      foot: `<button class="primary big" data-a="leave" data-primary ${this.busy ? 'disabled' : ''}>Next: ${next}</button>`,
-    };
-  }
-
   renderOverlay() {
     const g = this.game;
     const show = g.phase === 'shop' && !this.boardReq && !(this.stamp && performance.now() < this.stamp.hold);
     this.$overlay.hidden = !show;
-    if (!show) return;
+    if (!show) { this.shopShown = false; return; }
     const priceTag = (price) => `<span class="price"><b>${price === Infinity ? '—' : price}</b><i>VP</i></span>`;
     const offers = g.shop.map((s, i) => {
       const price = g.slotPrice(s);
@@ -1092,12 +1081,24 @@ export class UI {
       return `<div class="offer card-o ${it.rarity} ${s.sold ? 'sold' : ''}"><div class="o-stage"><div class="pcard big ${it.rarity}"><i class="dot" style="background:${CAT_DOT[it.cat] || '#a6a59e'}"></i><span class="k">${esc(CAT_SHORT[it.cat])}</span><span class="r rarity-${it.rarity}">${it.rarity}</span><span class="art" style="background-position:${cardArt(it)}"></span><span class="nm">${esc(it.name)}</span><span class="tx">${esc(desc)}</span></div></div>${priceTag(price)}${btn}</div>`;
     }).join('');
     const guilds = g.guilds.map((gd) => `<div class="pcard ${ITEMS[gd.id].rarity}" ${this.tipAttr(`sg:${gd.uid}`, { kind: 'Guild · always on', title: ITEMS[gd.id].name, desc: ITEMS[gd.id].desc })}><i class="dot" style="background:${CAT_DOT.guild}"></i><span class="art" style="background-position:${cardArt(ITEMS[gd.id])}"></span><span class="nm">${esc(ITEMS[gd.id].name)}</span></div>`).join('');
-    this.$overlay.innerHTML = `<div class="shop">
-      <div class="shop-head"><div><div class="eyebrow">Between rounds</div><h2>The Shop</h2></div><div class="budget-box"><div class="eyebrow">Budget · unspent VP is lost</div><div class="budget">${g.budget}<small>VP</small></div></div></div>
+    const nextBoss = g.blind === 2 ? BOSS_BY_ID[g.nextBossId] : g.boss;
+    const next = g.blind === 2 ? `ante ${g.ante + 1}, Small round` : `${BLINDS[g.blind + 1]} round`;
+    const e = g.earned;
+    const keep = this.$overlay.querySelector('.shop')?.scrollTop || 0;
+    this.$overlay.innerHTML = `<div class="shop" role="dialog" aria-label="The Shop">
+      <div class="shop-head"><div><div class="eyebrow">Between rounds</div><h2>The Shop</h2></div>
+        <div class="budget-box"><div class="eyebrow">Budget · unspent VP is lost</div><div class="budget">${g.budget}<small>VP</small></div>
+        <div class="small muted">Score ${g.vp} + unused rolls ${e.unusedRolls} + Storehouse ${e.storehouse}${e.river ? ` + River ${e.river}` : ''}${e.twinFortune ? ` + Twin Fortune ${e.twinFortune}` : ''}</div></div></div>
       <div class="shop-grid">${offers}</div>
-      <div class="shop-foot"><button data-a="reroll" ${g.budget >= g.rerollPrice ? '' : 'disabled'}>Reroll offers · ${g.rerollPrice} VP</button><span class="small muted">Dice, field and port upgrades ask you to pick their target after you buy.</span></div>
-      <div class="shop-have"><div class="rcard-box"><div class="eyebrow">Your dice</div><div class="mini-dice">${[0, 1].map((i) => `<div class="mini-die">${this.facesHtml(i, null)}${this.dieTags(i)}</div>`).join('')}</div></div>
-      <div class="rcard-box"><div class="eyebrow">Guilds <b>${g.guilds.length} of ${g.limits.guildSlots}</b></div><div class="slots" style="--n:${Math.max(1, g.limits.guildSlots)}">${guilds || '<span class="small muted">None yet.</span>'}</div></div></div></div>`;
+      <div class="shop-foot"><button data-a="reroll" ${g.budget >= g.rerollPrice ? '' : 'disabled'}>Reroll offers · ${g.rerollPrice} VP</button>
+        <button data-a="reroll-boss" ${g.budget >= g.bossRerollPrice ? '' : 'disabled'} title="Replace ${esc(nextBoss.name)} with another boss">Reroll boss · ${g.bossRerollPrice} VP</button>
+        <span class="small muted sf-note">Dice, field and port upgrades ask you to pick their target after you buy.</span>
+        <button class="primary big sf-next" data-a="leave" data-primary ${this.busy ? 'disabled' : ''}>Next: ${next}</button></div>
+      <div class="shop-have"><div class="eyebrow">Your dice</div><div class="mini-dice">${[0, 1].map((i) => `<div class="mini-die">${this.facesHtml(i, null)}${this.dieTags(i)}</div>`).join('')}</div></div></div>`;
+    for (const b of this.$overlay.querySelectorAll('button.primary[data-primary]')) b.insertAdjacentHTML('beforeend', '<kbd>Space</kbd>');
+    const sh = this.$overlay.querySelector('.shop');
+    if (sh && this.shopShown) sh.scrollTop = keep;
+    this.shopShown = true;
   }
 
   viewGameOver() {
@@ -1198,9 +1199,10 @@ export class UI {
       return `<div class="slot-wrap">${pcard(it, nm, `guild:${gd.uid}`, info)}${GAP}</div>`;
     }).join('');
     this.$hand.innerHTML = `
-      <section class="zone"><div class="zone-h">Hand <b>${total} card${total === 1 ? '' : 's'}${countable > 7 ? ' · <span class="bad">over 7: a 7 makes you discard</span>' : ' · safe from the robber up to 7'}</b></div><div class="res-row">${stacks}${storeBox}</div></section>
+      <section class="zone"><div class="zone-h">Hand ${this.vpChip()} <b>${total} card${total === 1 ? '' : 's'}${countable > 7 ? ' · <span class="bad">over 7: a 7 makes you discard</span>' : ' · safe from the robber up to 7'}</b></div><div class="res-row">${stacks}${storeBox}</div></section>
       <section class="zone"><div class="zone-h">Cards <b>${g.cards.length} of ${g.limits.handSlots}</b></div><div class="slots" style="--n:${g.limits.handSlots}">${cardSlots}</div></section>
       <section class="zone guilds"><div class="zone-h">Guilds <b>${g.guilds.length} of ${g.limits.guildSlots}</b></div><div class="slots" style="--n:${g.limits.guildSlots}">${guildSlots}</div></section>`;
+    this.$stage.style.setProperty('--hand-h', `${this.$hand.offsetHeight}px`);
     const lz = this.$hand.firstElementChild;
     this.$stage.style.setProperty('--hand-l', `${lz ? lz.offsetHeight : 160}px`);
     if (this.view && this.$hand.offsetHeight !== this._handH) { this._handH = this.$hand.offsetHeight; this.view.fit(); }
