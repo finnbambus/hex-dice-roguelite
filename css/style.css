@@ -772,3 +772,14 @@ select, input { font: inherit; color: var(--ink); background: var(--inset); bord
 .dice-area .die-box.open .small.muted { color: var(--accent); }
 .die-slot .die3d { --s: 88px; margin: 20px 22px 30px; }
 .rcol > .tribute, .rcol > .panel { box-sizing: border-box; width: 100%; max-width: 100%; min-width: 0; }
+
+/* boss: bigger and bolder at the top of the run card */
+.boss-row { padding-bottom: 12px; }
+.boss-row .name { font: 700 30px/1.05 var(--display); letter-spacing: .01em; align-items: center; }
+.boss-row .name .eyebrow { font-size: 10px; font-weight: 700; color: var(--muted); }
+.boss-row p { font-size: 14px; font-weight: 600; line-height: 1.35; color: var(--ink); margin-top: 6px; opacity: .92; }
+.tribute.boss .boss-row .name { color: #ffb29a; text-shadow: 0 0 18px rgba(255, 74, 28, .35); }
+.rcol .panel-body { gap: 6px; }
+.rcol .tribute { gap: 7px; }
+.boss-row { padding-bottom: 10px; }
+.boss-row .name { font-size: 29px; }
