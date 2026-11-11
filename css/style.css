@@ -285,7 +285,8 @@ select, input { font: inherit; color: var(--ink); background: var(--inset); bord
 .dice2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .die-box { border-radius: var(--r-card); padding: 10px; display: flex; flex-direction: column; gap: 8px; min-width: 0; background: var(--card); border: 1px solid var(--line); }
 .die-top { display: flex; gap: 10px; align-items: center; }
-.die3d { width: 56px; height: 56px; flex: none; perspective: 420px; margin: 8px 14px 8px 6px; }
+.die3d { --s: 56px; width: var(--s); height: var(--s); flex: none; perspective: calc(var(--s) * 7.5); margin: 8px 14px 8px 6px; touch-action: none; user-select: none; -webkit-user-select: none; cursor: grab; }
+.die3d:active { cursor: grabbing; }
 .die3d .tilt { width: 100%; height: 100%; transform-style: preserve-3d; transform: rotateX(-22deg) rotateY(28deg); }
 .cube { position: relative; width: 100%; height: 100%; transform-style: preserve-3d; transition: transform .25s ease; }
 .cube.rolling { animation: tumble .85s cubic-bezier(.15, .75, .25, 1) both; }
@@ -293,13 +294,7 @@ select, input { font: inherit; color: var(--ink); background: var(--inset); bord
 @keyframes reveal { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
 .side::after, .fa::after { content: ""; position: absolute; inset: 0; background: var(--tooth-dk); opacity: .13; pointer-events: none; }
 .side { position: absolute; inset: 0; border-radius: 0; background: var(--bone); border: 1px solid rgba(23, 24, 27, .55); backface-visibility: hidden; display: flex; align-items: center; justify-content: center; }
-.side.front { transform: translateZ(28px); }
-.side.back { transform: rotateY(180deg) translateZ(28px); }
-.side.right { transform: rotateY(90deg) translateZ(28px); }
-.side.left { transform: rotateY(-90deg) translateZ(28px); }
-.side.top { transform: rotateX(90deg) translateZ(28px); }
-.side.bottom { transform: rotateX(-90deg) translateZ(28px); }
-.side .lbl { font: 800 34px/1 var(--display); color: #17181b; }
+.side .lbl { font: 800 calc(var(--s, 56px) * .6)/1 var(--display); color: #17181b; }
 .side .lbl.lt { color: var(--bone); }
 .side .trg { position: absolute; bottom: 2px; right: 4px; font: 600 8px/1 var(--mono); color: #a3271a; }
 .die3d.held .side { outline: 1px dashed var(--accent); outline-offset: -3px; }
@@ -575,14 +570,7 @@ select, input { font: inherit; color: var(--ink); background: var(--inset); bord
 }
 
 .panel-body { flex: 0 1 auto; }
-.dice-area .die3d { width: 44px; height: 44px; margin: 8px 8px 8px 4px; }
-.dice-area .side.front { transform: translateZ(22px); }
-.dice-area .side.back { transform: rotateY(180deg) translateZ(22px); }
-.dice-area .side.right { transform: rotateY(90deg) translateZ(22px); }
-.dice-area .side.left { transform: rotateY(-90deg) translateZ(22px); }
-.dice-area .side.top { transform: rotateX(90deg) translateZ(22px); }
-.dice-area .side.bottom { transform: rotateX(-90deg) translateZ(22px); }
-.dice-area .side .lbl { font-size: 26px; }
+.dice-area .die3d { --s: 44px; margin: 8px 8px 8px 4px; }
 .dice-area .die-val { font-size: 22px; margin-top: 2px; }
 .dice-area { padding-top: 10px; }
 
@@ -608,14 +596,7 @@ select, input { font: inherit; color: var(--ink); background: var(--inset); bord
   .rcol { gap: 8px; }
   .rcol .tribute { padding-top: 9px; padding-bottom: 9px; }
   .rcol .dice-area { padding: 8px 14px 2px; gap: 6px; }
-  .rcol .dice-area .die3d { width: 34px; height: 34px; margin: 4px 6px 4px 2px; }
-  .rcol .dice-area .side.front { transform: translateZ(17px); }
-  .rcol .dice-area .side.back { transform: rotateY(180deg) translateZ(17px); }
-  .rcol .dice-area .side.right { transform: rotateY(90deg) translateZ(17px); }
-  .rcol .dice-area .side.left { transform: rotateY(-90deg) translateZ(17px); }
-  .rcol .dice-area .side.top { transform: rotateX(90deg) translateZ(17px); }
-  .rcol .dice-area .side.bottom { transform: rotateX(-90deg) translateZ(17px); }
-  .rcol .dice-area .side .lbl { font-size: 20px; }
+  .rcol .dice-area .die3d { --s: 34px; margin: 4px 6px 4px 2px; }
   .rcol .panel-body { padding-top: 10px; gap: 10px; }
   .rcol .panel-body h2 { font-size: 24px; }
   .rcol .panel-foot { padding: 8px 16px 14px; }
@@ -767,3 +748,27 @@ select, input { font: inherit; color: var(--ink); background: var(--inset); bord
 /* ---- action card: the main button stays in the same place on every step ---- */
 .rcol .panel-foot { min-height: 104px; justify-content: flex-start; }
 .hand .slot-wrap .play { top: auto; bottom: 5px; left: 5px; right: 5px; padding: 6px 4px; }
+
+/* cube faces sit half a cube out from the centre, whatever the cube's size */
+.side.front { transform: translateZ(calc(var(--s, 56px) / 2)); }
+.side.back { transform: rotateY(180deg) translateZ(calc(var(--s, 56px) / 2)); }
+.side.right { transform: rotateY(90deg) translateZ(calc(var(--s, 56px) / 2)); }
+.side.left { transform: rotateY(-90deg) translateZ(calc(var(--s, 56px) / 2)); }
+.side.top { transform: rotateX(90deg) translateZ(calc(var(--s, 56px) / 2)); }
+.side.bottom { transform: rotateX(-90deg) translateZ(calc(var(--s, 56px) / 2)); }
+
+/* dice without boxes: big in the Roll and Shop steps, compact elsewhere */
+.dice-stage { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 6px 0 2px; }
+.dice-stage .fx { justify-content: center; }
+.ds-row { display: flex; justify-content: center; gap: 36px; width: 100%; }
+.die-slot { display: flex; flex-direction: column; align-items: center; gap: 4px; cursor: pointer; border-radius: 12px; padding: 4px 6px 6px; }
+.die-slot .die3d { --s: 96px; margin: 26px 20px 18px; }
+.die-cap { font: 600 10px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--dim); }
+.die-slot:hover .die-cap, .die-slot.open .die-cap { color: var(--ink); }
+.die-slot.open .die-cap { color: var(--accent); }
+.ds-hint { font-size: 11.5px; color: var(--dim); text-align: center; }
+.dice-stage .die-sheet { width: 100%; }
+.dice-area .die-box, .dice-area .die-box:hover, .dice-area .die-box.open { background: none; border: 0; }
+.dice-area .die-box.open .small.muted { color: var(--accent); }
+.die-slot .die3d { --s: 88px; margin: 20px 22px 30px; }
+.rcol > .tribute, .rcol > .panel { box-sizing: border-box; width: 100%; max-width: 100%; min-width: 0; }

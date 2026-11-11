@@ -6,9 +6,9 @@
 import { Game, COSTS, BLINDS } from './game.js';
 import { RES, TERRAIN_RES, pips } from './board.js';
 import { ITEMS, ITEM_LIST, BOSS_BY_ID, ROLLS_PER_ROUND, LOADING, START_SETTLEMENTS, ECHO_BREAK } from './content.js';
-import { BoardView } from './board-view.js?v=19';
-import { figure } from './figures.js?v=19';
-import { Feel } from './feel.js?v=19';
+import { BoardView } from './board-view.js?v=20';
+import { figure } from './figures.js?v=20';
+import { Feel } from './feel.js?v=20';
 
 const TERRAIN_COLOR = { hills: '#c8734a', forest: '#3f7d4a', pasture: '#9ccf6a', fields: '#e8c547', mountains: '#8e939c', desert: '#e3d3a4' };
 const RES_ICON = { brick: 'B', lumber: 'L', wool: 'W', grain: 'G', ore: 'O' };
@@ -95,6 +95,8 @@ export class UI {
     this.payout = null; // the roll payout whose drop-in animation is running
     this.stamp = null; // a "tribute paid" moment
     this.selCard = null;
+    this.spin = [null, null]; // how far the player has turned each die by hand
+    this.drag = null;
     this.tipsOpen = false;
     this.tipsSeen = false;
     try { this.tipsSeen = localStorage.getItem('hd-tips') === 'seen'; } catch { /* storage can be blocked */ }
@@ -215,6 +217,30 @@ export class UI {
       const id = Number(el.dataset.id);
       if (el.dataset.k === this.boardReq.kind && this.boardReq.ids.has(id)) this.resolveBoard(id);
     });
+    // Turn a die by hand: drag it. A drag never counts as a click, so it does not open the face sheet.
+    document.addEventListener('pointerdown', (ev) => {
+      const d = ev.target.closest?.('.die3d[data-cube]');
+      if (!d || ev.button > 0) return;
+      const i = Number(d.dataset.cube);
+      this.drag = { i, x: ev.clientX, y: ev.clientY, moved: false, rx: this.spin[i]?.[0] ?? 0, ry: this.spin[i]?.[1] ?? 0 };
+    });
+    document.addEventListener('pointermove', (ev) => {
+      const dr = this.drag;
+      if (!dr) return;
+      const dx = ev.clientX - dr.x, dy = ev.clientY - dr.y;
+      if (!dr.moved && Math.hypot(dx, dy) < 5) return;
+      dr.moved = true;
+      this.spin[dr.i] = [dr.rx - dy * 0.7, dr.ry + dx * 0.7];
+      const cube = document.querySelector(`.die3d[data-cube="${dr.i}"] .cube`);
+      if (cube) { cube.style.transition = 'none'; cube.style.animation = 'none'; cube.style.transform = `rotateX(${this.spin[dr.i][0]}deg) rotateY(${this.spin[dr.i][1]}deg) ${cube.style.getPropertyValue('--final')}`; }
+    });
+    const endDrag = () => { if (this.drag?.moved) { this.dragMoved = true; setTimeout(() => { this.dragMoved = false; }, 0); } this.drag = null; };
+    document.addEventListener('pointerup', endDrag);
+    document.addEventListener('pointercancel', endDrag);
+    document.addEventListener('dblclick', (ev) => {
+      const d = ev.target.closest?.('.die3d[data-cube]');
+      if (d) { this.spin[Number(d.dataset.cube)] = null; this.render(); }
+    });
     // A picked card is put back when you click anywhere else.
     document.addEventListener('click', (ev) => {
       if (this.selCard != null && !ev.target.closest('.slot-wrap')) { this.selCard = null; this.render(); }
@@ -286,6 +312,7 @@ export class UI {
     this.selCard = null;
     this.tipsOpen = false;
     if (a !== 'die-sheet' && a !== 'die-open') this.dieSheet = null;
+    if (a === 'die-sheet' && this.dragMoved) return;
     if (a === 'die-sheet') { this.dieSheet = this.dieSheet === Number(d.die) ? null : Number(d.die); return this.render(); }
     if (a === 'die-open') { this.dieSheet = Number(d.die); return this.render(); }
     if (a === 'die-close') return this.render();
@@ -690,7 +717,7 @@ export class UI {
 
   // The one place the dice live: both cubes, the roll's values, running effects, and a face sheet that opens on click.
   diceArea(step) {
-    if (!['roll', 'adjust', 'result', 'build'].includes(step)) return '';
+    if (!['adjust', 'result', 'build'].includes(step)) return '';
     const g = this.game;
     let values = null, faces = null, opts = {};
     if (step === 'adjust') {
@@ -722,6 +749,15 @@ export class UI {
     return `<div class="dice-area">${fxHtml}<div class="dice2">${dice}</div>${this.dieSheet != null ? this.faceSheet(this.dieSheet) : ''}</div>`;
   }
 
+  // The big dice shown in the Roll and Shop steps: no boxes, drag a die to spin it, click it for its six faces.
+  diceStage(step) {
+    const g = this.game;
+    const fx = step === 'roll' ? this.effects() : [];
+    const fxHtml = fx.length ? `<div class="fx">${fx.map(([t, cls, tip, key]) => `<span class="fx-chip ${cls}" ${this.tipAttr(`fx:${t}`, { kind: 'Active this round', title: t, desc: tip })} data-hl="${key || ''}">${t}</span>`).join('')}</div>` : '';
+    const dice = [0, 1].map((i) => `<div class="die-slot ${this.dieSheet === i ? 'open' : ''}" data-a="die-sheet" data-die="${i}" title="Drag to spin · click for the six faces">${this.cube(i, g.lastRoll ? g.lastRoll.faces[i] : 0, false, false)}<span class="die-cap">Die ${i + 1}</span></div>`).join('');
+    return `<div class="dice-stage">${fxHtml}<div class="ds-row">${dice}</div><div class="ds-hint">Drag a die to spin it · click it for its faces</div>${this.dieSheet != null ? this.faceSheet(this.dieSheet) : ''}</div>`;
+  }
+
   // All six faces of one die, with its upgrades. Opens above the dice on click.
   faceSheet(i) {
     const g = this.game;
@@ -739,21 +775,23 @@ export class UI {
     const PIPS = { 1: [5], 2: [1, 9], 3: [1, 5, 9], 4: [1, 3, 7, 9], 5: [1, 3, 5, 7, 9], 6: [1, 3, 4, 6, 7, 9] };
     const TONE = { front: '#e4dfd0', right: '#d6d0c0', top: '#efeadc', bottom: '#bdb7a7', left: '#d6d0c0', back: '#e4dfd0' };
     const PP = { 1: [[50, 50]], 2: [[28, 28], [72, 72]], 3: [[28, 28], [50, 50], [72, 72]], 4: [[28, 28], [72, 28], [28, 72], [72, 72]], 5: [[28, 28], [72, 28], [50, 50], [28, 72], [72, 72]], 6: [[28, 26], [72, 26], [28, 50], [72, 50], [28, 74], [72, 74]] };
-    const pr = 4.6;
-    const pipBg = (v, ink) => PP[v].map((q) => `radial-gradient(circle at ${q[0]}% ${q[1]}%, ${ink} 0 ${pr}px, transparent ${pr + 0.8}px)`).join(', ');
+    const u = (k) => `calc(var(--s, 56px) * ${k})`; // sizes scale with the cube
+    const pipBg = (v, ink) => PP[v].map((q) => `radial-gradient(circle at ${q[0]}% ${q[1]}%, ${ink} 0 ${u(0.09)}, transparent ${u(0.105)})`).join(', ');
     const sides = d.faces.map((f, k) => {
       const loaded = d.loaded && d.loaded.face === k;
       const tone = loaded ? '#e6cf8c' : TONE[SIDE[k]];
       let bg = `${pipBg(f.value, '#17181b')}, ${tone}`;
       let inner = '';
-      if (f.setter === 'mirror') bg = `radial-gradient(circle at 50% 50%, #17181b 0 9px, ${tone} 10px 15px, #17181b 16px)`;
+      if (f.setter === 'mirror') bg = `radial-gradient(circle at 50% 50%, #17181b 0 ${u(0.16)}, ${tone} ${u(0.18)} ${u(0.27)}, #17181b ${u(0.29)})`;
       else if (f.setter === 'robber') { bg = '#17181b'; inner = '<span class="lbl lt">R</span>'; }
       else if (f.setter === 'blank') { bg = '#17181b'; inner = '<span class="lbl lt">?</span>'; }
       return `<div class="side ${SIDE[k]}" style="background:${bg}">${inner}${f.triggers.length ? `<span class="trg">${f.triggers.map((t) => TRIG_LABEL[t]).join('')}</span>` : ''}</div>`;
     }).join('');
     const final = TURN[SIDE[fi]];
     let cls = '';
-    let style = `--final:${final};transform:${final};`;
+    const sp = this.spin[i];
+    const spun = sp ? `rotateX(${sp[0].toFixed(1)}deg) rotateY(${sp[1].toFixed(1)}deg) ` : '';
+    let style = `--final:${final};transform:${spun}${final};`;
     const el = live ? this.rollElapsed() : null;
     const toss = el != null && !held ? ` toss" style="--td:${-Math.round(el)}ms` : '';
     if (el != null && !held) {
@@ -761,7 +799,7 @@ export class UI {
       cls = 'rolling';
       style += `--rx0:${r[0]}deg;--ry0:${r[1]}deg;--rz0:${r[2]}deg;animation-delay:${-Math.round(el)}ms;`;
     }
-    return `<div class="die3d ${held ? 'held' : ''}${toss}" data-hl="die:${i}"><div class="tilt"><div class="cube ${cls}" style="${style}">${sides}</div></div></div>`;
+    return `<div class="die3d ${held ? 'held' : ''}${toss}" data-hl="die:${i}" data-cube="${i}"><div class="tilt"><div class="cube ${cls}" style="${style}">${sides}</div></div></div>`;
   }
 
   // Milliseconds since the latest roll started, while its animation is still running (else null).
@@ -770,6 +808,7 @@ export class UI {
     if (g.rollSeq !== this.seenSeq) {
       this.seenSeq = g.rollSeq;
       this.rollStart = performance.now();
+      this.spin = [null, null];
       const spin = () => [720 + Math.floor(Math.random() * 360), 540 + Math.floor(Math.random() * 360), Math.floor(Math.random() * 180)];
       this.rollSpin = [spin(), spin()];
     }
@@ -919,6 +958,7 @@ export class UI {
     const pre = g.cards.filter((c) => PRE_ROLL_CARDS.includes(c.id));
     return {
       body: `<h2>${BLINDS[g.blind]} round · ante ${g.ante}</h2>
+        ${this.diceStage('roll')}
         ${this.hint('How a round works', `You have <b>${ROLLS_PER_ROUND} rolls</b>. Each roll pays every hex with that number to your buildings next to it (settlement 1, city 2). Between rolls you can build and trade. At the end you pay the tribute shown at the top of the board.`)}
         ${pre.length ? `<div class="callout"><b>Before rolling:</b> you can play ${pre.map((c) => ITEMS[c.id].name).join(', ')} from your hand below.</div>` : ''}`,
       foot: `<button class="primary big" data-a="roll" data-primary ${this.busy ? 'disabled' : ''}>Roll the dice${this.rollsLeft()}</button>
@@ -1069,7 +1109,8 @@ export class UI {
     return {
       body: `${this.hint('How the shop works', 'Spend your VP on upgrades in the popup. Unspent VP is lost when you leave; buying never lowers your score.')}
         <h2>Shop</h2>
-        <p class="lead">Budget <b>${g.budget} VP</b>. Spend it, then move on.</p>`,
+        <p class="lead">Budget <b>${g.budget} VP</b>. Spend it, then move on.</p>
+        ${this.diceStage('shop')}`,
       foot: `<button class="primary big" data-a="leave" data-primary ${this.busy ? 'disabled' : ''}>Next: ${next}</button>
         <button class="small ghost" data-a="reroll-boss" ${g.budget >= g.bossRerollPrice ? '' : 'disabled'} title="Replace ${esc(nextBoss.name)} with another boss">Reroll boss · ${g.bossRerollPrice} VP</button>`,
     };
