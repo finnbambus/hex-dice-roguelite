@@ -6,9 +6,9 @@
 import { Game, COSTS, BLINDS } from './game.js';
 import { RES, TERRAIN_RES, pips } from './board.js';
 import { ITEMS, ITEM_LIST, BOSS_BY_ID, ROLLS_PER_ROUND, LOADING, START_SETTLEMENTS, ECHO_BREAK } from './content.js';
-import { BoardView } from './board-view.js?v=18';
-import { figure } from './figures.js?v=18';
-import { Feel } from './feel.js?v=18';
+import { BoardView } from './board-view.js?v=19';
+import { figure } from './figures.js?v=19';
+import { Feel } from './feel.js?v=19';
 
 const TERRAIN_COLOR = { hills: '#c8734a', forest: '#3f7d4a', pasture: '#9ccf6a', fields: '#e8c547', mountains: '#8e939c', desert: '#e3d3a4' };
 const RES_ICON = { brick: 'B', lumber: 'L', wool: 'W', grain: 'G', ore: 'O' };
@@ -54,7 +54,6 @@ const faceArt = (f, loaded) => {
   const marks = f.triggers.length ? `<i class="trg">${[...new Set(f.triggers)].map((t) => TRIG_LABEL[t]).join('')}</i>` : '';
   return `<span class="fa" style="background:${bg}">${inner}${marks}</span>`;
 };
-const GAP = '<button class="small play" style="visibility:hidden" tabindex="-1" disabled aria-hidden="true">Play</button>'; // keeps guild and empty slots level with the cards that have a Play button
 const UPGRADE_CATS = ['face', 'die', 'token', 'hex', 'port'];
 const cardArt = (it) => artPos(CARD_ART[it.id] ?? CAT_ART[it.cat] ?? 3);
 
@@ -95,6 +94,7 @@ export class UI {
     this.prevPhase = null;
     this.payout = null; // the roll payout whose drop-in animation is running
     this.stamp = null; // a "tribute paid" moment
+    this.selCard = null;
     this.tipsOpen = false;
     this.tipsSeen = false;
     try { this.tipsSeen = localStorage.getItem('hd-tips') === 'seen'; } catch { /* storage can be blocked */ }
@@ -215,6 +215,10 @@ export class UI {
       const id = Number(el.dataset.id);
       if (el.dataset.k === this.boardReq.kind && this.boardReq.ids.has(id)) this.resolveBoard(id);
     });
+    // A picked card is put back when you click anywhere else.
+    document.addEventListener('click', (ev) => {
+      if (this.selCard != null && !ev.target.closest('.slot-wrap')) { this.selCard = null; this.render(); }
+    });
     // The ? tips popover closes when you click anywhere else.
     document.addEventListener('click', (ev) => {
       if (this.tipsOpen && !ev.target.closest('.tips-pop, .tip-btn')) { this.tipsOpen = false; this.render(); }
@@ -245,6 +249,7 @@ export class UI {
       }
       if (ev.key === 'Escape') {
         if (!document.getElementById('menu-pop').hidden) this.setMenu(false);
+        else if (this.selCard != null) { this.selCard = null; this.render(); }
         else if (this.tipsOpen) { this.tipsOpen = false; this.render(); }
         else if (this.dieSheet != null) { this.dieSheet = null; this.render(); }
         else if (this.pinnedTip) this.unpinTip();
@@ -256,7 +261,7 @@ export class UI {
       }
       if (this.busy || this.modal || this.dialog || this.boardReq) return;
       if (ev.key === 'Enter' || ev.key === ' ') {
-        const btn = this.$panel.querySelector('[data-primary]:not([disabled])') || (this.$overlay.hidden ? null : this.$overlay.querySelector('[data-primary]:not([disabled])'));
+        const btn = this.$panel.querySelector('[data-primary]:not([disabled])');
         if (btn) { ev.preventDefault(); btn.click(); }
       }
     });
@@ -277,6 +282,8 @@ export class UI {
       try { localStorage.setItem('hd-tips', 'seen'); } catch { /* ignore */ }
       return this.render();
     }
+    if (a === 'pick-card') { this.selCard = this.selCard === Number(d.uid) ? null : Number(d.uid); this.tipsOpen = false; return this.render(); }
+    this.selCard = null;
     this.tipsOpen = false;
     if (a !== 'die-sheet' && a !== 'die-open') this.dieSheet = null;
     if (a === 'die-sheet') { this.dieSheet = this.dieSheet === Number(d.die) ? null : Number(d.die); return this.render(); }
@@ -580,12 +587,12 @@ export class UI {
     el.innerHTML = this.bossRow() + this.anteRow() + el.innerHTML;
   }
 
-  // The score, as a chip in the hand row's header.
-  vpChip() {
+  // The score: a big number at the far right of the hand row.
+  vpBig() {
     const g = this.game;
     const vp = g.vpBreakdown();
     const info = { kind: 'Score', title: `${vp.total} VP`, desc: 'Your score this round. Whatever you hold when the tribute is paid becomes your shop budget.', lines: [`Settlements ${vp.settlements} · Cities ${vp.cities}`, `VP cards ${vp.vpCards}`, `Longest road ${vp.road} (length ${vp.longestRoad})`, `Army ${vp.army} (${g.knights} knights)`] };
-    return `<span class="vp-chip" data-hl="vp" ${this.tipAttr('score', info)}><span data-ck="vp">${this.feel.value('vp', vp.total)}</span><small>VP</small></span>`;
+    return `<section class="vp-big" data-hl="vp" ${this.tipAttr('score', info)}><div class="eyebrow">Score</div><div class="num"><span data-ck="vp">${this.feel.value('vp', vp.total)}</span><small>VP</small></div></section>`;
   }
 
   // Rolls left, shown inside the roll buttons.
@@ -662,9 +669,6 @@ export class UI {
   renderPanel() {
     const step = this.step();
     if (this.lastStep !== step) this.tipsOpen = false;
-    // The shop is a popup over the board; the action card steps aside while it is open.
-    this.$panel.hidden = step === 'shop';
-    if (step === 'shop') { this._tip = null; this.lastStep = step; return; }
     this._tip = null;
     const view = {
       setup: () => this.viewSetup(),
@@ -673,6 +677,7 @@ export class UI {
       result: () => this.viewResult(),
       build: () => this.viewBuild(),
       tribute: () => this.viewTribute(),
+      shop: () => this.viewShop(),
       gameover: () => this.viewGameOver(),
     }[step]();
     const scroll = this.$panel.querySelector('.panel-body')?.scrollTop || 0;
@@ -1056,6 +1061,20 @@ export class UI {
     };
   }
 
+  // The shop itself is a popup over the board; the action card keeps the button for the next round in its usual place.
+  viewShop() {
+    const g = this.game;
+    const next = g.blind === 2 ? `ante ${g.ante + 1}, Small round` : `${BLINDS[g.blind + 1]} round`;
+    const nextBoss = g.blind === 2 ? BOSS_BY_ID[g.nextBossId] : g.boss;
+    return {
+      body: `${this.hint('How the shop works', 'Spend your VP on upgrades in the popup. Unspent VP is lost when you leave; buying never lowers your score.')}
+        <h2>Shop</h2>
+        <p class="lead">Budget <b>${g.budget} VP</b>. Spend it, then move on.</p>`,
+      foot: `<button class="primary big" data-a="leave" data-primary ${this.busy ? 'disabled' : ''}>Next: ${next}</button>
+        <button class="small ghost" data-a="reroll-boss" ${g.budget >= g.bossRerollPrice ? '' : 'disabled'} title="Replace ${esc(nextBoss.name)} with another boss">Reroll boss · ${g.bossRerollPrice} VP</button>`,
+    };
+  }
+
   renderOverlay() {
     const g = this.game;
     const show = g.phase === 'shop' && !this.boardReq && !(this.stamp && performance.now() < this.stamp.hold);
@@ -1081,8 +1100,6 @@ export class UI {
       return `<div class="offer card-o ${it.rarity} ${s.sold ? 'sold' : ''}"><div class="o-top" aria-hidden="true"></div><div class="o-stage"><div class="pcard big ${it.rarity}"><i class="dot" style="background:${CAT_DOT[it.cat] || '#a6a59e'}"></i><span class="k">${esc(CAT_SHORT[it.cat])}</span><span class="r rarity-${it.rarity}">${it.rarity}</span><span class="art" style="background-position:${cardArt(it)}"></span><span class="nm">${esc(it.name)}</span><span class="tx">${esc(desc)}</span></div></div>${priceTag(price)}${btn}</div>`;
     }).join('');
     const guilds = g.guilds.map((gd) => `<div class="pcard ${ITEMS[gd.id].rarity}" ${this.tipAttr(`sg:${gd.uid}`, { kind: 'Guild · always on', title: ITEMS[gd.id].name, desc: ITEMS[gd.id].desc })}><i class="dot" style="background:${CAT_DOT.guild}"></i><span class="art" style="background-position:${cardArt(ITEMS[gd.id])}"></span><span class="nm">${esc(ITEMS[gd.id].name)}</span></div>`).join('');
-    const nextBoss = g.blind === 2 ? BOSS_BY_ID[g.nextBossId] : g.boss;
-    const next = g.blind === 2 ? `ante ${g.ante + 1}, Small round` : `${BLINDS[g.blind + 1]} round`;
     const e = g.earned;
     const keep = this.$overlay.querySelector('.shop')?.scrollTop || 0;
     this.$overlay.innerHTML = `<div class="shop" role="dialog" aria-label="The Shop">
@@ -1091,11 +1108,8 @@ export class UI {
         <div class="small muted">Score ${g.vp} + unused rolls ${e.unusedRolls} + Storehouse ${e.storehouse}${e.river ? ` + River ${e.river}` : ''}${e.twinFortune ? ` + Twin Fortune ${e.twinFortune}` : ''}</div></div></div>
       <div class="shop-grid" style="--n:${g.shop.length}">${offers}</div>
       <div class="shop-foot"><button data-a="reroll" ${g.budget >= g.rerollPrice ? '' : 'disabled'}>Reroll offers · ${g.rerollPrice} VP</button>
-        <button data-a="reroll-boss" ${g.budget >= g.bossRerollPrice ? '' : 'disabled'} title="Replace ${esc(nextBoss.name)} with another boss">Reroll boss · ${g.bossRerollPrice} VP</button>
-        <span class="small muted sf-note">Dice, field and port upgrades ask you to pick their target after you buy.</span>
-        <button class="primary big sf-next" data-a="leave" data-primary ${this.busy ? 'disabled' : ''}>Next: ${next}</button></div>
+        <span class="small muted sf-note">Dice, field and port upgrades ask you to pick their target after you buy.</span></div>
       <div class="shop-have"><div class="eyebrow">Your dice</div><div class="mini-dice">${[0, 1].map((i) => `<div class="mini-die">${this.facesHtml(i, null)}${this.dieTags(i)}</div>`).join('')}</div></div></div>`;
-    for (const b of this.$overlay.querySelectorAll('button.primary[data-primary]')) b.insertAdjacentHTML('beforeend', '<kbd>Space</kbd>');
     const sh = this.$overlay.querySelector('.shop');
     if (sh && this.shopShown) sh.scrollTop = keep;
     this.shopShown = true;
@@ -1175,10 +1189,11 @@ export class UI {
     const countable = g.handCountable();
     // card slots
     const canPlay = g.canAct() && !this.busy;
-    const pcard = (it, name, tipKey, info, extra = '', hl = '') => `<div class="pcard ${it.rarity}" style="rotate:${tilt(hs(tipKey), .8)}deg" ${this.tipAttr(tipKey, info)} ${hl}><i class="dot" style="background:${CAT_DOT[it.cat] || '#a6a59e'}"></i><span class="art" style="background-position:${cardArt(it)}"></span><span class="nm">${esc(name)}</span>${extra}</div>`;
+    const sel = g.cards.some((c) => c.uid === this.selCard) ? this.selCard : null;
+    const pcard = (it, name, tipKey, info, extra = '', hl = '', cls = '') => `<div class="pcard ${it.rarity} ${cls}" style="rotate:${tilt(hs(tipKey), .8)}deg" ${this.tipAttr(tipKey, info)} ${hl}><i class="dot" style="background:${CAT_DOT[it.cat] || '#a6a59e'}"></i><span class="art" style="background-position:${cardArt(it)}"></span><span class="nm">${esc(name)}</span>${extra}</div>`;
     const cardSlots = Array.from({ length: g.limits.handSlots }, (_, i) => {
       const c = g.cards[i];
-      if (!c) return `<div class="slot-wrap"><div class="slot empty">Empty<br>card slot</div>${GAP}</div>`;
+      if (!c) return `<div class="slot-wrap"><div class="slot empty">Empty<br>card slot</div></div>`;
       const it = ITEMS[c.id];
       const info = {
         kind: CAT_LABEL[it.cat] || 'Card',
@@ -1187,21 +1202,23 @@ export class UI {
         now: canPlay ? 'Playable now.' : 'Playable on your turn, when no roll is pending.',
         lines: [`Rarity: ${it.rarity}`],
       };
-      return `<div class="slot-wrap">${pcard(it, it.name, `card:${c.uid}`, info, '', `data-hl="card:${c.uid}"`)}<button class="small play ${canPlay ? 'primary' : ''}" data-a="play" data-uid="${c.uid}" ${canPlay ? '' : 'disabled'} title="${canPlay ? 'Play this card' : 'Cards can be played during your turn, when no roll is pending'}">Play</button></div>`;
+      const picked = sel === c.uid;
+      return `<div class="slot-wrap ${picked ? 'picked' : ''}">${pcard(it, it.name, `card:${c.uid}`, info, '', `data-hl="card:${c.uid}" data-a="pick-card" data-uid="${c.uid}" role="button" tabindex="0"`, picked ? 'sel' : '')}${picked ? `<button class="small play ${canPlay ? 'primary' : ''}" data-a="play" data-uid="${c.uid}" ${canPlay ? '' : 'disabled'} title="${canPlay ? 'Play this card' : 'Cards can be played during your turn, when no roll is pending'}">Play</button>` : ''}</div>`;
     }).join('');
     const guildSlots = Array.from({ length: g.limits.guildSlots }, (_, i) => {
       const gd = g.guilds[i];
-      if (!gd) return `<div class="slot-wrap"><div class="slot empty small-slot">Empty<br>guild slot</div>${GAP}</div>`;
+      if (!gd) return `<div class="slot-wrap"><div class="slot empty small-slot">Empty<br>guild slot</div></div>`;
       const it = ITEMS[gd.id];
       const now = this.guildNow(gd.id);
       const nm = `${it.name}${gd.data.terrain ? ` (${gd.data.terrain})` : ''}`;
       const info = { kind: 'Guild · always on', title: nm, desc: it.desc, now, lines: [`Rarity: ${it.rarity}`] };
-      return `<div class="slot-wrap">${pcard(it, nm, `guild:${gd.uid}`, info)}${GAP}</div>`;
+      return `<div class="slot-wrap">${pcard(it, nm, `guild:${gd.uid}`, info)}</div>`;
     }).join('');
     this.$hand.innerHTML = `
-      <section class="zone"><div class="zone-h">Hand ${this.vpChip()} <b>${total} card${total === 1 ? '' : 's'}${countable > 7 ? ' · <span class="bad">over 7: a 7 makes you discard</span>' : ' · safe from the robber up to 7'}</b></div><div class="res-row">${stacks}${storeBox}</div></section>
+      <section class="zone"><div class="zone-h">Hand <b>${total} card${total === 1 ? '' : 's'}${countable > 7 ? ' · <span class="bad">over 7: a 7 makes you discard</span>' : ' · safe from the robber up to 7'}</b></div><div class="res-row">${stacks}${storeBox}</div></section>
       <section class="zone"><div class="zone-h">Cards <b>${g.cards.length} of ${g.limits.handSlots}</b></div><div class="slots" style="--n:${g.limits.handSlots}">${cardSlots}</div></section>
-      <section class="zone guilds"><div class="zone-h">Guilds <b>${g.guilds.length} of ${g.limits.guildSlots}</b></div><div class="slots" style="--n:${g.limits.guildSlots}">${guildSlots}</div></section>`;
+      <section class="zone guilds"><div class="zone-h">Guilds <b>${g.guilds.length} of ${g.limits.guildSlots}</b></div><div class="slots" style="--n:${g.limits.guildSlots}">${guildSlots}</div></section>
+      ${this.vpBig()}`;
     this.$stage.style.setProperty('--hand-h', `${this.$hand.offsetHeight}px`);
     const lz = this.$hand.firstElementChild;
     this.$stage.style.setProperty('--hand-l', `${lz ? lz.offsetHeight : 160}px`);

@@ -743,3 +743,27 @@ select, input { font: inherit; color: var(--ink); background: var(--inset); bord
 .shop-grid .o-stage > .figure { zoom: .83; }
 .shop-grid .offer.pack .o-stage > * { zoom: .78; }
 @media (max-width: 1300px) { .shop-grid .o-stage > .figure { zoom: .66; } .shop-grid .offer.pack .o-stage > * { zoom: .62; } }
+
+/* ---- hand row: resources, cards and guilds share one baseline and one card size ---- */
+.stack { width: 82px; padding: 0; gap: 0; }
+.stack-cards, .rcard { height: 112px; }
+.stack-label { position: absolute; left: 50%; transform: translateX(-50%); top: calc(100% + 3px); min-height: 0; text-align: center; }
+.res-row { gap: 14px; align-items: flex-end; }
+.storebox { margin: 0 0 0 4px; align-self: flex-end; }
+.hand .slot, .hand .pcard { width: 82px; height: 112px; aspect-ratio: auto; }
+.hand .zone { align-self: flex-end; }
+.hand .slot-wrap { position: relative; display: block; width: 82px; }
+.hand .slot-wrap .play { position: absolute; left: 0; right: 0; top: calc(100% + 6px); width: auto; z-index: 21; box-shadow: 0 8px 16px -6px rgba(0, 0, 0, .8); }
+.hand .pcard[data-a="pick-card"] { cursor: pointer; transition: transform .15s, outline-color .15s; }
+.hand .pcard[data-a="pick-card"]:hover { transform: translateY(-4px); }
+.hand .pcard.sel { transform: translateY(-8px); outline: 2px solid var(--accent); outline-offset: 1px; }
+.vp-big { margin-left: auto; align-self: flex-end; text-align: right; padding: 0 6px 0 20px; position: relative; cursor: help; pointer-events: auto; }
+.vp-big .eyebrow { margin-bottom: 2px; }
+.vp-big .num { display: flex; align-items: baseline; justify-content: flex-end; gap: 6px; font: 800 76px/.9 var(--display); font-variant-numeric: tabular-nums; color: var(--ink); text-shadow: 0 6px 24px rgba(0, 0, 0, .7); }
+.vp-big .num small { font: 600 12px/1 var(--mono); letter-spacing: .12em; color: var(--muted); }
+.vp-big .num span { display: inline-block; transform-origin: 50% 70%; }
+@media (max-width: 1300px) { .vp-big .num { font-size: 54px; } }
+
+/* ---- action card: the main button stays in the same place on every step ---- */
+.rcol .panel-foot { min-height: 104px; justify-content: flex-start; }
+.hand .slot-wrap .play { top: auto; bottom: 5px; left: 5px; right: 5px; padding: 6px 4px; }
