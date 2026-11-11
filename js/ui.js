@@ -6,9 +6,9 @@
 import { Game, COSTS, BLINDS } from './game.js';
 import { RES, TERRAIN_RES, pips } from './board.js';
 import { ITEMS, ITEM_LIST, BOSS_BY_ID, ROLLS_PER_ROUND, LOADING, START_SETTLEMENTS, ECHO_BREAK } from './content.js';
-import { BoardView } from './board-view.js?v=17';
-import { figure } from './figures.js?v=17';
-import { Feel } from './feel.js?v=17';
+import { BoardView } from './board-view.js?v=18';
+import { figure } from './figures.js?v=18';
+import { Feel } from './feel.js?v=18';
 
 const TERRAIN_COLOR = { hills: '#c8734a', forest: '#3f7d4a', pasture: '#9ccf6a', fields: '#e8c547', mountains: '#8e939c', desert: '#e3d3a4' };
 const RES_ICON = { brick: 'B', lumber: 'L', wool: 'W', grain: 'G', ore: 'O' };
@@ -556,8 +556,8 @@ export class UI {
     if (g.phase === 'shop') {
       const st = this.stamp && performance.now() - this.stamp.start < 2600 ? this.stamp : null;
       const bossDown = g.blind === 2;
-      el.innerHTML = `${this.anteRow()}<div class="trib-head"><span class="eyebrow">${BLINDS[g.blind]} tribute</span></div>
-        <div class="paid ${bossDown ? 'boss' : ''} ${st ? 'slam' : ''}" ${st ? `style="animation-delay:${-Math.round(performance.now() - st.start)}ms"` : ''}><b>Paid</b><span>${bossDown ? 'The boss is beaten.' : 'Spend your VP in the shop.'}</span></div>${this.bossRow()}`;
+      el.innerHTML = `${this.bossRow()}${this.anteRow()}<div class="trib-head"><span class="eyebrow">${BLINDS[g.blind]} tribute</span></div>
+        <div class="paid ${bossDown ? 'boss' : ''} ${st ? 'slam' : ''}" ${st ? `style="animation-delay:${-Math.round(performance.now() - st.start)}ms"` : ''}><b>Paid</b><span>${bossDown ? 'The boss is beaten.' : 'Spend your VP in the shop.'}</span></div>`;
       return;
     }
     const due = g.tributeDue();
@@ -577,7 +577,7 @@ export class UI {
     }).join('');
     const state = g.phase === 'setup' ? '' : ok ? '<b class="ok">Ready to pay</b>' : '<b class="no">Not yet</b>';
     el.innerHTML = `<div class="trib-head" ${this.tipAttr('tribute', { kind: 'Tribute', title: 'Due at round end', desc: 'Each part needs a different resource type. Storehouse cards count first, then your hand.', lines })}><span class="eyebrow">${BLINDS[g.blind]} tribute · due at round end</span>${state}</div><div class="trib-parts">${parts}</div>`;
-    el.innerHTML = this.anteRow() + el.innerHTML + this.bossRow();
+    el.innerHTML = this.bossRow() + this.anteRow() + el.innerHTML;
   }
 
   // The score, as a chip in the hand row's header.
@@ -1078,7 +1078,7 @@ export class UI {
       if (UPGRADE_CATS.includes(it.cat)) {
         return `<div class="offer obj ${it.rarity} ${s.sold ? 'sold' : ''}">${top}<div class="o-stage">${figure(it.id, 0.86)}</div><div class="o-name">${esc(it.name)}</div><div class="o-desc">${esc(desc)}</div>${priceTag(price)}${btn}</div>`;
       }
-      return `<div class="offer card-o ${it.rarity} ${s.sold ? 'sold' : ''}"><div class="o-stage"><div class="pcard big ${it.rarity}"><i class="dot" style="background:${CAT_DOT[it.cat] || '#a6a59e'}"></i><span class="k">${esc(CAT_SHORT[it.cat])}</span><span class="r rarity-${it.rarity}">${it.rarity}</span><span class="art" style="background-position:${cardArt(it)}"></span><span class="nm">${esc(it.name)}</span><span class="tx">${esc(desc)}</span></div></div>${priceTag(price)}${btn}</div>`;
+      return `<div class="offer card-o ${it.rarity} ${s.sold ? 'sold' : ''}"><div class="o-top" aria-hidden="true"></div><div class="o-stage"><div class="pcard big ${it.rarity}"><i class="dot" style="background:${CAT_DOT[it.cat] || '#a6a59e'}"></i><span class="k">${esc(CAT_SHORT[it.cat])}</span><span class="r rarity-${it.rarity}">${it.rarity}</span><span class="art" style="background-position:${cardArt(it)}"></span><span class="nm">${esc(it.name)}</span><span class="tx">${esc(desc)}</span></div></div>${priceTag(price)}${btn}</div>`;
     }).join('');
     const guilds = g.guilds.map((gd) => `<div class="pcard ${ITEMS[gd.id].rarity}" ${this.tipAttr(`sg:${gd.uid}`, { kind: 'Guild · always on', title: ITEMS[gd.id].name, desc: ITEMS[gd.id].desc })}><i class="dot" style="background:${CAT_DOT.guild}"></i><span class="art" style="background-position:${cardArt(ITEMS[gd.id])}"></span><span class="nm">${esc(ITEMS[gd.id].name)}</span></div>`).join('');
     const nextBoss = g.blind === 2 ? BOSS_BY_ID[g.nextBossId] : g.boss;
@@ -1089,7 +1089,7 @@ export class UI {
       <div class="shop-head"><div><div class="eyebrow">Between rounds</div><h2>The Shop</h2></div>
         <div class="budget-box"><div class="eyebrow">Budget · unspent VP is lost</div><div class="budget">${g.budget}<small>VP</small></div>
         <div class="small muted">Score ${g.vp} + unused rolls ${e.unusedRolls} + Storehouse ${e.storehouse}${e.river ? ` + River ${e.river}` : ''}${e.twinFortune ? ` + Twin Fortune ${e.twinFortune}` : ''}</div></div></div>
-      <div class="shop-grid">${offers}</div>
+      <div class="shop-grid" style="--n:${g.shop.length}">${offers}</div>
       <div class="shop-foot"><button data-a="reroll" ${g.budget >= g.rerollPrice ? '' : 'disabled'}>Reroll offers · ${g.rerollPrice} VP</button>
         <button data-a="reroll-boss" ${g.budget >= g.bossRerollPrice ? '' : 'disabled'} title="Replace ${esc(nextBoss.name)} with another boss">Reroll boss · ${g.bossRerollPrice} VP</button>
         <span class="small muted sf-note">Dice, field and port upgrades ask you to pick their target after you buy.</span>

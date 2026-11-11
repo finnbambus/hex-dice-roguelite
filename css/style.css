@@ -720,3 +720,26 @@ select, input { font: inherit; color: var(--ink); background: var(--inset); bord
 .tips-pop .tp-body { display: block; }
 .tips-pop .tp-body > p { margin: 0 0 8px; }
 .tips-pop .tp-body > p:last-child { margin-bottom: 0; }
+
+/* ---- action card at the bottom right, boss info on top of the run card ---- */
+.rcol .panel { margin-top: auto; }
+.boss-row { margin-top: 0; padding-top: 0; border-top: 0; padding-bottom: 10px; border-bottom: 1px solid #25272c; }
+.tribute.boss .boss-row { border-bottom-color: rgba(255, 74, 28, .4); }
+
+/* ---- shop: every offer shares the same rows, so art, names, prices and buttons line up ---- */
+.shop-grid { display: grid; grid-template-columns: repeat(var(--n, 5), minmax(0, 1fr)); grid-template-rows: auto 150px auto auto auto auto; column-gap: 14px; row-gap: 6px; align-items: start; }
+.shop-grid .offer { display: grid; grid-template-rows: subgrid; grid-row: span 6; min-width: 0; gap: 0; row-gap: 6px; }
+.shop-grid .o-top { grid-row: 1; }
+.shop-grid .o-stage { grid-row: 2; height: auto; min-height: 0; padding: 0; overflow: visible; }
+.shop-grid .o-name { grid-row: 3; align-self: end; }
+.shop-grid .o-desc { grid-row: 4; }
+.shop-grid .price { grid-row: 5; align-self: start; margin: 4px 0 0; }
+.shop-grid .buy { grid-row: 6; align-self: end; }
+.shop-grid .offer.card-o .o-stage { grid-row: 2 / 5; }
+.shop-grid .o-stage > * { zoom: .78; }
+.shop-grid .offer.card-o .o-stage > .pcard.big { zoom: .9; }
+.shop-grid .offer.pack .o-stage > * { zoom: .9; }
+@media (max-width: 1300px) { .shop-grid .o-stage > * { zoom: .62; } .shop-grid .offer.card-o .o-stage > .pcard.big { zoom: .66; } .shop-grid .offer.pack .o-stage > * { zoom: .7; } .shop-grid { grid-template-rows: auto 120px auto auto auto auto; } }
+.shop-grid .o-stage > .figure { zoom: .83; }
+.shop-grid .offer.pack .o-stage > * { zoom: .78; }
+@media (max-width: 1300px) { .shop-grid .o-stage > .figure { zoom: .66; } .shop-grid .offer.pack .o-stage > * { zoom: .62; } }

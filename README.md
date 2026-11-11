@@ -23,11 +23,11 @@ No build step, no dependencies. It's plain HTML, CSS and JavaScript.
 The interface is dark and modern: greys, one vermilion accent for things you can press, medieval display type for titles and numbers.
 
 - **One stage, no side columns.** Everything sits on the table around the island:
-  - **Right column** (top to bottom): one **run card** (ante with Small / Big / Boss, the tribute with a bar per resource and "Ready to pay", a PAID stamp once settled, and the boss with its description), then the **action card** below it.
+  - **Right column** (top to bottom): one **run card** at the top (the boss and its description first, then the ante with Small / Big / Boss, the tribute with a bar per resource and "Ready to pay", and a PAID stamp once settled), with the **action card** anchored to the bottom right.
   - **Menu** button (top-right): Log, Help, Dev tools, New run and the screen-shake switch.
   - **Score** is a VP chip in the hand row's header. The **Storehouse** sits beside the resource stacks it was shipped from.
   - **Action card:** a three-step flow on top (Roll → Build & trade → Tribute; the result of a roll belongs to Roll) with a **?** button that opens the tips for the current step over the board, the step in the middle, then the one **dice area** (running effects as chips, both cubes) and the main button. **Rolls left** are shown inside the Roll button.
-  - **Shop:** a popup over the board after the tribute is paid; the run card and your hand stay visible. Reroll offers and reroll boss sit in its footer, with the button for the next round.
+  - **Shop:** a popup over the board after the tribute is paid; every offer shares the same rows, so art, names, prices and Buy buttons line up; the run card and your hand stay visible. Reroll offers and reroll boss sit in its footer, with the button for the next round.
   - **Dice:** click a die to open a sheet with its six faces and upgrades (hover a face for what it does).
 - **Island** (centre): isometric halftone tiles with 3D-rendered pieces, number tokens in perspective, lying flat like printed paper on a very quiet black-and-white halftone tabletop (faint wood fibres) (the paper itself never moves, except when the table is hit). Drag to pan. Field upgrades show as a finish and rim on the hex and a ring on the token (hover for the upgrade's figure).
 - **Hand row** (bottom of the island): resources as card stacks, your single-use cards (with Play buttons) and your guilds, all in one row at the same card size. Cards carry rarity in their border: grey, silver-blue, or holo for legendary.
