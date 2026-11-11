@@ -147,7 +147,7 @@ export class BoardView {
     for (const h of B.hexes) {
       const lit = (resultMode && paid.has(h.id)) || isT('hex', h.id);
       if (!lit) continue;
-      out.push(`<svg class="lit${isT('hex', h.id) ? ' pick' : ''}" aria-hidden="true" width="220" height="180" viewBox="-110 -90 220 180" style="left:${f1(this.hx(h) - 110)}px;top:${f1(this.hy(h) - 90)}px;z-index:700"><polygon points="${hexPoints(0.93)}"/></svg>`);
+      out.push(`<svg class="lit${isT('hex', h.id) ? ' tgt' : ''}" aria-hidden="true" width="220" height="180" viewBox="-110 -90 220 180" style="left:${f1(this.hx(h) - 110)}px;top:${f1(this.hy(h) - 90)}px;z-index:700"><polygon points="${hexPoints(0.93)}"/></svg>`);
     }
     // ports
     for (const p of B.ports) this.port(out, B, p, isT('port', p.id));

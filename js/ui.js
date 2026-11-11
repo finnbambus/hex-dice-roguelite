@@ -6,9 +6,9 @@
 import { Game, COSTS, BLINDS } from './game.js';
 import { RES, TERRAIN_RES, pips } from './board.js';
 import { ITEMS, ITEM_LIST, BOSS_BY_ID, ROLLS_PER_ROUND, LOADING, START_SETTLEMENTS, ECHO_BREAK } from './content.js';
-import { BoardView } from './board-view.js?v=25';
-import { figure } from './figures.js?v=25';
-import { Feel } from './feel.js?v=25';
+import { BoardView } from './board-view.js?v=26';
+import { figure } from './figures.js?v=26';
+import { Feel } from './feel.js?v=26';
 
 const TERRAIN_COLOR = { hills: '#c8734a', forest: '#3f7d4a', pasture: '#9ccf6a', fields: '#e8c547', mountains: '#8e939c', desert: '#e3d3a4' };
 const RES_ICON = { brick: 'B', lumber: 'L', wool: 'W', grain: 'G', ore: 'O' };
@@ -784,7 +784,7 @@ export class UI {
     const dice = [0, 1].map((i) => pick
       ? `<div class="die-slot picking">${this.cube(i, 0, false, false, true)}<span class="die-cap">Die ${i + 1}</span></div>`
       : `<div class="die-slot ${this.dieSheet === i ? 'open' : ''}" data-a="die-sheet" data-die="${i}" title="Drag to spin · click for the six faces">${this.cube(i, g.lastRoll ? g.lastRoll.faces[i] : 0, false, false)}<span class="die-cap">Die ${i + 1}</span></div>`).join('');
-    return `<div class="dice-stage ${pick ? 'pick' : ''}">${fxHtml}<div class="ds-row">${dice}</div><div class="ds-hint">${pick ? 'Click a face to choose it' : 'Drag a die to spin it · click it for its faces'}</div>${!pick && this.dieSheet != null ? this.faceSheet(this.dieSheet) : ''}</div>`;
+    return `<div class="dice-stage ${pick ? 'choosing' : ''}">${fxHtml}<div class="ds-row">${dice}</div><div class="ds-hint">${pick ? 'Click a face to choose it' : 'Drag a die to spin it · click it for its faces'}</div>${!pick && this.dieSheet != null ? this.faceSheet(this.dieSheet) : ''}</div>`;
   }
 
   // All six faces of one die, with its upgrades. Opens above the dice on click.
@@ -973,13 +973,13 @@ export class UI {
     const what = n > roads ? 'a road next to your new settlement' : `settlement ${n + 1} of ${START_SETTLEMENTS}`;
     return {
       body: `<h2>Set up your island</h2>
-        <p>Place <b>${what}</b> on one of the white markers.</p>
+        <p>Place <b>${what}</b> on one of the pulsing dots.</p>
         ${this.hint('Picking a good spot', `<ul class="small" style="margin:6px 0 0;padding-left:18px">
           <li>Each corner touches up to three hexes. Every hex pays its resource when its number is rolled.</li>
           <li>More dots under a number = rolled more often. 6 and 8 are best.</li>
           <li>Try to touch different resources: the Boss tribute needs three different types.</li>
           <li>Each starting settlement gives you one card per hex next to it.</li><li>Spread out: settlements need two edges of distance between them.</li></ul>`)}`,
-      foot: '<div class="hint">Click a white marker on the board to place it.</div>',
+      foot: '<div class="hint">Click a pulsing dot on the board to place it.</div>',
     };
   }
 
