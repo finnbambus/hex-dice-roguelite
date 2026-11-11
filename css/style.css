@@ -826,3 +826,8 @@ select, input { font: inherit; color: var(--ink); background: var(--inset); bord
 .vp-body .num span { display: inline-block; transform-origin: 50% 70%; }
 .act-head .stepper, .act-head .segs { height: 36px; align-items: stretch; }
 .act-head .stepper span, .act-head .segs span { display: flex; align-items: center; justify-content: center; padding: 0 2px; }
+
+/* menu button in the top-left corner */
+.menu { right: auto; left: 16px; }
+.menu-pop { right: auto; left: 0; }
+@media (max-width: 900px) { .menu { left: 12px; right: auto; } }
