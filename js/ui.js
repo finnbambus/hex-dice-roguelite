@@ -6,9 +6,9 @@
 import { Game, COSTS, BLINDS } from './game.js';
 import { RES, TERRAIN_RES, pips } from './board.js';
 import { ITEMS, ITEM_LIST, BOSS_BY_ID, ROLLS_PER_ROUND, LOADING, START_SETTLEMENTS, ECHO_BREAK } from './content.js';
-import { BoardView } from './board-view.js?v=22';
-import { figure } from './figures.js?v=22';
-import { Feel } from './feel.js?v=22';
+import { BoardView } from './board-view.js?v=23';
+import { figure } from './figures.js?v=23';
+import { Feel } from './feel.js?v=23';
 
 const TERRAIN_COLOR = { hills: '#c8734a', forest: '#3f7d4a', pasture: '#9ccf6a', fields: '#e8c547', mountains: '#8e939c', desert: '#e3d3a4' };
 const RES_ICON = { brick: 'B', lumber: 'L', wool: 'W', grain: 'G', ore: 'O' };
@@ -312,7 +312,12 @@ export class UI {
     this.selCard = null;
     this.tipsOpen = false;
     if (a !== 'die-sheet' && a !== 'die-open') this.dieSheet = null;
-    if (a === 'die-sheet' && this.dragMoved) return;
+    if ((a === 'die-sheet' || a === 'pick-face') && this.dragMoved) return;
+    if (a === 'pick-face') {
+      const m = this.modal;
+      const opt = m?.type === 'face' ? m.options.find((o) => o.die === Number(d.die) && o.face === Number(d.face)) : null;
+      return opt ? this.resolveModal(opt) : undefined;
+    }
     if (a === 'die-sheet') { this.dieSheet = this.dieSheet === Number(d.die) ? null : Number(d.die); return this.render(); }
     if (a === 'die-open') { this.dieSheet = Number(d.die); return this.render(); }
     if (a === 'die-close') return this.render();
@@ -633,17 +638,21 @@ export class UI {
     return `<span class="rl" title="Rolls left this round">${Array.from({ length: ROLLS_PER_ROUND }, (_, i) => `<i class="${i < left ? 'on' : ''}"></i>`).join('')}<b>${left} left</b></span>`;
   }
 
-  // Top of the action card: which step of the round you are on (with the ? for its tips), and which of the ante's three rounds this is.
+  // The ? button that opens the tips for the current step; it sits next to the secondary button at the bottom of the card.
+  tipBtn() {
+    return this._tip ? `<button class="tip-btn ${this.tipsOpen ? 'on' : ''} ${this.tipsSeen ? '' : 'new'}" data-a="tips" aria-expanded="${this.tipsOpen}" title="How this step works">?</button>` : '';
+  }
+
+  // Top of the action card: which step of the round you are on, and which of the ante's three rounds this is.
   actHead(step) {
-    if (step === 'setup' || step === 'gameover') return this._tip ? `<div class="act-head"><button class="tip-btn ${this.tipsOpen ? 'on' : ''} ${this.tipsSeen ? '' : 'new'}" data-a="tips" aria-expanded="${this.tipsOpen}" title="How this step works">?</button></div>` : '';
+    if (step === 'setup' || step === 'gameover') return '';
     let stepper = '';
     if (['roll', 'adjust', 'result', 'build', 'tribute'].includes(step)) {
       const current = step === 'adjust' || step === 'result' ? 'roll' : step;
       const idx = STEPS.findIndex(([k]) => k === current);
       stepper = `<nav class="stepper" aria-label="Round steps">${STEPS.map(([k, l], i) => `<span class="${i === idx ? 'on' : i < idx ? 'done' : ''}">${l}</span>`).join('')}</nav>`;
     }
-    const tip = this._tip ? `<button class="tip-btn ${this.tipsOpen ? 'on' : ''} ${this.tipsSeen ? '' : 'new'}" data-a="tips" aria-expanded="${this.tipsOpen}" title="How this step works">?</button>` : '';
-    return `<div class="act-head ${stepper ? '' : 'nostep'}">${stepper}${stepper ? tip : ''}${this.roundSegs()}${stepper ? '' : tip}</div>`;
+    return `<div class="act-head">${stepper}${this.roundSegs()}</div>`;
   }
 
   // Active round effects: [label, 'bad' | 'good' | '', tooltip]
@@ -703,7 +712,8 @@ export class UI {
     const step = this.step();
     if (this.lastStep !== step) this.tipsOpen = false;
     this._tip = null;
-    const view = {
+    const pickingFace = this.modal?.type === 'face';
+    const view = pickingFace ? this.viewPickFace() : {
       setup: () => this.viewSetup(),
       roll: () => this.viewRoll(),
       adjust: () => this.viewAdjust(),
@@ -715,7 +725,10 @@ export class UI {
     }[step]();
     const scroll = this.$panel.querySelector('.panel-body')?.scrollTop || 0;
     const tips = this.tipsOpen && this._tip ? `<div class="tips-pop" role="dialog" aria-label="How this step works"><div class="eyebrow">${this._tip.title}</div><div class="tp-body">${this._tip.html}</div></div>` : '';
-    this.$panel.innerHTML = `${this.actHead(step)}<div class="panel-body">${view.body}</div>${this.diceArea(step)}${view.foot ? `<div class="panel-foot">${view.foot}</div>` : ''}${tips}`;
+    const sec = view.sec || '';
+    const tb = this.tipBtn();
+    const footHtml = `${view.foot || ''}${sec || tb ? `<div class="foot-row">${sec}${tb}</div>` : ''}`;
+    this.$panel.innerHTML = `${this.actHead(step)}<div class="panel-body">${view.body}</div>${pickingFace ? '' : this.diceArea(step)}${footHtml ? `<div class="panel-foot">${footHtml}</div>` : ''}${tips}`;
     if (this.lastStep === step) this.$panel.querySelector('.panel-body').scrollTop = scroll;
     for (const b of this.$panel.querySelectorAll('.panel-foot button.primary[data-primary]')) b.insertAdjacentHTML('beforeend', '<kbd>Space</kbd>');
     this.lastStep = step;
@@ -766,8 +779,11 @@ export class UI {
     const g = this.game;
     const fx = step === 'roll' ? this.effects() : [];
     const fxHtml = fx.length ? `<div class="fx">${fx.map(([t, cls, tip, key]) => `<span class="fx-chip ${cls}" ${this.tipAttr(`fx:${t}`, { kind: 'Active this round', title: t, desc: tip })} data-hl="${key || ''}">${t}</span>`).join('')}</div>` : '';
-    const dice = [0, 1].map((i) => `<div class="die-slot ${this.dieSheet === i ? 'open' : ''}" data-a="die-sheet" data-die="${i}" title="Drag to spin · click for the six faces">${this.cube(i, g.lastRoll ? g.lastRoll.faces[i] : 0, false, false)}<span class="die-cap">Die ${i + 1}</span></div>`).join('');
-    return `<div class="dice-stage">${fxHtml}<div class="ds-row">${dice}</div><div class="ds-hint">Drag a die to spin it · click it for its faces</div>${this.dieSheet != null ? this.faceSheet(this.dieSheet) : ''}</div>`;
+    const pick = step === 'pick';
+    const dice = [0, 1].map((i) => pick
+      ? `<div class="die-slot picking">${this.cube(i, 0, false, false, true)}<span class="die-cap">Die ${i + 1}</span></div>`
+      : `<div class="die-slot ${this.dieSheet === i ? 'open' : ''}" data-a="die-sheet" data-die="${i}" title="Drag to spin · click for the six faces">${this.cube(i, g.lastRoll ? g.lastRoll.faces[i] : 0, false, false)}<span class="die-cap">Die ${i + 1}</span></div>`).join('');
+    return `<div class="dice-stage ${pick ? 'pick' : ''}">${fxHtml}<div class="ds-row">${dice}</div><div class="ds-hint">${pick ? 'Click a face to choose it' : 'Drag a die to spin it · click it for its faces'}</div>${!pick && this.dieSheet != null ? this.faceSheet(this.dieSheet) : ''}</div>`;
   }
 
   // All six faces of one die, with its upgrades. Opens above the dice on click.
@@ -780,7 +796,7 @@ export class UI {
   }
 
   // A CSS 3D cube showing the die's six real faces, turned to face `fi`. Tumbles after each new roll.
-  cube(i, fi, held, live) {
+  cube(i, fi, held, live, pick = false) {
     const d = this.game.dice[i];
     const SIDE = ['front', 'right', 'top', 'bottom', 'left', 'back']; // physical face k → cube side (opposites: 0-5, 1-4, 2-3)
     const TURN = { front: 'rotateX(0deg) rotateY(0deg)', right: 'rotateY(-90deg)', top: 'rotateX(-90deg)', bottom: 'rotateX(90deg)', left: 'rotateY(90deg)', back: 'rotateY(180deg)' };
@@ -797,7 +813,8 @@ export class UI {
       if (f.setter === 'mirror') bg = `radial-gradient(circle at 50% 50%, #17181b 0 ${u(0.16)}, ${tone} ${u(0.18)} ${u(0.27)}, #17181b ${u(0.29)})`;
       else if (f.setter === 'robber') { bg = '#17181b'; inner = '<span class="lbl lt">R</span>'; }
       else if (f.setter === 'blank') { bg = '#17181b'; inner = '<span class="lbl lt">?</span>'; }
-      return `<div class="side ${SIDE[k]}" style="background:${bg}">${inner}${f.triggers.length ? `<span class="trg">${f.triggers.map((t) => TRIG_LABEL[t]).join('')}</span>` : ''}</div>`;
+      const faceTip = f.triggers.map((t) => ITEMS[t].name).join(', ') || (f.setter ? ITEMS[SETTER_ITEM[f.setter]].name : `Shows ${f.value}`);
+      return `<div class="side ${SIDE[k]}" style="background:${bg}" ${pick ? `data-a="pick-face" data-die="${i}" data-face="${k}" title="Die ${i + 1}, face ${k + 1}: ${esc(faceTip)}"` : ''}>${inner}${f.triggers.length ? `<span class="trg">${f.triggers.map((t) => TRIG_LABEL[t]).join('')}</span>` : ''}</div>`;
     }).join('');
     const final = TURN[SIDE[fi]];
     let cls = '';
@@ -965,6 +982,17 @@ export class UI {
     };
   }
 
+  // Choosing the face of a face upgrade: spin the dice in the action card and click the face itself.
+  viewPickFace() {
+    const m = this.modal;
+    return {
+      body: `<h2>${esc(m.prompt)}</h2>
+        <p class="small muted">Drag a die to spin it, then click the face to upgrade. Upgrades stay on the physical face. A new value-setter replaces the old one; triggers stack.</p>
+        ${this.diceStage('pick', m)}`,
+      foot: m.cancel ? '<button class="big center" data-a="cancel-modal">Cancel</button>' : '',
+    };
+  }
+
   viewRoll() {
     const g = this.game;
     const pre = g.cards.filter((c) => PRE_ROLL_CARDS.includes(c.id));
@@ -973,9 +1001,8 @@ export class UI {
         ${this.diceStage('roll')}
         ${this.hint('How a round works', `You have <b>${ROLLS_PER_ROUND} rolls</b>. Each roll pays every hex with that number to your buildings next to it (settlement 1, city 2). Between rolls you can build and trade. At the end you pay the tribute shown at the top of the board.`)}
         ${pre.length ? `<div class="callout"><b>Before rolling:</b> you can play ${pre.map((c) => ITEMS[c.id].name).join(', ')} from your hand below.</div>` : ''}`,
-      foot: `<button class="primary big" data-a="roll" data-primary ${this.busy ? 'disabled' : ''}>Roll the dice${this.rollsLeft()}</button>
-        <div class="row" style="justify-content:center"><button class="small ghost" data-a="prebuild" ${this.busy ? 'disabled' : ''}>Build or trade first</button>
-        <button class="small ghost" data-a="end" ${this.busy ? 'disabled' : ''}>Skip all rolls (+${ROLLS_PER_ROUND} VP)</button></div>`,
+      foot: `<button class="primary big" data-a="roll" data-primary ${this.busy ? 'disabled' : ''}>Roll the dice${this.rollsLeft()}</button>`,
+      sec: `<button class="small ghost" data-a="end" ${this.busy ? 'disabled' : ''}>Skip all rolls (+${ROLLS_PER_ROUND} VP)</button>`,
     };
   }
 
@@ -1087,7 +1114,8 @@ export class UI {
         <div class="trade-line"><span>Get 1</span><div class="trade-grid">${getRow}</div></div>
         ${give || !RES.some((r) => g.hand[r] >= rate(r)) ? `<p class="small muted">${tradeHint}</p>` : ''}
         ${ports.length || g.bossIs('pirate') ? `<h3>Ship to the Storehouse</h3>${ship}` : ship}`,
-      foot: `${primary}${secondary}`,
+      foot: primary,
+      sec: secondary.replace('<button ', '<button class="small ghost" '),
     };
   }
 
@@ -1123,8 +1151,8 @@ export class UI {
         <h2>Shop</h2>
         <p class="lead">Budget <b>${g.budget} VP</b>. Spend it, then move on.</p>
         ${this.diceStage('shop')}`,
-      foot: `<button class="primary big" data-a="leave" data-primary ${this.busy ? 'disabled' : ''}>Next: ${next}</button>
-        <button class="small ghost" data-a="reroll-boss" ${g.budget >= g.bossRerollPrice ? '' : 'disabled'} title="Replace ${esc(nextBoss.name)} with another boss">Reroll boss · ${g.bossRerollPrice} VP</button>`,
+      foot: `<button class="primary big" data-a="leave" data-primary ${this.busy ? 'disabled' : ''}>Next: ${next}</button>`,
+      sec: `<button class="small ghost" data-a="reroll-boss" ${g.budget >= g.bossRerollPrice ? '' : 'disabled'} title="Replace ${esc(nextBoss.name)} with another boss">Reroll boss · ${g.bossRerollPrice} VP</button>`,
     };
   }
 
@@ -1162,7 +1190,7 @@ export class UI {
       <div class="shop-grid" style="--n:${g.shop.length}">${offers}</div>
       <div class="shop-foot"><button data-a="reroll" ${g.budget >= g.rerollPrice ? '' : 'disabled'}>Reroll offers · ${g.rerollPrice} VP</button>
         <span class="small muted sf-note">Dice, field and port upgrades ask you to pick their target after you buy.</span></div>
-      <div class="shop-have"><div class="eyebrow">Your dice</div><div class="mini-dice">${[0, 1].map((i) => `<div class="mini-die">${this.facesHtml(i, null)}${this.dieTags(i)}</div>`).join('')}</div></div></div>`;
+</div>`;
     const sh = this.$overlay.querySelector('.shop');
     if (sh && this.shopShown) sh.scrollTop = keep;
     this.shopShown = true;
@@ -1312,15 +1340,7 @@ export class UI {
     if (m.type === 'options') {
       return `<div class="modal" role="dialog" aria-modal="true"><h2>${esc(m.prompt)}</h2><div class="opts">${m.options.map((o, i) => `<button data-a="opt" data-i="${i}" ${o.disabled ? 'disabled' : ''}>${esc(o.label)}</button>`).join('')}</div><div class="modal-foot">${cancel}</div></div>`;
     }
-    if (m.type === 'face') {
-      const g = this.game;
-      const dieBlock = (d) => `<div class="small muted">Die ${d + 1}</div><div class="face-grid">${m.options.map((o, i) => {
-        if (o.die !== d) return '';
-        const f = g.dice[d].faces[o.face];
-        return `<button data-a="face" data-i="${i}" title="${esc(f.triggers.map((t) => ITEMS[t].name).join(', ') || (f.setter ? ITEMS[SETTER_ITEM[f.setter]].name : 'Shows ' + f.value))}">${faceArt(f, d.loaded && d.loaded.face === o.face)}</button>`;
-      }).join('')}</div>`;
-      return `<div class="modal" role="dialog" aria-modal="true"><h2>${esc(m.prompt)}</h2><p class="small muted">Upgrades stay on the physical face, not on its number. A new value-setter replaces the old one; triggers stack.</p>${dieBlock(0)}${dieBlock(1)}<div class="modal-foot">${cancel}</div></div>`;
-    }
+    if (m.type === 'face') return ''; // chosen on the dice in the action card
     if (m.type === 'resources') {
       const total = RES.reduce((s, r) => s + m.counts[r], 0);
       return `<div class="modal" role="dialog" aria-modal="true"><h2>${esc(m.prompt)}</h2><p class="muted">${m.discard ? 'Discard' : 'Choose'} ${m.n} · selected <b>${total}</b></p>
