@@ -802,3 +802,27 @@ select, input { font: inherit; color: var(--ink); background: var(--inset); bord
 .dice-stage.pick .side { cursor: pointer; }
 .dice-stage.pick .side:hover { filter: brightness(1.25) drop-shadow(0 0 6px var(--accent)); outline: 2px solid var(--accent); outline-offset: -3px; }
 .dice-stage.pick .ds-hint { color: var(--accent); font-weight: 600; }
+
+/* ---- the step flow and the Small / Big / Boss slider are the same control ---- */
+.act-head .stepper, .act-head .segs { box-sizing: border-box; width: 100%; flex: 1 1 100%; display: flex; gap: 2px; padding: 3px; border-radius: 10px; background: #0e0f11; border: 1px solid var(--line); backdrop-filter: none; }
+.act-head .stepper span, .act-head .segs span { flex: 1; display: block; box-sizing: border-box; text-align: center; padding: 8px 2px; font: 500 11.5px/1 var(--sans); letter-spacing: 0; text-transform: none; border-radius: 8px; background: none; color: var(--muted); white-space: nowrap; }
+.act-head .stepper span.done, .act-head .segs span.done { color: var(--ink); background: none; }
+.act-head .stepper span.on, .act-head .segs span.on { background: var(--ink); color: #0c0d0f; font-weight: 650; }
+.act-head .segs span:not(.done):not(.on) { color: var(--dim); }
+
+/* ---- hand row: bigger cards; the score sits in the row like the other zones ---- */
+.hand { --hz: .86; gap: 18px; }
+@media (min-width: 1760px) { .hand { --hz: 1.1; gap: 22px; } }
+@media (max-width: 1300px) { .hand { --hz: .74; } }
+@media (max-width: 1100px) { .hand { --hz: .6; } }
+.hand { --ch: calc(112px * var(--hz)); }
+.vp-zone { margin-left: auto; align-self: flex-end; cursor: help; pointer-events: auto; padding: 0 6px 0 16px; }
+.vp-zone .zone-h { justify-content: flex-end; min-height: 26px; }
+.vp-body { height: var(--ch); display: flex; align-items: flex-end; justify-content: flex-end; }
+.vp-body .num { display: flex; align-items: baseline; gap: 6px; font: 800 calc(var(--ch) * 1.02)/.74 var(--display); font-variant-numeric: tabular-nums; color: var(--ink); text-shadow: 0 6px 24px rgba(0, 0, 0, .7); }
+.vp-body.d3 .num { font-size: calc(var(--ch) * .86); }
+.vp-body.d4 .num { font-size: calc(var(--ch) * .66); }
+.vp-body .num small { font: 600 12px/1 var(--mono); letter-spacing: .12em; color: var(--muted); }
+.vp-body .num span { display: inline-block; transform-origin: 50% 70%; }
+.act-head .stepper, .act-head .segs { height: 36px; align-items: stretch; }
+.act-head .stepper span, .act-head .segs span { display: flex; align-items: center; justify-content: center; padding: 0 2px; }

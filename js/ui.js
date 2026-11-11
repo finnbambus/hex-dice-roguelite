@@ -6,9 +6,9 @@
 import { Game, COSTS, BLINDS } from './game.js';
 import { RES, TERRAIN_RES, pips } from './board.js';
 import { ITEMS, ITEM_LIST, BOSS_BY_ID, ROLLS_PER_ROUND, LOADING, START_SETTLEMENTS, ECHO_BREAK } from './content.js';
-import { BoardView } from './board-view.js?v=23';
-import { figure } from './figures.js?v=23';
-import { Feel } from './feel.js?v=23';
+import { BoardView } from './board-view.js?v=24';
+import { figure } from './figures.js?v=24';
+import { Feel } from './feel.js?v=24';
 
 const TERRAIN_COLOR = { hills: '#c8734a', forest: '#3f7d4a', pasture: '#9ccf6a', fields: '#e8c547', mountains: '#8e939c', desert: '#e3d3a4' };
 const RES_ICON = { brick: 'B', lumber: 'L', wool: 'W', grain: 'G', ore: 'O' };
@@ -629,7 +629,8 @@ export class UI {
     const g = this.game;
     const vp = g.vpBreakdown();
     const info = { kind: 'Score', title: `${vp.total} VP`, desc: 'Your score this round. Whatever you hold when the tribute is paid becomes your shop budget.', lines: [`Settlements ${vp.settlements} · Cities ${vp.cities}`, `VP cards ${vp.vpCards}`, `Longest road ${vp.road} (length ${vp.longestRoad})`, `Army ${vp.army} (${g.knights} knights)`] };
-    return `<section class="vp-big" data-hl="vp" ${this.tipAttr('score', info)}><div class="eyebrow">Score</div><div class="num"><span data-ck="vp">${this.feel.value('vp', vp.total)}</span><small>VP</small></div></section>`;
+    const digits = String(vp.total).length;
+    return `<section class="zone vp-zone" data-hl="vp" ${this.tipAttr('score', info)}><div class="zone-h">Score</div><div class="vp-body d${Math.min(digits, 4)}"><div class="num"><span data-ck="vp">${this.feel.value('vp', vp.total)}</span><small>VP</small></div></div></section>`;
   }
 
   // Rolls left, shown inside the roll buttons.
