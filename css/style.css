@@ -783,3 +783,15 @@ select, input { font: inherit; color: var(--ink); background: var(--inset); bord
 .rcol .tribute { gap: 7px; }
 .boss-row { padding-bottom: 10px; }
 .boss-row .name { font-size: 29px; }
+
+/* ---- ante indicator sits right above the tribute; the Small / Big / Boss slider moves under the step flow ---- */
+.act-head { flex-wrap: wrap; }
+.act-head .segs { flex: 1 1 100%; gap: 4px; }
+.act-head .segs span { padding: 7px 0; }
+.rcol .tribute .ante { display: flex; align-items: baseline; gap: 10px; }
+.rcol .tribute .ante b { font: 700 22px/1 var(--display); }
+.rcol .tribute .ante .rnd { font: 700 11px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: #0c0d0f; background: var(--ink); padding: 5px 9px; border-radius: 6px; }
+.rcol .tribute .ante .rnd.boss { background: var(--accent); color: #1a0703; }
+.rcol .tribute .ante .surv { margin-left: auto; }
+.rcol .tribute .ante + .trib-head { margin-top: -2px; }
+.act-head.nostep .segs { flex: 1 1 0; }

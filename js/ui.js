@@ -6,9 +6,9 @@
 import { Game, COSTS, BLINDS } from './game.js';
 import { RES, TERRAIN_RES, pips } from './board.js';
 import { ITEMS, ITEM_LIST, BOSS_BY_ID, ROLLS_PER_ROUND, LOADING, START_SETTLEMENTS, ECHO_BREAK } from './content.js';
-import { BoardView } from './board-view.js?v=21';
-import { figure } from './figures.js?v=21';
-import { Feel } from './feel.js?v=21';
+import { BoardView } from './board-view.js?v=22';
+import { figure } from './figures.js?v=22';
+import { Feel } from './feel.js?v=22';
 
 const TERRAIN_COLOR = { hills: '#c8734a', forest: '#3f7d4a', pasture: '#9ccf6a', fields: '#e8c547', mountains: '#8e939c', desert: '#e3d3a4' };
 const RES_ICON = { brick: 'B', lumber: 'L', wool: 'W', grain: 'G', ore: 'O' };
@@ -563,11 +563,16 @@ export class UI {
   }
 
   // ---------------------------------------------------------------- run card: ante, tribute and boss in one plaque
-  // Where the run stands: the ante and Small / Big / Boss.
+  // Which round the tribute below belongs to: the ante and the round you are in.
   anteRow() {
     const g = this.game;
-    const segs = BLINDS.map((b, i) => `<span class="${i < g.blind || (g.phase === 'shop' && i === g.blind) ? 'done' : i === g.blind ? 'on' : ''}">${b}</span>`).join('');
-    return `<div class="ante"><b>Ante ${g.ante}</b><span class="segs">${segs}</span><span class="surv" title="Rounds survived this run">${g.roundsSurvived} survived</span></div>`;
+    return `<div class="ante"><b>Ante ${g.ante}</b><span class="rnd ${g.blind === 2 && g.phase !== 'shop' ? 'boss' : ''}">${BLINDS[g.blind]} round</span><span class="surv" title="Rounds survived this run">${g.roundsSurvived} survived</span></div>`;
+  }
+
+  // Small / Big / Boss of the current ante, shown under the step flow in the action card.
+  roundSegs() {
+    const g = this.game;
+    return `<span class="segs" title="The three rounds of ante ${g.ante}">${BLINDS.map((b, i) => `<span class="${i < g.blind || (g.phase === 'shop' && i === g.blind) ? 'done' : i === g.blind ? 'on' : ''}">${b}</span>`).join('')}</span>`;
   }
 
   // The boss of this round, or the next one while you shop.
@@ -628,8 +633,9 @@ export class UI {
     return `<span class="rl" title="Rolls left this round">${Array.from({ length: ROLLS_PER_ROUND }, (_, i) => `<i class="${i < left ? 'on' : ''}"></i>`).join('')}<b>${left} left</b></span>`;
   }
 
-  // Top of the action card: which step of the round you are on, and the ? that opens the tips for it.
+  // Top of the action card: which step of the round you are on (with the ? for its tips), and which of the ante's three rounds this is.
   actHead(step) {
+    if (step === 'setup' || step === 'gameover') return this._tip ? `<div class="act-head"><button class="tip-btn ${this.tipsOpen ? 'on' : ''} ${this.tipsSeen ? '' : 'new'}" data-a="tips" aria-expanded="${this.tipsOpen}" title="How this step works">?</button></div>` : '';
     let stepper = '';
     if (['roll', 'adjust', 'result', 'build', 'tribute'].includes(step)) {
       const current = step === 'adjust' || step === 'result' ? 'roll' : step;
@@ -637,7 +643,7 @@ export class UI {
       stepper = `<nav class="stepper" aria-label="Round steps">${STEPS.map(([k, l], i) => `<span class="${i === idx ? 'on' : i < idx ? 'done' : ''}">${l}</span>`).join('')}</nav>`;
     }
     const tip = this._tip ? `<button class="tip-btn ${this.tipsOpen ? 'on' : ''} ${this.tipsSeen ? '' : 'new'}" data-a="tips" aria-expanded="${this.tipsOpen}" title="How this step works">?</button>` : '';
-    return stepper || tip ? `<div class="act-head">${stepper}${tip}</div>` : '';
+    return `<div class="act-head ${stepper ? '' : 'nostep'}">${stepper}${stepper ? tip : ''}${this.roundSegs()}${stepper ? '' : tip}</div>`;
   }
 
   // Active round effects: [label, 'bad' | 'good' | '', tooltip]
@@ -717,7 +723,7 @@ export class UI {
 
   // The one place the dice live: both cubes, the roll's values, running effects, and a face sheet that opens on click.
   diceArea(step) {
-    if (!['adjust', 'result', 'build'].includes(step)) return '';
+    if (!['adjust', 'result'].includes(step)) return '';
     const g = this.game;
     let values = null, faces = null, opts = {};
     if (step === 'adjust') {
@@ -747,6 +753,12 @@ export class UI {
       </div>`;
     }).join('');
     return `<div class="dice-area">${fxHtml}<div class="dice2">${dice}</div>${this.dieSheet != null ? this.faceSheet(this.dieSheet) : ''}</div>`;
+  }
+
+  // Running round effects as chips.
+  fxChips() {
+    const fx = this.effects();
+    return fx.length ? `<div class="fx">${fx.map(([t, cls, tip, key]) => `<span class="fx-chip ${cls}" ${this.tipAttr(`fx:${t}`, { kind: 'Active this round', title: t, desc: tip })} data-hl="${key || ''}">${t}</span>`).join('')}</div>` : '';
   }
 
   // The big dice shown in the Roll and Shop steps: no boxes, drag a die to spin it, click it for its six faces.
@@ -1063,7 +1075,7 @@ export class UI {
         : `<button class="primary big" data-a="end" data-primary ${dis ? 'disabled' : ''}>Go to the tribute</button>`;
     const secondary = rollsLeft > 0 || echo ? `<button data-a="end" ${dis ? 'disabled' : ''}>End round now${rollsLeft > 0 ? ` · +${rollsLeft} VP` : ''}</button>` : '';
     return {
-      body: `${this.hint('How building and trading work', `<p>${g.rollsUsed === 0 ? 'Before your first roll.' : `After roll ${g.rollsUsed} of ${ROLLS_PER_ROUND}.`} Do as much as you like between rolls. Hover an option to see the cards it uses. The tribute card above says whether you can pay it now; anything you build comes out of the rest.</p><p><b>Trade</b> gives you one card of any type for ${Math.min(...RES.map(rate))} of another (less with ports). <b>Ship</b> sends cards to the Storehouse from a port; they count toward the tribute with a bonus.</p>`)}
+      body: `${this.fxChips()}${this.hint('How building and trading work', `<p>${g.rollsUsed === 0 ? 'Before your first roll.' : `After roll ${g.rollsUsed} of ${ROLLS_PER_ROUND}.`} Do as much as you like between rolls. Hover an option to see the cards it uses. The tribute card above says whether you can pay it now; anything you build comes out of the rest.</p><p><b>Trade</b> gives you one card of any type for ${Math.min(...RES.map(rate))} of another (less with ports). <b>Ship</b> sends cards to the Storehouse from a port; they count toward the tribute with a bonus.</p>`)}
         <div class="tiles">
           ${tile('settlement', 'Settlement', `+1 VP · produces 1 · ${c.settlement}/${g.limits.settlement}`)}
           ${tile('city', 'City', `Upgrade: +1 VP · produces 2 · ${c.city}/${g.limits.city}`)}
