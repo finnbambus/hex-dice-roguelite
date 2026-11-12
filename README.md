@@ -60,6 +60,10 @@ Open the game with `?dev` in the address (e.g. `index.html?dev`) and the menu ga
 
 The `.nojekyll` file stops GitHub from running Jekyll over the files. All paths are relative, so the game also works from a sub-path or a custom domain.
 
+### Odds in the die sheet (v36)
+
+Clicking a die opens its six faces and, below them, the chance of each total 2–12 with both dice as they stand (changed faces, Loaded weights, Mirror, Blank and Robber's Face included), plus the chance of a 7 and the average total. While the sheet is open in the Roll and Shop steps the big dice shrink so everything fits.
+
 ### Looking at the board from the shop (v35)
 
 **View board** in the shop's footer hides the shop sheet so the island, tokens and ports can be inspected (hover works as usual). **Back to the shop** at the top of the board, or Esc, returns.

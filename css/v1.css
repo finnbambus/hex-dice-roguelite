@@ -403,3 +403,14 @@ input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); ou
 .peek-back { pointer-events: auto; display: inline-flex; align-items: center; gap: 10px; height: 40px; padding: 0 16px; border-radius: 999px; background: #f2efe6; color: #141518; border: 0; font-weight: 600; box-shadow: 0 8px 24px -8px rgba(0, 0, 0, .8); }
 .peek-back:hover { background: #fff; }
 .peek-back kbd { font: var(--cap); padding: 2px 6px; border-radius: 4px; background: rgba(0, 0, 0, .12); }
+
+/* Die sheet: current odds */
+.pk-chart.odds { margin-top: 0; }
+.pk-chart.odds text.pct { fill: var(--muted); }
+.pk-chart.odds text.pct.hi { fill: var(--ink); }
+.pk-chart.odds .pk-read { min-height: 0; }
+/* With the sheet open in the Roll and Shop steps, the big dice step back so faces and odds fit without scrolling. */
+.rcol .panel-body:has(.dice-stage .die-sheet) > h2, .rcol .panel-body:has(.dice-stage .die-sheet) > .lead, .dice-stage:has(.die-sheet) .ds-hint { display: none; }
+.dice-stage:has(.die-sheet) .die-slot .die3d { --s: clamp(36px, 5.5vh, 52px); margin: calc(var(--s) * .26) calc(var(--s) * .26) calc(var(--s) * .32); }
+.dice-stage .die-sheet > p.small { display: none; }
+@media (max-height: 800px) { .dice-stage:has(.die-sheet) .ds-row { display: none; } .dice-stage .die-sheet { gap: 8px; padding: 10px; margin-top: 0; } }

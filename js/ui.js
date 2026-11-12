@@ -6,9 +6,9 @@
 import { Game, COSTS, BLINDS } from './game.js';
 import { RES, TERRAIN_RES, pips } from './board.js';
 import { ITEMS, ITEM_LIST, BOSS_BY_ID, ROLLS_PER_ROUND, LOADING, START_SETTLEMENTS, ECHO_BREAK } from './content.js';
-import { BoardView } from './board-view.js?v=35';
-import { figure, faceBody, primaryTrigger } from './figures.js?v=35';
-import { Feel } from './feel.js?v=35';
+import { BoardView } from './board-view.js?v=36';
+import { figure, faceBody, primaryTrigger } from './figures.js?v=36';
+import { Feel } from './feel.js?v=36';
 
 const TERRAIN_COLOR = { hills: '#c8734a', forest: '#3f7d4a', pasture: '#9ccf6a', fields: '#e8c547', mountains: '#8e939c', desert: '#e3d3a4' };
 const RES_ICON = { brick: 'B', lumber: 'L', wool: 'W', grain: 'G', ore: 'O' };
@@ -918,7 +918,8 @@ export class UI {
     const shown = g.lastRoll ? g.lastRoll.faces[i] : null;
     return `<div class="die-sheet"><div class="ds-head"><span class="ds-tabs">${[0, 1].map((k) => `<button class="${k === i ? 'on' : ''}" data-a="die-open" data-die="${k}">Die ${k + 1}</button>`).join('')}</span><button class="small" data-a="die-close">Close</button></div>
       ${this.facesHtml(i, shown)}${this.dieTags(i)}
-      <p class="small muted">Hover a face for what it does${shown != null ? '. The outlined one showed last' : ''}.</p></div>`;
+      ${this.oddsChart()}
+      <p class="small muted">Hover a face for what it does${shown != null ? '. The outlined one showed last' : ''}. Face upgrades preview their effect on this curve when you place them.</p></div>`;
   }
 
   // A CSS 3D cube showing the die's six real faces, turned to face `fi`. Tumbles after each new roll.
@@ -1166,6 +1167,26 @@ export class UI {
     if (item.id === 'lower') return [{ ...f, value: f.value === 1 ? 6 : f.value - 1, setter: null }];
     const setter = { mirror: 'mirror', robberFace: 'robber', blank: 'blank' }[item.id];
     return setter ? [{ ...f, setter }] : null;
+  }
+
+  // The odds as the dice stand now (faces, Loaded weights, Mirror, Blank, Robber's Face): shown with a die's faces.
+  oddsChart() {
+    const W = 280, H = 104;
+    const dist = this.sumDist();
+    const st = this.distStats(dist);
+    const top = Math.max(...dist) * 1.25 || 1;
+    const cp = this.curvePath(dist, W, H, top);
+    const x = (i) => (10 + (i / 10) * (W - 20)).toFixed(1);
+    const best = Math.max(...dist.slice(2));
+    const cols = Array.from({ length: 11 }, (_, i) => {
+      const s = i + 2, pr = dist[s] / st.tot, y = H - 16 - (dist[s] / top) * (H - 30);
+      return `<text x="${x(i)}" y="${(y - 6).toFixed(1)}" text-anchor="middle" class="pct ${dist[s] === best ? 'hi' : ''}">${pr ? (pr * 100 < 1 ? '<1' : Math.round(pr * 100)) : '–'}</text><text x="${x(i)}" y="${H - 3}" text-anchor="middle" class="${s === 7 ? 'seven' : ''}">${s}</text>`;
+    }).join('');
+    const none = 1 - st.tot;
+    return `<div class="pk-chart odds" aria-label="Chance of each roll total with your dice as they are">
+      <div class="pk-title">Chance of each total · %</div>
+      <svg viewBox="0 0 ${W} ${H}" width="100%" role="img"><path d="${cp.area}" class="pk-before-fill"/><path d="${cp.d}" class="pk-before"/>${cols}</svg>
+      <div class="pk-read">Both dice together: 7 comes up ${(st.p7 * 100).toFixed(1)}% · average total ${st.mean.toFixed(1)}${none > 0.0005 ? ` · no total ${(none * 100).toFixed(1)}%` : ''}.</div></div>`;
   }
 
   pickChart(item) {
