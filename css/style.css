@@ -416,9 +416,7 @@ select, input { font: inherit; color: var(--ink); background: var(--inset); bord
 .slots { display: grid; grid-template-columns: repeat(var(--n, 3), minmax(0, 1fr)); gap: 10px; align-items: end; }
 .hand .slots { grid-template-columns: repeat(var(--n, 3), 82px); gap: 10px; align-items: end; }
 .slot-wrap { display: flex; flex-direction: column; align-items: stretch; gap: 7px; min-width: 0; }
-.pcard { position: relative; width: 100%; aspect-ratio: 78 / 108; container-type: inline-size; border-radius: 10px; border: 3px solid transparent; background: linear-gradient(#1d1e22, #1d1e22) padding-box, var(--band, #3a3c42) border-box; box-shadow: 0 1px 0 #0b0b0d, 0 14px 18px -8px rgba(0, 0, 0, .9); overflow: hidden; }
 .pcard.common { border-width: 1.5px; --band: #3a3c42; }
-.pcard { outline: 1px solid var(--bone-line); }
 /* printed on stock: paper tooth over every card, and the art plate printed a hair off register */
 .rcard::after, .pcard::after { content: ""; position: absolute; inset: 0; border-radius: inherit; background: var(--tooth); opacity: .09; pointer-events: none; }
 .rcard .art::before, .pcard .art::before { content: ""; position: absolute; inset: 0; background: inherit; filter: sepia(1) saturate(4) hue-rotate(-34deg) brightness(.8); mix-blend-mode: screen; transform: translate(1.1px, .7px); opacity: .2; pointer-events: none; }
@@ -571,8 +569,7 @@ select, input { font: inherit; color: var(--ink); background: var(--inset); bord
 
 /* ---- one row for the hand: resources, cards and guilds, all at the same card size ---- */
 .hand { display: flex; align-items: flex-end; gap: 22px; }
-.hand .slot, .hand .pcard { width: 82px; }
-.hand .slot { height: 113px; aspect-ratio: auto; }
+.hand .slot, .hand .hand .slot { height: 113px; aspect-ratio: auto; }
 .hand .zone { flex: none; }
 
 /* ---- right column: tribute and boss stack above the action card ---- */
@@ -721,8 +718,7 @@ select, input { font: inherit; color: var(--ink); background: var(--inset); bord
 .stack-label { position: absolute; left: 50%; transform: translateX(-50%); top: calc(100% + 3px); min-height: 0; text-align: center; }
 .res-row { gap: 14px; align-items: flex-end; }
 .storebox { margin: 0 0 0 4px; align-self: flex-end; }
-.hand .slot, .hand .pcard { width: 82px; height: 112px; aspect-ratio: auto; }
-.hand .zone { align-self: flex-end; }
+.hand .slot, .hand .hand .zone { align-self: flex-end; }
 .hand .slot-wrap { position: relative; display: block; width: 82px; }
 .hand .slot-wrap .play { position: absolute; left: 0; right: 0; top: calc(100% + 6px); width: auto; z-index: 21; box-shadow: 0 8px 16px -6px rgba(0, 0, 0, .8); }
 .hand .pcard[data-a="pick-card"] { cursor: pointer; transition: transform .15s, outline-color .15s; }
@@ -908,9 +904,9 @@ select, input { font: inherit; color: var(--ink); background: var(--inset); bord
 .dice-stage.choosing .die-slot .die3d { margin: 14px 16px 18px; }
 
 /* port cards and piers on the board */
-.pcard { position: absolute; pointer-events: none; transition: filter .2s; filter: brightness(1.45) saturate(1.1) drop-shadow(0 3px 3px rgba(0,0,0,.45)); }
-.pcard .portplate { position: relative; }
-.pcard.target { pointer-events: auto; cursor: pointer; filter: drop-shadow(0 0 2px var(--accent)) drop-shadow(0 0 7px rgba(255, 74, 28, .85)); }
-.pierend { position: absolute; border-radius: 50%; box-sizing: border-box; border: 3px solid var(--pc, #e3dcc8); background: rgba(12, 13, 15, .75); pointer-events: none; }
-.dock { position: absolute; height: 7px; transform-origin: 50% 50%; pointer-events: none; border-radius: 2px; background: repeating-linear-gradient(90deg, #b99a64 0 6px, #8a6d3f 6px 8px); box-shadow: 0 0 0 2px var(--pc, #e3dcc8), 0 0 0 3.5px rgba(12,13,15,.8), 0 2px 4px rgba(0,0,0,.5); }
+.portcard { position: absolute; pointer-events: none; transition: filter .2s; filter: drop-shadow(0 3px 3px rgba(0, 0, 0, .5)); }
+.portcard .portplate { position: relative; }
+.pierend { position: absolute; border-radius: 50%; box-sizing: border-box; border: 3px solid var(--pc, #e3dcc8); background: rgba(12, 13, 15, .55); pointer-events: none; }
+.dock { position: absolute; height: 4px; transform-origin: 50% 50%; pointer-events: none; background: repeating-linear-gradient(90deg, var(--pc, #e3dcc8) 0 7px, transparent 7px 11px); filter: drop-shadow(0 0 1.5px #000) drop-shadow(0 0 1px #000); }
+.portcard.target { pointer-events: auto; cursor: pointer; filter: drop-shadow(0 0 2px var(--accent)) drop-shadow(0 0 7px rgba(255, 74, 28, .85)); }
 .dock.brick, .pierend.brick { --pc: var(--brick); } .dock.lumber, .pierend.lumber { --pc: #6fa868; } .dock.wool, .pierend.wool { --pc: #b6d98a; } .dock.grain, .pierend.grain { --pc: #e8c547; } .dock.ore, .pierend.ore { --pc: #aab0ba; } .dock.any, .pierend.any { --pc: #e3dcc8; }

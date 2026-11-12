@@ -267,24 +267,24 @@ export class BoardView {
     const num = (t) => `<u class="pc${t.length >= 3 ? ' l3' : ''}">${t}</u>`;
     const up = [p.up.overflow ? 'overflow' : '', p.up.bigger ? num(`+${p.up.bigger}`) : '', p.up.smaller ? num(`−${p.up.smaller}`) : '', p.up.free ? 'free' : ''].filter(Boolean).join('');
     const title = generic ? 'Generic port: trade 3:1' : `${p.type} port: trade 2:1`;
-    const tx = Mx + nx * 0.52 * U, ty = My + ny * 0.52 * U * K; // the port card sits out in the sea, piers run back to the two intersections
+    const tx = Mx + nx * 0.7 * U, ty = My + ny * 0.7 * U * K; // the port card sits out in the sea, piers run back to the two intersections
     const c = PORT_SCALE;
     const [sx, sy, w, h] = at.s;
     const left = Mx + at.o[0] * c, top = My + at.o[1] * c;
     out.push(`<div class="pport${target ? ' target' : ''}" style="left:${f1(left)}px;top:${f1(top)}px;width:${f1(w * c)}px;height:${f1(h * c)}px;background-size:${f1(PORT_SHEET[0] * c)}px ${f1(PORT_SHEET[1] * c)}px;background-position:${f1(-sx * c)}px ${f1(-sy * c)}px;z-index:${z}"></div>`);
     const kind = generic ? 'any' : p.type;
-    const pw = 108, ph = (112 * pw) / 180;
+    const pw = 98, ph = (112 * pw) / 180;
     // the port card from the shop (bone frame, resource-coloured panel, fanned cards, ratio); clickable while a port is being picked
-    out.push(`<div class="pcard ${kind}${target ? ' target' : ''}" ${target ? `data-k="port" data-id="${p.id}"` : ''} title="${esc(title)}" style="left:${f1(tx - pw / 2)}px;top:${f1(ty - (ph * K) / 2)}px;width:${pw}px;height:${f1(ph * K)}px;z-index:${z + 10}"><div style="transform:scaleY(${K}) rotate(${tilt((p.id ?? 0) + 40, 1.4)}deg);transform-origin:50% 50%">${portPlate(generic ? 'generic' : p.type, pw)}</div></div>`);
-    if (up) out.push(`<em class="pup" style="left:${f1(tx)}px;top:${f1(ty - (ph * K) / 2 - 24)}px;z-index:${z + 11}">${up}</em>`);
+    out.push(`<div class="portcard ${kind}${target ? ' target' : ''}" ${target ? `data-k="port" data-id="${p.id}"` : ''} title="${esc(title)}" style="left:${f1(tx - pw / 2)}px;top:${f1(ty - ph / 2)}px;width:${pw}px;height:${f1(ph)}px;z-index:${z + 10}"><div>${portPlate(generic ? 'generic' : p.type, pw)}</div></div>`);
+    if (up) out.push(`<em class="pup" style="left:${f1(tx)}px;top:${f1(ty - ph / 2 - 22)}px;z-index:${z + 11}">${up}</em>`);
     // piers: a short wooden dock from the card to each of the two intersections the port serves, ringed in the resource colour
     {
       const x1 = this.vx(va), y1 = this.vy(va), x2 = this.vx(vb), y2 = this.vy(vb);
       const line = (ax, ay, bx, by) => {
         const len = Math.hypot(bx - ax, by - ay), ang = (Math.atan2(by - ay, bx - ax) * 180) / Math.PI;
-        return `<div class="dock ${kind}" style="left:${f1((ax + bx) / 2 - len / 2)}px;top:${f1((ay + by) / 2 - 3.5)}px;width:${f1(len)}px;transform:rotate(${f1(ang)}deg);z-index:${z + 2}"></div>`;
+        return `<div class="dock ${kind}" style="left:${f1((ax + bx) / 2 - len / 2)}px;top:${f1((ay + by) / 2 - 2)}px;width:${f1(len)}px;transform:rotate(${f1(ang)}deg);z-index:${z + 2}"></div>`;
       };
-      const ring = (x, y) => `<i class="pierend ${kind}" style="left:${f1(x - 10)}px;top:${f1(y - 10)}px;width:20px;height:20px;z-index:${z + 3}"></i>`;
+      const ring = (x, y) => `<i class="pierend ${kind}" style="left:${f1(x - 9)}px;top:${f1(y - 9)}px;width:18px;height:18px;z-index:${z + 3}"></i>`;
       out.push(line(tx, ty, x1, y1) + line(tx, ty, x2, y2) + ring(x1, y1) + ring(x2, y2));
     }
     const pts = at.p.map(([x, y]) => `${f1(x * c)},${f1(y * c)}`).join(' ');
