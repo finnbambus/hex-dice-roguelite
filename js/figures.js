@@ -360,16 +360,14 @@ function build(id) {
     };
 
     // the port plate as it is drawn on the board: same harbour card as in the shop, sized 180 × 112 from (0, 0)
-    // board version: the sea panel takes the resource colour, and the cards are bigger and break out of the frame
-    const SEA = { generic: '#7b7a70', brick: '#a8503a', lumber: '#4f7b49', wool: '#8f9f5e', grain: '#c39a38', ore: '#6f7f9a' };
+    // board version: no plate, just the stack of resource cards (3:1 ports show "?" cards, like the packs in the shop) with the rate centred above it
     const boardPort = (t) => {
       const generic = t === 'generic', n = generic ? 3 : 2;
       const arts = generic ? [RES.brick, RES.wool, RES.ore] : [RES[t], RES[t]];
-      const sea = SEA[t];
-      R({ style: abs(0, 0, 140, 92, 'border-radius:12px;background:' + BONE + ';box-shadow:0 2px 0 #8c8168,0 12px 10px rgba(0,0,0,0.6);z-index:2'), txt: '', kids: [{ style: abs(8, 8, 124, 76, 'border-radius:7px;background-color:' + sea + ';background-image:' + dotsBg('rgba(0,0,0,0.22)', 1.25, 5)), txt: '', kids: [] }] });
-      const rot = n === 3 ? [-9, -1, 8] : [-6, 6], step = n === 3 ? 17 : 31, cw = n === 3 ? 60 : 66;
-      for (let k = 0; k < n; k++) R(resCard(arts[k], (n === 3 ? -14 : -10) + k * step, -9 + (k === 1 && n === 3 ? 2 : 0), cw, rot[k], 3 + k, generic ? { q: true, edge: k === n - 1 ? '#ff4a1c' : undefined } : undefined)); // 3:1 ports show "?" cards, like the packs in the shop
-      R(txt(78, 18, 62, 56, generic ? '3:1' : '2:1', 44, CREAM, 'text-shadow:0 2px 0 rgba(0,0,0,0.55),0 0 8px rgba(0,0,0,0.35);z-index:9'));
+      const cw = 64, step = generic ? 24 : 30, rot = n === 3 ? [-8, -1, 7] : [-6, 6];
+      const x0 = (140 - (cw + (n - 1) * step)) / 2;
+      R(txt(0, 0, 140, 40, generic ? '3:1' : '2:1', 38, CREAM, 'text-shadow:0 0 3px #000,0 0 6px #000,0 2px 0 #000;z-index:9'));
+      for (let k = 0; k < n; k++) R(resCard(arts[k], x0 + k * step, 42 + (k === 1 && n === 3 ? 2 : 0), cw, rot[k], 3 + k, generic ? { q: true, edge: k === n - 1 ? '#ff4a1c' : undefined } : undefined));
     };
     for (const t of ['generic', 'brick', 'lumber', 'wool', 'grain', 'ore']) E['port:' + t] = () => boardPort(t);
     (E[id] || E.fertile)();
@@ -421,10 +419,10 @@ export function figure(id, scale = 1) {
   return html;
 }
 
-// A port plate for the board (the harbour card from the shop), `w` px wide. type: a resource or 'generic'.
+// The port figure for the board (the stack of resource cards with the rate above it), `w` px wide. type: a resource or 'generic'.
 export function portPlate(type, w = 90) {
-  const k = w / 140; // the board plate is 140 × 92 (the shop's harbour card is bigger)
+  const k = w / 140; // the board figure is 140 × 126; the card stack's centre sits 84 px down
   const out = build('port:' + type);
   const inner = out.layers.map(layerHtml).join('');
-  return `<div class="portplate" style="width:${w}px;height:${92 * k}px"><div style="width:140px;height:92px;position:relative;transform:scale(${k});transform-origin:0 0">${inner}</div></div>`;
+  return `<div class="portplate" style="width:${w}px;height:${126 * k}px"><div style="width:140px;height:126px;position:relative;transform:scale(${k});transform-origin:0 0">${inner}</div></div>`;
 }
