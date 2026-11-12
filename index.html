@@ -8,8 +8,9 @@
   <meta name="theme-color" content="#0c0d0f">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><polygon points='50,5 90,27 90,73 50,95 10,73 10,27' fill='%23ff4a1c'/></svg>">
   <link rel="preload" href="assets/fonts/grenze-gotisch-latin-600-normal.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="css/fonts.css?v=33">
-  <link rel="stylesheet" href="css/style.css?v=33">
+  <link rel="stylesheet" href="css/fonts.css?v=34">
+  <link rel="stylesheet" href="css/style.css?v=34">
+  <link rel="stylesheet" href="css/v1.css?v=34">
 </head>
 <body>
   <div class="app">
@@ -19,13 +20,14 @@
         <div class="lamp" aria-hidden="true"></div>
         <div class="menu">
           <button id="menu-btn" class="menu-btn" aria-haspopup="true" aria-expanded="false" title="Menu" aria-label="Menu"><i></i><i></i><i></i></button>
-          <div id="menu-pop" class="menu-pop" hidden>
-            <button data-top="log" title="Show the game log">Log</button>
-            <button data-top="tutorial" title="A guided tour of the screen">Tutorial</button>
-            <button data-top="help" title="Rules summary">Help</button>
-            <button data-top="dev" title="Testing tools">Dev tools</button>
-            <button data-top="new" title="Start a new run">New run</button>
-            <label class="switch" title="Shake the table on big hits"><input id="opt-shake" type="checkbox" checked><span>Screen shake on big hits</span></label>
+          <div id="menu-pop" class="menu-pop" role="menu" hidden>
+            <button role="menuitem" data-top="help">How to play</button>
+            <button role="menuitem" data-top="tutorial">Tutorial</button>
+            <button role="menuitem" data-top="log">Game log</button>
+            <button role="menuitem" data-top="dev" class="dev-only">Dev tools</button>
+            <label class="switch" title="Shake the table on big hits"><input id="opt-shake" type="checkbox" checked><span>Screen shake</span></label>
+            <hr>
+            <button role="menuitem" data-top="new" class="danger">New run…</button>
           </div>
         </div>
         <div id="prompt" class="board-prompt" hidden></div>
@@ -42,6 +44,6 @@
   <div id="drawer"></div>
   <div id="modal-root"></div>
   <noscript>This game needs JavaScript.</noscript>
-  <script type="module" src="js/main.js?v=33"></script>
+  <script type="module" src="js/main.js?v=34"></script>
 </body>
 </html>

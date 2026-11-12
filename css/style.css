@@ -416,6 +416,7 @@ select, input { font: inherit; color: var(--ink); background: var(--inset); bord
 .slots { display: grid; grid-template-columns: repeat(var(--n, 3), minmax(0, 1fr)); gap: 10px; align-items: end; }
 .hand .slots { grid-template-columns: repeat(var(--n, 3), 82px); gap: 10px; align-items: end; }
 .slot-wrap { display: flex; flex-direction: column; align-items: stretch; gap: 7px; min-width: 0; }
+.pcard { position: relative; width: 100%; aspect-ratio: 78 / 108; container-type: inline-size; border-radius: 10px; border: 3px solid transparent; background: linear-gradient(#1d1e22, #1d1e22) padding-box, var(--band, #3a3c42) border-box; box-shadow: 0 1px 0 #0b0b0d, 0 14px 18px -8px rgba(0, 0, 0, .9); overflow: hidden; outline: 1px solid var(--bone-line); }
 .pcard.common { border-width: 1.5px; --band: #3a3c42; }
 /* printed on stock: paper tooth over every card, and the art plate printed a hair off register */
 .rcard::after, .pcard::after { content: ""; position: absolute; inset: 0; border-radius: inherit; background: var(--tooth); opacity: .09; pointer-events: none; }

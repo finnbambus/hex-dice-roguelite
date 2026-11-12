@@ -1208,7 +1208,7 @@ export class Game {
     if (slot.kind === 'pack') {
       if (this.budget < PACK_PRICE) return;
       const choice = await this.io.chooseOption(
-        slot.options.map((it, i) => ({ label: `${it.name} (${it.rarity}) — ${it.desc}`, value: i })),
+        slot.options.map((it, i) => ({ label: `${it.name} (${it.rarity}) — ${it.desc}`, value: i, item: it.id })),
         'Pack: choose 1 of 3', { cancel: true });
       if (choice == null) return;
       const ok = await this.acquire(slot.options[choice], { free: true });

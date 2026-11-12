@@ -24,7 +24,7 @@ The interface is dark and modern: greys, one vermilion accent for things you can
 
 - **One stage, no side columns.** Everything sits on the table around the island:
   - **Right column** (top to bottom): one **run card** at the top (the boss and its description first, then an ante indicator ("Ante 1 · Small round") that sits directly above the tribute so it is clear whose tribute it is, the tribute with a bar per resource and "Ready to pay", and a PAID stamp once settled), with the **action card** anchored to the bottom right.
-  - **Menu** button (top-right): Log, Help, Dev tools, New run and the screen-shake switch.
+  - **Menu** button (top-left): How to play, Tutorial, Game log, the screen-shake switch and, set apart at the bottom, New run. Dev tools appear only with `?dev` in the address or when served from localhost.
   - **Score** is the VP number in the top left corner, next to the Road and Army title cards. The **Storehouse** sits beside the resource stacks it was shipped from.
   - **Action card:** a three-step flow on top (Roll → Build & trade → Tribute; the result of a roll belongs to Roll) with the Small / Big / Boss slider right under it (the same size and look as the step flow), the step in the middle (**Rolls left** are shown inside the Roll button), and the main button at the bottom. Under it sits one row with the secondary button (Skip all rolls, End round now, Reroll boss) and the **?** button, which opens the how-to and tips for the current step over the board (closed by default; it pulses until you first open it).
   - **Titles:** two small cards next to the score show **Road** (longest road) and **Army** (knights played) with what they are worth. Hover for the VP rules and, for Road, the chain of roads is highlighted and numbered on the island.
@@ -50,7 +50,7 @@ Every run has a **seed** (shown top right and in the URL, e.g. `?seed=4242`). Th
 
 ### Dev tools
 
-The **Dev tools** button opens a testing panel: add resources, force the next roll, give yourself any item for free, skip straight to the shop, and add shop budget. Use it to set up specific situations (e.g. Echo + Copycat + Mirror) without grinding for them.
+Open the game with `?dev` in the address (e.g. `index.html?dev`) and the menu gains a **Dev tools** entry. It opens a testing panel: add resources, force the next roll, give yourself any item for free, skip straight to the shop, and add shop budget. Use it to set up specific situations (e.g. Echo + Copycat + Mirror) without grinding for them.
 
 ## Publish on GitHub Pages
 
@@ -59,6 +59,10 @@ The **Dev tools** button opens a testing panel: add resources, force the next ro
 3. After a minute the game is live at `https://<your-user>.github.io/<repo>/`.
 
 The `.nojekyll` file stops GitHub from running Jekyll over the files. All paths are relative, so the game also works from a sub-path or a custom domain.
+
+### Interface layer (v34)
+
+`css/v1.css` is the last stylesheet and holds the v1 interface pass: spacing, radius and type tokens, the fixed action-card frame, and the shop, pack, menu, title and game-over layouts. Board, dice and card rendering stay in `css/style.css`. The audit behind it is in `docs/ui-audit-v1.md`.
 
 ## Project structure
 
