@@ -213,14 +213,12 @@ export class Game {
       pr.faces = [...this.lastRoll.faces];
       pr.hold[1 - die] = this.lastRoll.values[1 - die];
       pr.faces[die] = this.rollFace(die);
-      if (this.hasDieUp(die, 'twin')) pr.alt[die] = this.rollFace(die);
       this.chain++;
       this.log(`Echo! Die ${die + 1} rolls again (chain ${this.chain}).`, 'good');
     } else {
       this.rollsUsed++;
       this.chain = 0;
       pr.faces = [this.rollFace(0), this.rollFace(1)];
-      for (const i of [0, 1]) if (this.hasDieUp(i, 'twin')) pr.alt[i] = this.rollFace(i);
     }
     if (this.devForce) {
       for (const i of [0, 1]) {
@@ -259,7 +257,7 @@ export class Game {
       if (this.hasDieUp(i, 'nudge') && !d.used.nudge) out.push({ die: i, id: 'nudge' });
       if (this.hasDieUp(i, 'recast') && !d.used.recast) out.push({ die: i, id: 'recast' });
       if (this.hasDieUp(i, 'alchemist') && !d.used.alchemist) out.push({ die: i, id: 'alchemist' });
-      if (pr.alt[i] != null) out.push({ die: i, id: 'twin' });
+      if (this.hasDieUp(i, 'twin') && !d.used.twin) out.push({ die: i, id: 'twin' });
     }
     return out;
   }
@@ -295,8 +293,15 @@ export class Game {
       d.used.alchemist = true;
       this.report?.dice[die].notes.push(`Alchemist: set to ${v}`);
     } else if (id === 'twin') {
-      [pr.faces[die], pr.alt[die]] = [pr.alt[die], pr.faces[die]];
-      this.report?.dice[die].notes.push('Twin Die: switched to the other result');
+      // Once per round: reroll this die instead of keeping the result. The new result stands, there is no going back.
+      pr.faces[die] = this.rollFace(die);
+      this.rollSeq++;
+      pr.adj[die] = 0;
+      pr.set[die] = null;
+      pr.blank[die] = null;
+      d.used.twin = true;
+      this.log(`Twin Die: die ${die + 1} rerolled.`);
+      this.report?.dice[die].notes.push('Twin Die: rerolled (final)');
     }
     this.emit();
   }
@@ -346,7 +351,6 @@ export class Game {
       if (pr.hold[i] != null || pr.set[i] != null) continue;
       const face = f[i];
       const n = rep.dice[i].notes;
-      if (pr.alt[i] != null) n.push(`Twin Die: rolled two results, kept this one`);
       if (face.setter === 'mirror') n.push(zero ? 'Mirror Face vs Mirror Face: both count as 0' : `Mirror Face: copied the other die (${v[i]})`);
       if (face.setter === 'blank') n.push(`Blank Face: you chose ${pr.blank[i]}`);
       if (face.setter === 'robber') n.push("Robber's Face: the roll counts as 7, +2 resources of your choice");

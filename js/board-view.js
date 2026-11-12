@@ -149,6 +149,14 @@ export class BoardView {
       if (!lit) continue;
       out.push(`<svg class="lit${isT('hex', h.id) ? ' tgt' : ''}" aria-hidden="true" width="220" height="180" viewBox="-110 -90 220 180" style="left:${f1(this.hx(h) - 110)}px;top:${f1(this.hy(h) - 90)}px;z-index:700"><polygon points="${hexPoints(0.93)}"/></svg>`);
     }
+    // while picking a hex for an upgrade: hexes that already carry one say that it will be replaced
+    if (opts.replace && req && req.kind === 'hex') {
+      for (const h of B.hexes) {
+        const nm = opts.replace.get(h.id);
+        if (!nm || !isT('hex', h.id)) continue;
+        out.push(`<div class="hexlabel rep" style="left:${f1(this.hx(h) - 90)}px;top:${f1(this.hy(h) + 22)}px;width:180px;z-index:720"><span>Replaces ${esc(nm)}</span></div>`);
+      }
+    }
     // ports
     for (const p of B.ports) this.port(out, B, p, isT('port', p.id));
     // roads
@@ -165,6 +173,18 @@ export class BoardView {
         const len = Math.hypot(x2 - x1, y2 - y1) * 0.62;
         out.push(`<button class="spot edge" data-k="edge" data-id="${e.id}" aria-label="Build a road here" style="left:${f1(mx - len / 2)}px;top:${f1(my - 11)}px;width:${f1(len)}px;transform:rotate(${f1(ang)}deg);z-index:740"><i></i></button>`);
       }
+    }
+    // the roads that make up the longest road (hover the stat card to see them), numbered in order
+    if (opts.hlEdges && opts.hlEdges.length) {
+      opts.hlEdges.forEach((id, n) => {
+        const e = B.edges[id];
+        const va = B.vertices[e.v[0]], vb = B.vertices[e.v[1]];
+        const x1 = this.vx(va), y1 = this.vy(va), x2 = this.vx(vb), y2 = this.vy(vb);
+        const mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
+        const len = Math.hypot(x2 - x1, y2 - y1) * 0.92;
+        const ang = (Math.atan2(y2 - y1, x2 - x1) * 180) / Math.PI;
+        out.push(`<div class="roadhl" style="left:${f1(mx - len / 2)}px;top:${f1(my - 3.5)}px;width:${f1(len)}px;transform:rotate(${f1(ang)}deg);z-index:735"></div><span class="roadn" style="left:${f1(mx - 11)}px;top:${f1(my - 11)}px;z-index:736">${n + 1}</span>`);
+      });
     }
     // buildings and open spots
     for (const v of B.vertices) {
@@ -253,6 +273,13 @@ export class BoardView {
     out.push(`<div class="pport${target ? ' target' : ''}" style="left:${f1(left)}px;top:${f1(top)}px;width:${f1(w * c)}px;height:${f1(h * c)}px;background-size:${f1(PORT_SHEET[0] * c)}px ${f1(PORT_SHEET[1] * c)}px;background-position:${f1(-sx * c)}px ${f1(-sy * c)}px;z-index:${z}"></div>`);
     out.push(`<div class="tok ptok ${generic ? 'any' : p.type}" style="left:${f1(tx - 24)}px;top:${f1(ty - 20 * K)}px;height:${f1(40 * K)}px;z-index:${z + 4}"><div class="in" style="transform:scaleY(${K}) rotate(${tilt((p.id ?? 0) + 40, 1.4)}deg)"><span class="n">${generic ? '3:1' : '2:1'}</span><small>${generic ? 'any' : p.type}</small></div></div>`);
     if (up) out.push(`<em class="pup" style="left:${f1(tx)}px;top:${f1(ty - 40)}px;z-index:${z + 6}">${up}</em>`);
+    // the two intersections this port serves: the shore edge between them is marked, with a dot on each end
+    {
+      const x1 = this.vx(va), y1 = this.vy(va), x2 = this.vx(vb), y2 = this.vy(vb);
+      const len = Math.hypot(x2 - x1, y2 - y1);
+      const ang = (Math.atan2(y2 - y1, x2 - x1) * 180) / Math.PI;
+      out.push(`<div class="portedge ${generic ? 'any' : p.type}" style="left:${f1((x1 + x2) / 2 - len / 2)}px;top:${f1((y1 + y2) / 2 - 3)}px;width:${f1(len)}px;transform:rotate(${f1(ang)}deg);z-index:${z + 2}"></div><i class="portdot ${generic ? 'any' : p.type}" style="left:${f1(x1 - 6)}px;top:${f1(y1 - 6)}px;z-index:${z + 3}"></i><i class="portdot ${generic ? 'any' : p.type}" style="left:${f1(x2 - 6)}px;top:${f1(y2 - 6)}px;z-index:${z + 3}"></i>`);
+    }
     const pts = at.p.map(([x, y]) => `${f1(x * c)},${f1(y * c)}`).join(' ');
     out.push(`<svg class="phit${target ? ' target' : ''}" ${target ? `data-k="port" data-id="${p.id}"` : ''} style="left:${f1(left)}px;top:${f1(top)}px;z-index:${z + 8}" width="${f1(w * c)}" height="${f1(h * c)}" viewBox="0 0 ${f1(w * c)} ${f1(h * c)}"><polygon points="${pts}"><title>${esc(title)}</title></polygon></svg>`);
   }

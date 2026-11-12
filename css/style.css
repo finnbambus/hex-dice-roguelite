@@ -816,7 +816,7 @@ select, input { font: inherit; color: var(--ink); background: var(--inset); bord
 @media (max-width: 1300px) { .hand { --hz: .74; } }
 @media (max-width: 1100px) { .hand { --hz: .6; } }
 .hand { --ch: calc(112px * var(--hz)); }
-.vp-zone { margin-left: auto; align-self: flex-end; cursor: help; pointer-events: auto; padding: 0 6px 0 16px; }
+.vp-zone { margin-left: 0; align-self: flex-end; cursor: help; pointer-events: auto; padding: 0 6px 0 16px; }
 .vp-zone .zone-h { justify-content: flex-end; min-height: 26px; }
 .vp-body { height: var(--ch); display: flex; align-items: flex-end; justify-content: flex-end; }
 .vp-body .num { display: flex; align-items: baseline; gap: 6px; font: 800 calc(var(--ch) * 1.02)/.74 var(--display); font-variant-numeric: tabular-nums; color: var(--ink); text-shadow: 0 6px 24px rgba(0, 0, 0, .7); }
@@ -841,3 +841,82 @@ select, input { font: inherit; color: var(--ink); background: var(--inset); bord
 .spot:hover:not(:disabled) i { animation: none; transform: scale(1.5); }
 @keyframes dotPulse { 0%, 100% { transform: scale(.85); opacity: .7; } 50% { transform: scale(1.15); opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .spot i { animation: none; } }
+
+.hexlabel.rep span { background: var(--accent); color: #0c0d0f; font-weight: 700; box-shadow: 0 2px 8px rgba(0, 0, 0, .55); }
+.rep-note { font-style: normal; color: var(--accent-ink, #0c0d0f); opacity: .75; margin-left: 4px; }
+
+/* ---- title cards (longest road, largest army) ---- */
+.stat-zone { margin-left: auto; align-self: flex-end; pointer-events: auto; }
+.stat-zone .zone-h { min-height: 26px; }
+.stats { height: var(--ch); display: flex; flex-direction: column; gap: 6px; }
+.stat { flex: 1; min-height: 0; box-sizing: border-box; width: 90px; display: grid; grid-template-columns: 1fr auto; grid-template-rows: auto 1fr; align-items: center; padding: 6px 10px; border-radius: 8px; background: #16171a; border: 1px solid var(--line); cursor: help; transition: border-color .15s, background .15s; }
+.stat:hover { border-color: var(--line2); background: #1c1d21; }
+.stat .s-k { grid-column: 1 / 3; font: 600 8.5px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+.stat .s-n { font: 800 22px/1 var(--display); color: var(--ink); font-variant-numeric: tabular-nums; }
+.stat .s-v { font: 600 10px/1 var(--mono); color: var(--dim); text-align: right; }
+.stat.on { border-color: rgba(156, 199, 138, .55); }
+.stat.on .s-v { color: var(--good); }
+.roadhl { position: absolute; height: 7px; border-radius: 4px; background: var(--accent); box-shadow: 0 0 0 2px rgba(12, 13, 15, .6), 0 0 14px 3px rgba(255, 74, 28, .65); pointer-events: none; transform-origin: 50% 50%; }
+.roadn { position: absolute; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; background: var(--ink); color: #0c0d0f; font: 800 12px/1 var(--display); pointer-events: none; box-shadow: 0 2px 6px rgba(0, 0, 0, .6); }
+
+/* the hand row scales with the screen: cards, titles and score have to fit left of the action card */
+.hand { --hz: .74; gap: 18px; }
+@media (min-width: 1300px) { .hand { --hz: .66; } }
+@media (min-width: 1400px) { .hand { --hz: .76; } }
+@media (min-width: 1500px) { .hand { --hz: .86; } }
+@media (min-width: 1600px) { .hand { --hz: .9; } }
+@media (min-width: 1760px) { .hand { --hz: 1.08; gap: 22px; } }
+@media (min-width: 1900px) { .hand { --hz: 1.15; gap: 24px; } }
+@media (max-width: 1299px) { .hand { --hz: .6; } }
+@media (max-width: 1099px) { .hand { --hz: .5; } }
+.vp-zone { padding: 0 4px 0 6px; }
+
+/* ---- bell curve while choosing a face ---- */
+.pk-chart { margin-top: 6px; padding: 8px 10px 10px; border-radius: 10px; background: #0e0f11; border: 1px solid var(--line); }
+.pk-title { font: 600 9px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin-bottom: 4px; }
+.pk-chart svg { display: block; overflow: visible; }
+.pk-before-fill { fill: rgba(236, 235, 230, .1); }
+.pk-before { fill: none; stroke: rgba(236, 235, 230, .55); stroke-width: 2; }
+.pk-after-fill { fill: rgba(255, 74, 28, .16); }
+.pk-after { fill: none; stroke: var(--accent); stroke-width: 2.5; }
+.pk-after.random { stroke-dasharray: 5 4; }
+.pk-chart text { font: 600 8.5px var(--mono); fill: var(--dim); }
+.pk-chart text.seven { fill: var(--ink); }
+.pk-read { margin-top: 4px; font: 500 11px/1.35 var(--sans); color: var(--muted); min-height: 30px; }
+
+.dice-stage.choosing .die3d { --s: 62px; }
+.dice-stage.choosing .die-cap { margin-top: 2px; }
+.dice-stage.choosing .ds-row { padding: 4px 0 0; }
+.dice-stage.choosing .ds-hint { margin-top: 2px; }
+.die-slot .die3d { --s: 96px; }
+.dice-stage.choosing .die-slot .die3d { --s: 62px; margin: 14px 16px 10px; }
+
+/* ---- guided tutorial ---- */
+#tutorial { position: fixed; inset: 0; z-index: 90; }
+#tutorial[hidden] { display: none; }
+.tut-dim { position: absolute; inset: 0; background: rgba(6, 7, 9, .78); }
+.tut-spot { position: absolute; border-radius: 14px; box-shadow: 0 0 0 9999px rgba(6, 7, 9, .78); outline: 2px solid var(--accent); outline-offset: 0; transition: all .25s ease; pointer-events: none; }
+.tut-card { position: absolute; width: min(360px, calc(100vw - 16px)); box-sizing: border-box; padding: 16px 18px 14px; border-radius: 14px; background: #131417; border: 1px solid var(--line2); box-shadow: 0 18px 50px rgba(0, 0, 0, .7); }
+.tut-card h3 { margin: 2px 0 8px; font: 700 21px/1.15 var(--display); color: var(--ink); }
+.tut-card p { margin: 0 0 12px; font: 400 13.5px/1.5 var(--sans); color: var(--muted); }
+.tut-card p b { color: var(--ink); }
+.tut-step { font: 600 9px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
+.tut-dots { display: flex; gap: 5px; margin-bottom: 12px; }
+.tut-dots i { width: 6px; height: 6px; border-radius: 50%; background: #34363c; }
+.tut-dots i.done { background: var(--muted); }
+.tut-dots i.on { background: var(--accent); }
+.tut-nav { display: flex; align-items: center; gap: 8px; }
+.tut-nav .sp { flex: 1; }
+.tut-btn.new { border-color: var(--accent); color: var(--accent); animation: tutPulse 1.8s ease-in-out infinite; }
+@keyframes tutPulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(255, 74, 28, 0); } 50% { box-shadow: 0 0 0 3px rgba(255, 74, 28, .35); } }
+.dice-stage.choosing .die-slot .die3d { margin: 14px 16px 18px; }
+
+/* ---- ports: the shore edge between the two intersections that use the port ---- */
+.portedge { position: absolute; height: 6px; border-radius: 3px; background: var(--pc, #e3dcc8); box-shadow: 0 0 0 1.5px rgba(12, 13, 15, .7); pointer-events: none; transform-origin: 50% 50%; opacity: .95; }
+.portdot { position: absolute; width: 12px; height: 12px; border-radius: 50%; background: var(--pc, #e3dcc8); border: 2px solid rgba(12, 13, 15, .85); box-sizing: border-box; pointer-events: none; }
+.portedge.brick, .portdot.brick { --pc: var(--brick); }
+.portedge.lumber, .portdot.lumber { --pc: #6fa868; }
+.portedge.wool, .portdot.wool { --pc: #b6d98a; }
+.portedge.grain, .portdot.grain { --pc: #e8c547; }
+.portedge.ore, .portdot.ore { --pc: #aab0ba; }
+.portedge.any, .portdot.any { --pc: #e3dcc8; }

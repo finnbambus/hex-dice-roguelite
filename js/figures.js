@@ -3,6 +3,41 @@
 // Ported from the design canvas: figure(id) returns the HTML for a 240 × 210 stage.
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
+const INK = '#17181b', GOLD = '#e2bd62', GOLD2 = '#a67f22', CARD = '#8c8168';
+const G = {
+  clover: (f) => '<g fill="' + f + '"><circle cx="50" cy="31" r="17"/><circle cx="69" cy="50" r="17"/><circle cx="50" cy="69" r="17"/><circle cx="31" cy="50" r="17"/></g><path d="M50 52 Q56 78 70 92" stroke="' + f + '" stroke-width="7" fill="none" stroke-linecap="round"/>',
+  knight: (f) => '<path d="M50 2 L62 14 L62 61 L38 61 L38 14 Z" fill="' + f + '"/><rect x="18" y="61" width="64" height="9" rx="3" fill="' + f + '"/><rect x="45" y="69" width="10" height="19" fill="' + f + '"/><circle cx="50" cy="92" r="5.5" fill="' + f + '"/>',
+  robber: (f) => '<circle cx="50" cy="27" r="15" fill="' + f + '"/><path d="M24 90 Q26 52 50 44 Q74 52 76 90 Z" fill="' + f + '"/>',
+  eye: (f) => '<path d="M8 50 Q50 12 92 50 Q50 88 8 50 Z" fill="none" stroke="' + f + '" stroke-width="8" stroke-linejoin="round"/><circle cx="50" cy="50" r="13" fill="' + f + '"/><path d="M18 86 L82 14" stroke="' + f + '" stroke-width="9" stroke-linecap="round"/>',
+  sprout: (f) => '<path d="M50 90 L50 46" stroke="' + f + '" stroke-width="7" stroke-linecap="round"/><path d="M50 56 Q20 54 16 26 Q46 24 50 56 Z" fill="' + f + '"/><path d="M50 46 Q80 44 84 14 Q54 12 50 46 Z" fill="' + f + '"/>',
+  crown: (f) => '<path d="M14 76 L10 30 L33 52 L50 20 L67 52 L90 30 L86 76 Z" fill="' + f + '"/><rect x="14" y="80" width="72" height="9" fill="' + f + '"/>',
+  sigil: (f) => '<path d="M50 14 L88 78 L12 78 Z" fill="none" stroke="' + f + '" stroke-width="7" stroke-linejoin="round"/><circle cx="50" cy="56" r="13" fill="none" stroke="' + f + '" stroke-width="6"/><path d="M50 78 L50 94 M38 88 L62 88" stroke="' + f + '" stroke-width="6" stroke-linecap="round"/>',
+  coin: (f, r) => '<circle cx="50" cy="50" r="40" fill="' + f + '" stroke="' + (r || GOLD2) + '" stroke-width="6"/><circle cx="50" cy="50" r="24" fill="none" stroke="' + (r || GOLD2) + '" stroke-width="5"/>',
+  sparkle: (f) => '<path d="M50 4 Q54 46 96 50 Q54 54 50 96 Q46 54 4 50 Q46 46 50 4 Z" fill="' + f + '"/>',
+  arrow: (f, d) => d === 'up' ? '<path d="M50 14 L82 52 L60 52 L60 88 L40 88 L40 52 L18 52 Z" fill="' + f + '"/>' : '<path d="M50 86 L82 48 L60 48 L60 12 L40 12 L40 48 L18 48 Z" fill="' + f + '"/>',
+  crate: (t, l, r) => '<polygon points="50,6 92,28 50,50 8,28" fill="' + t + '"/><polygon points="8,28 50,50 50,96 8,74" fill="' + l + '"/><polygon points="92,28 50,50 50,96 92,74" fill="' + r + '"/><path d="M8 28 L50 50 L92 28 M50 50 L50 96" stroke="rgba(23,24,27,0.5)" stroke-width="3" fill="none"/>',
+  leaf: (f) => '<path d="M10 90 Q6 30 60 8 Q90 40 40 86 Z" fill="' + f + '"/>'
+};
+
+// The face of a die that carries a trigger: every pip is replaced by the trigger's symbol (a sword for
+// the Knight's faces, a robber for the Robber's faces, a clover for Lucky Number, an eye for Hidden), so the
+// number of symbols is still the face's value. Rare triggers get a gold frame. Returns a 100 × 100 svg body.
+export const TRIG_GLYPH = { lucky: 'clover', knightFav: 'knight', knightLucky: 'knight', robberFav: 'robber', robberLucky: 'robber', hidden: 'eye' };
+const TRIG_PRIO = ['knightLucky', 'knightFav', 'robberLucky', 'robberFav', 'hidden', 'lucky'];
+const PIPS_AT = { 1: [[50, 50]], 2: [[28, 28], [72, 72]], 3: [[28, 28], [50, 50], [72, 72]], 4: [[28, 28], [72, 28], [28, 72], [72, 72]], 5: [[28, 28], [72, 28], [50, 50], [28, 72], [72, 72]], 6: [[28, 26], [72, 26], [28, 50], [72, 50], [28, 74], [72, 74]] };
+export function primaryTrigger(triggers) { return TRIG_PRIO.find((t) => triggers.includes(t)) || null; }
+export function faceBody(value, triggers) {
+  const t = primaryTrigger(triggers);
+  if (!t) return null;
+  const rare = triggers.includes('knightLucky') || triggers.includes('robberLucky');
+  const ink = rare ? GOLD2 : INK;
+  const gl = G[TRIG_GLYPH[t]];
+  const size = value === 1 ? 46 : 27;
+  const marks = PIPS_AT[value].map((q) => '<g transform="translate(' + (q[0] - size / 2) + ' ' + (q[1] - size / 2) + ') scale(' + size / 100 + ')">' + gl(ink) + '</g>').join('');
+  const frame = '<rect x="5" y="5" width="90" height="90" fill="none" stroke="' + (rare ? GOLD : CARD) + '" stroke-width="' + (rare ? 4 : 2) + '"/>';
+  return frame + marks;
+}
+
 function build(id) {
     const INK = '#17181b', BONE = '#e3dcc8', CREAM = '#efeadc', GOLD = '#e2bd62', GOLD2 = '#a67f22', SILV = '#a9c4dc', CARD = '#8c8168';
     const FONT = "'Grenze Gotisch', Georgia, serif";
@@ -18,20 +53,6 @@ function build(id) {
     const R = (...a) => layers.push(...a);
 
     // ---------- glyph bodies (100x100) ----------
-    const G = {
-      clover: (f) => '<g fill="' + f + '"><circle cx="50" cy="31" r="17"/><circle cx="69" cy="50" r="17"/><circle cx="50" cy="69" r="17"/><circle cx="31" cy="50" r="17"/></g><path d="M50 52 Q56 78 70 92" stroke="' + f + '" stroke-width="7" fill="none" stroke-linecap="round"/>',
-      knight: (f) => '<path d="M26 88 L26 76 Q28 54 44 44 L38 32 L50 16 L56 24 Q80 30 78 62 Q78 78 74 88 Z" fill="' + f + '"/>',
-      robber: (f) => '<circle cx="50" cy="27" r="15" fill="' + f + '"/><path d="M24 90 Q26 52 50 44 Q74 52 76 90 Z" fill="' + f + '"/>',
-      eye: (f) => '<path d="M8 50 Q50 12 92 50 Q50 88 8 50 Z" fill="none" stroke="' + f + '" stroke-width="8" stroke-linejoin="round"/><circle cx="50" cy="50" r="13" fill="' + f + '"/><path d="M18 86 L82 14" stroke="' + f + '" stroke-width="9" stroke-linecap="round"/>',
-      sprout: (f) => '<path d="M50 90 L50 46" stroke="' + f + '" stroke-width="7" stroke-linecap="round"/><path d="M50 56 Q20 54 16 26 Q46 24 50 56 Z" fill="' + f + '"/><path d="M50 46 Q80 44 84 14 Q54 12 50 46 Z" fill="' + f + '"/>',
-      crown: (f) => '<path d="M14 76 L10 30 L33 52 L50 20 L67 52 L90 30 L86 76 Z" fill="' + f + '"/><rect x="14" y="80" width="72" height="9" fill="' + f + '"/>',
-      sigil: (f) => '<path d="M50 14 L88 78 L12 78 Z" fill="none" stroke="' + f + '" stroke-width="7" stroke-linejoin="round"/><circle cx="50" cy="56" r="13" fill="none" stroke="' + f + '" stroke-width="6"/><path d="M50 78 L50 94 M38 88 L62 88" stroke="' + f + '" stroke-width="6" stroke-linecap="round"/>',
-      coin: (f, r) => '<circle cx="50" cy="50" r="40" fill="' + f + '" stroke="' + (r || GOLD2) + '" stroke-width="6"/><circle cx="50" cy="50" r="24" fill="none" stroke="' + (r || GOLD2) + '" stroke-width="5"/>',
-      sparkle: (f) => '<path d="M50 4 Q54 46 96 50 Q54 54 50 96 Q46 54 4 50 Q46 46 50 4 Z" fill="' + f + '"/>',
-      arrow: (f, d) => d === 'up' ? '<path d="M50 14 L82 52 L60 52 L60 88 L40 88 L40 52 L18 52 Z" fill="' + f + '"/>' : '<path d="M50 86 L82 48 L60 48 L60 12 L40 12 L40 48 L18 48 Z" fill="' + f + '"/>',
-      crate: (t, l, r) => '<polygon points="50,6 92,28 50,50 8,28" fill="' + t + '"/><polygon points="8,28 50,50 50,96 8,74" fill="' + l + '"/><polygon points="92,28 50,50 50,96 92,74" fill="' + r + '"/><path d="M8 28 L50 50 L92 28 M50 50 L50 96" stroke="rgba(23,24,27,0.5)" stroke-width="3" fill="none"/>',
-      leaf: (f) => '<path d="M10 90 Q6 30 60 8 Q90 40 40 86 Z" fill="' + f + '"/>'
-    };
 
     // ---------- rarity halo (same dotted foil as the pieces) ----------
     const halo = (kind) => {
@@ -152,12 +173,12 @@ function build(id) {
       const p = [[28, 28], [72, 28], [28, 72]].map((q) => pipC(q[0], q[1], INK)).join('') + '<circle cx="72" cy="72" r="12" fill="none" stroke="rgba(23,24,27,0.55)" stroke-width="3" stroke-dasharray="4 3"/><path d="M64 72 L80 72" stroke="' + INK + '" stroke-width="4" stroke-linecap="round"/>';
       faceDie(faceSvg(p, true));
     };
-    E.lucky = () => faceDie(faceSvg(frame(CARD) + med(72, 28, 'common', 'clover')));
-    E.knightFav = () => faceDie(faceSvg(frame(CARD) + med(72, 28, 'common', 'knight')));
-    E.knightLucky = () => { rarity = 'rare'; faceDie(faceSvg(frame(GOLD) + med(72, 28, 'rare', 'knight') + '<g transform="translate(14 60) scale(0.26)">' + G.coin(GOLD) + '</g>')); };
-    E.robberFav = () => faceDie(faceSvg(frame(CARD) + med(72, 28, 'common', 'robber')));
-    E.robberLucky = () => { rarity = 'rare'; faceDie(faceSvg(frame(GOLD) + med(72, 28, 'rare', 'robber') + '<g transform="translate(14 60) scale(0.26)">' + G.coin(GOLD) + '</g>')); };
-    E.hidden = () => faceDie(faceSvg(frame(CARD) + med(72, 28, 'common', 'eye')));
+    E.lucky = () => faceDie(faceSvg(faceBody(3, ['lucky']), true));
+    E.knightFav = () => faceDie(faceSvg(faceBody(3, ['knightFav']), true));
+    E.knightLucky = () => { rarity = 'rare'; faceDie(faceSvg(faceBody(3, ['knightLucky']), true)); };
+    E.robberFav = () => faceDie(faceSvg(faceBody(3, ['robberFav']), true));
+    E.robberLucky = () => { rarity = 'rare'; faceDie(faceSvg(faceBody(3, ['robberLucky']), true)); };
+    E.hidden = () => faceDie(faceSvg(faceBody(3, ['hidden']), true));
     E.mirror = () => { rarity = 'rare'; die({ top: 5, front: 1, right: 3, size: 88, marks: { front: 'mirror' } }, 120, 108); };
     E.robberFace = () => { rarity = 'rare'; die({ top: 5, front: 1, right: 3, size: 88, marks: { front: 'robber' } }, 120, 108); };
     E.blank = () => { rarity = 'rare'; die({ top: 5, front: 1, right: 3, size: 88, marks: { front: 'wild' } }, 120, 108); };

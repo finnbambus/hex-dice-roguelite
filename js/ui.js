@@ -6,20 +6,33 @@
 import { Game, COSTS, BLINDS } from './game.js';
 import { RES, TERRAIN_RES, pips } from './board.js';
 import { ITEMS, ITEM_LIST, BOSS_BY_ID, ROLLS_PER_ROUND, LOADING, START_SETTLEMENTS, ECHO_BREAK } from './content.js';
-import { BoardView } from './board-view.js?v=26';
-import { figure } from './figures.js?v=26';
-import { Feel } from './feel.js?v=26';
+import { BoardView } from './board-view.js?v=27';
+import { figure, faceBody, primaryTrigger } from './figures.js?v=27';
+import { Feel } from './feel.js?v=27';
 
 const TERRAIN_COLOR = { hills: '#c8734a', forest: '#3f7d4a', pasture: '#9ccf6a', fields: '#e8c547', mountains: '#8e939c', desert: '#e3d3a4' };
 const RES_ICON = { brick: 'B', lumber: 'L', wool: 'W', grain: 'G', ore: 'O' };
 const FACE_LABEL = { mirror: 'M', robber: 'R7', blank: '?' };
 const SETTER_ITEM = { mirror: 'mirror', robber: 'robberFace', blank: 'blank' };
 const TRIG_LABEL = { lucky: 'L', knightFav: 'kF', knightLucky: 'kL', robberFav: 'rF', robberLucky: 'rL', hidden: 'H' };
+// The guided tutorial: each step points at a real part of the screen (a missing target gets a centred card).
+const TUTORIAL = [
+  { title: 'Welcome to Hex & Dice', text: 'You run one island through an endless series of rounds. Each round you roll dice to earn resources, build, and then pay a <b>tribute</b>. Pay it every time and keep upgrading your dice and island; miss one and the run is over.' },
+  { sel: '#board .world', pad: -30, title: 'Your island', text: 'Every hex pays out its resource when its number is rolled, to each of your buildings touching it (settlement 1 card, city 2). More dots under a number means it comes up more often; 6 and 8 are best. You start by placing free settlements and roads on the pulsing dots.' },
+  { sel: '#hand .zone:first-child', title: 'Your hand', text: 'Resources you hold sit in stacks here. Roads, settlements, cities and cards cost resources. Careful: a rolled <b>7</b> makes you discard down to 7 cards and moves the robber, which blocks a hex.' },
+  { sel: '#hand .zone:nth-child(2)', title: 'Cards and guilds', text: '<b>Cards</b> are single-use: click one to pick it, then press Play. <b>Guilds</b> are permanent bonuses. You find both in the shop. Hover anything for the details.', alsoSel: '#hand .zone.guilds' },
+  { sel: '#panel .act-head', title: 'A round has three steps', text: '<b>Roll</b> the dice (up to 4 rolls per round), <b>build and trade</b> between rolls, then pay the <b>tribute</b>. The three bars below show whether this is the Small, Big or Boss round of the ante. This card always shows what you can do right now, and the big button moves you on.' },
+  { sel: '#tribute', title: 'The boss and the tribute', text: 'At the top: this ante\'s <b>boss</b> and its drawback. Below it, the <b>tribute</b> you must hand over at the end of the round, one bar per resource. The tribute grows every ante, and the Boss round also needs three different resource types.' },
+  { sel: '#panel .dice-stage', fallback: '#panel .panel-body', title: 'The dice', text: 'You roll two dice. The total decides which hexes pay. Drag a die to spin it and see every face; click it for a list of its faces and upgrades. Upgrading faces is how you bend the odds.' },
+  { sel: '.vp-zone', alsoSel: '.stat-zone', title: 'Score and titles', text: '<b>Score</b> is your victory points: settlements 1, cities 2, VP cards, plus bonus for the <b>longest road</b> and the <b>largest army</b> (the two small cards, hover them for details). Unused rolls add VP too.' },
+  { title: 'The shop', text: 'After the tribute is paid, whatever VP you have becomes your <b>shop budget</b> (unspent VP is lost). Buy upgrades for your dice faces, number tokens, hexes and ports, plus cards and guilds. Then the next round starts, and it is harder. Good luck!' },
+];
+
 const MOD_INFO = {
   nudge: ['Nudge', 'Change this die by ±1 (once per round).'],
   recast: ['Recast', 'Reroll this die (once per round).'],
   alchemist: ['Alchemist', 'Set this die to any value (once per round).'],
-  twin: ['Twin Die', 'Switch to the other result you rolled.'],
+  twin: ['Twin Die · reroll', 'Reroll this die instead of keeping its result. Once per round, and the new result is final: there is no going back. To keep the current result, just use the roll.'],
 };
 const CAT_LABEL = { face: 'Dice · face', die: 'Dice · whole die', token: 'Field · number token', hex: 'Field · hex', port: 'Field · port', classic: 'Card · single use', edict: 'Edict · single use', guild: 'Guild · always on', charter: 'Charter · instant' };
 const PRE_ROLL_CARDS = ['bumper', 'omen', 'monopoly'];
@@ -44,14 +57,18 @@ const CAT_SHORT = { classic: 'Card', edict: 'Edict', guild: 'Guild', charter: 'C
 // A die face drawn as a face: pips for numbers, the special marks for mirror / robber / blank faces.
 const PIP_AT = { 1: [[50, 50]], 2: [[28, 28], [72, 72]], 3: [[28, 28], [50, 50], [72, 72]], 4: [[28, 28], [72, 28], [28, 72], [72, 72]], 5: [[28, 28], [72, 28], [50, 50], [28, 72], [72, 72]], 6: [[28, 26], [72, 26], [28, 50], [72, 50], [28, 74], [72, 74]] };
 const svgUrl = (body) => `url('data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'>${body}</svg>`).replace(/'/g, '%27').replace(/\(/g, '%28').replace(/\)/g, '%29')}')`;
+// Triggers other than the one whose symbol is drawn on the face get a short label in the corner.
+const extraTrg = (f) => { const p = f.setter ? null : primaryTrigger(f.triggers); return [...new Set(f.triggers)].filter((t) => t !== p).map((t) => TRIG_LABEL[t]).join(''); };
 const faceArt = (f, loaded) => {
   const tone = loaded ? '#e6cf8c' : '#e9e4d6';
   let bg = tone, inner = '';
   if (f.setter === 'mirror') bg = `${svgUrl("<circle cx='50' cy='50' r='27' fill='#e9e4d6'/><circle cx='50' cy='50' r='17' fill='#17181b'/>")} center/100% 100% no-repeat, #17181b`;
   else if (f.setter === 'robber') { bg = '#17181b'; inner = '<span class="lbl">R</span>'; }
   else if (f.setter === 'blank') { bg = '#17181b'; inner = '<span class="lbl">?</span>'; }
+  else if (f.triggers.length) bg = `${svgUrl(faceBody(f.value, f.triggers))} center/100% 100% no-repeat, ${tone}`;
   else bg = `${svgUrl(PIP_AT[f.value].map((q) => `<circle cx='${q[0]}' cy='${q[1]}' r='8.5' fill='#17181b'/>`).join(''))} center/100% 100% no-repeat, ${tone}`;
-  const marks = f.triggers.length ? `<i class="trg">${[...new Set(f.triggers)].map((t) => TRIG_LABEL[t]).join('')}</i>` : '';
+  const ex = f.triggers.length ? extraTrg(f) : '';
+  const marks = ex ? `<i class="trg">${ex}</i>` : '';
   return `<span class="fa" style="background:${bg}">${inner}${marks}</span>`;
 };
 const UPGRADE_CATS = ['face', 'die', 'token', 'hex', 'port'];
@@ -99,6 +116,9 @@ export class UI {
     this.drag = null;
     this.tipsOpen = false;
     this.tipsSeen = false;
+    this.tutSeen = false;
+    this.tut = null;
+    try { this.tutSeen = localStorage.getItem('hd-tutorial') === 'seen'; } catch { /* storage can be blocked */ }
     try { this.tipsSeen = localStorage.getItem('hd-tips') === 'seen'; } catch { /* storage can be blocked */ }
     this.$drawer = document.getElementById('drawer');
     this.$modal = document.getElementById('modal-root');
@@ -195,11 +215,14 @@ export class UI {
     });
     // Detail cards: hover shows one, click keeps it open (buttons keep their own clicks).
     document.addEventListener('pointerover', (ev) => {
+      const pf = ev.target.closest?.('[data-a="pick-face"]');
+      if (pf) this.pickPreview(`${pf.dataset.die}-${pf.dataset.face}`);
       if (this.pinnedTip) return;
       const el = ev.target.closest?.('[data-tip]');
       if (el && el.dataset.tip !== this.tipKey) this.openTip(el.dataset.tip, el);
     });
     document.addEventListener('pointerout', (ev) => {
+      if (ev.target.closest?.('[data-a="pick-face"]') && !ev.relatedTarget?.closest?.('[data-a="pick-face"]')) this.pickPreview(null);
       if (this.pinnedTip) return;
       if (!ev.relatedTarget?.closest?.('[data-tip]')) this.hideTip();
     });
@@ -273,6 +296,13 @@ export class UI {
         if (ev.key === 'Enter' && ev.target.id === 'new-seed') this.onAction('start-seed', {});
         return;
       }
+      if (this.tut) {
+        if (ev.key === 'Escape') this.endTutorial();
+        else if (ev.key === 'ArrowRight' || ev.key === 'Enter') this.tutStep(1);
+        else if (ev.key === 'ArrowLeft') this.tutStep(-1);
+        ev.preventDefault();
+        return;
+      }
       if (ev.key === 'Escape') {
         if (!document.getElementById('menu-pop').hidden) this.setMenu(false);
         else if (this.selCard != null) { this.selCard = null; this.render(); }
@@ -296,6 +326,7 @@ export class UI {
   onTop(k) {
     if (k === 'new') this.dialog = 'new';
     if (k === 'help') this.dialog = 'help';
+    if (k === 'tutorial') return this.startTutorial();
     if (k === 'log' || k === 'dev') this.drawer = this.drawer === k ? null : k;
     this.render();
     if (k === 'new') setTimeout(() => document.getElementById('new-seed')?.focus(), 0);
@@ -348,6 +379,10 @@ export class UI {
       // turn flow
       case 'roll': this.preBuild = false; return this.run(() => g.roll());
       case 'resolve': return this.run(() => g.resolveRoll());
+      case 'tutorial': return this.startTutorial();
+      case 'tut-next': return this.tutStep(1);
+      case 'tut-back': return this.tutStep(-1);
+      case 'tut-end': return this.endTutorial();
       case 'mod': return this.run(() => g.useModifier(Number(d.die), d.id));
       case 'seen': if (g.report) g.report.seen = true; return this.render();
       case 'prebuild': this.preBuild = true; return this.render();
@@ -524,7 +559,14 @@ export class UI {
     return `data-tip="${esc(key)}"`;
   }
 
+  setRoadHl(on) {
+    if (!!this.hlRoad === on) return;
+    this.hlRoad = on;
+    this.renderBoard();
+  }
+
   openTip(key, el) {
+    this.setRoadHl(key === 'stat:road');
     this.tipKey = key;
     this.$tip.hidden = false;
     this.fillTip(key, el);
@@ -552,6 +594,7 @@ export class UI {
   }
 
   hideTip() {
+    this.setRoadHl(false);
     this.tipKey = null;
     this.$tip.hidden = true;
   }
@@ -646,9 +689,10 @@ export class UI {
 
   // Top of the action card: which step of the round you are on, and which of the ante's three rounds this is.
   actHead(step) {
-    if (step === 'setup' || step === 'gameover') return '';
+    if (step === 'gameover') return '';
     let stepper = '';
-    if (['roll', 'adjust', 'result', 'build', 'tribute'].includes(step)) {
+    if (step === 'setup') stepper = `<nav class="stepper" aria-label="Round steps">${STEPS.map(([, l]) => `<span>${l}</span>`).join('')}</nav>`;
+    else if (['roll', 'adjust', 'result', 'build', 'tribute'].includes(step)) {
       const current = step === 'adjust' || step === 'result' ? 'roll' : step;
       const idx = STEPS.findIndex(([k]) => k === current);
       stepper = `<nav class="stepper" aria-label="Round steps">${STEPS.map(([k, l], i) => `<span class="${i === idx ? 'on' : i < idx ? 'done' : ''}">${l}</span>`).join('')}</nav>`;
@@ -682,7 +726,79 @@ export class UI {
     const b = this.boardReq;
     this.$prompt.hidden = !b;
     if (!b) return;
-    this.$prompt.innerHTML = `<span><b>Click the board:</b> ${esc(b.prompt)}</span>${b.cancel ? '<button data-a="cancel-board">Cancel</button>' : ''}`;
+    const rep = this.replaceMap();
+    this.$prompt.innerHTML = `<span><b>Click the board:</b> ${esc(b.prompt)}${rep ? ' <em class="rep-note">Hexes marked “Replaces …” lose their old effect.</em>' : ''}</span>${b.cancel ? '<button data-a="cancel-board">Cancel</button>' : ''}`;
+  }
+
+  // The longest unbroken chain of roads (same rule as the engine's longestRoad), with the edges in order.
+  roadPath() {
+    const g = this.game;
+    const adj = new Map();
+    for (const e of g.roads) for (const v of g.board.edges[e].v) { if (!adj.has(v)) adj.set(v, []); adj.get(v).push(e); }
+    let best = [];
+    const used = new Set();
+    const path = [];
+    const dfs = (v) => {
+      if (path.length > best.length) best = [...path];
+      for (const e of adj.get(v) || []) {
+        if (used.has(e)) continue;
+        used.add(e); path.push(e);
+        const [a, b] = g.board.edges[e].v;
+        dfs(a === v ? b : a);
+        used.delete(e); path.pop();
+      }
+    };
+    for (const v of adj.keys()) dfs(v);
+    return { len: best.length, edges: best };
+  }
+
+  // Two small title cards next to the score: Longest road and Largest army, with what they are worth.
+  statCards() {
+    const g = this.game;
+    const vp = g.vpBreakdown();
+    const lr = vp.longestRoad;
+    const kn = g.knights;
+    const carto = g.hasGuild('cartographer');
+    const marshal = g.hasGuild('marshal');
+    const next = (n, base, guild) => (n < base ? `${base - n} more to reach ${base}` : guild ? `next VP at ${n + 1}` : `next VP at ${base + 2 * (Math.floor((n - base) / 2) + 1)}`);
+    const roadInfo = {
+      kind: 'Title · longest road',
+      title: `${lr} road segment${lr === 1 ? '' : 's'} in a row`,
+      desc: 'Your longest unbroken chain of roads. It starts to score at 5 segments, and the chain is shown numbered on the island while you hover this card.',
+      lines: [
+        '5 segments in a row: 2 VP',
+        carto ? 'Cartographer: every segment beyond 5 gives +1 VP' : 'Every 2 further segments beyond 5: +1 VP',
+        `Now: ${lr} segments = ${vp.road} VP${vp.road ? ` (2 base + ${vp.road - 2} extra)` : ''}`,
+        `Next: ${next(lr, 5, carto)}`,
+      ],
+    };
+    const armyInfo = {
+      kind: 'Title · largest army',
+      title: `${kn} knight${kn === 1 ? '' : 's'} played`,
+      desc: 'Every Knight card you play counts toward your army, and it starts to score at 3 knights.',
+      lines: [
+        '3 knights played: 2 VP',
+        marshal ? 'Marshal: every knight beyond 3 gives +1 VP' : 'Every 2 further knights beyond 3: +1 VP',
+        `Now: ${kn} knights = ${vp.army} VP${vp.army ? ` (2 base + ${vp.army - 2} extra)` : ''}`,
+        `Next: ${next(kn, 3, marshal)}`,
+      ],
+    };
+    const card = (cls, label, n, goal, val, key, info, hl) => `<div class="stat ${cls} ${val ? 'on' : ''}" ${this.tipAttr(key, info)} ${hl ? 'data-hlroad="1"' : ''}><span class="s-k">${label}</span><span class="s-n">${n}</span><span class="s-v">${val ? `+${val} VP` : n >= goal ? '0 VP' : `${goal - n} to go`}</span></div>`;
+    return `<section class="zone stat-zone"><div class="zone-h">Titles</div><div class="stats">${card('road', 'Road', lr, 5, vp.road, 'stat:road', roadInfo, true)}${card('army', 'Army', kn, 3, vp.army, 'stat:army', armyInfo, false)}</div></section>`;
+  }
+
+  // The upgrade being placed (from the engine's prompt), and which targets already carry an effect it would replace.
+  replaceMap() {
+    const b = this.boardReq;
+    if (!b || b.kind !== 'hex') return null;
+    const it = ITEM_LIST.find((x) => (x.cat === 'hex' || x.cat === 'token') && x.kind !== 'setter' && b.prompt.startsWith(`${x.name}:`));
+    if (!it) return null;
+    const m = new Map();
+    for (const h of this.game.board.hexes) {
+      const cur = it.cat === 'hex' ? h.hexEffect : h.tokenEffect;
+      if (cur && b.ids.has(h.id)) m.set(h.id, ITEMS[cur.id].name);
+    }
+    return m.size ? m : null;
   }
 
   renderBoard() {
@@ -697,6 +813,8 @@ export class UI {
       paid,
       rolled,
       volcano: g.volcanoHex,
+      replace: this.replaceMap(),
+      hlEdges: this.hlRoad ? this.roadPath().edges : null,
       tip: (h) => {
         const parts = [];
         if (h.hexEffect) parts.push(ITEMS[h.hexEffect.id]);
@@ -811,11 +929,12 @@ export class UI {
       const tone = loaded ? '#e6cf8c' : TONE[SIDE[k]];
       let bg = `${pipBg(f.value, '#17181b')}, ${tone}`;
       let inner = '';
+      if (f.triggers.length && !f.setter) bg = `${svgUrl(faceBody(f.value, f.triggers))} center/100% 100% no-repeat, ${tone}`;
       if (f.setter === 'mirror') bg = `radial-gradient(circle at 50% 50%, #17181b 0 ${u(0.16)}, ${tone} ${u(0.18)} ${u(0.27)}, #17181b ${u(0.29)})`;
       else if (f.setter === 'robber') { bg = '#17181b'; inner = '<span class="lbl lt">R</span>'; }
       else if (f.setter === 'blank') { bg = '#17181b'; inner = '<span class="lbl lt">?</span>'; }
       const faceTip = f.triggers.map((t) => ITEMS[t].name).join(', ') || (f.setter ? ITEMS[SETTER_ITEM[f.setter]].name : `Shows ${f.value}`);
-      return `<div class="side ${SIDE[k]}" style="background:${bg}" ${pick ? `data-a="pick-face" data-die="${i}" data-face="${k}" title="Die ${i + 1}, face ${k + 1}: ${esc(faceTip)}"` : ''}>${inner}${f.triggers.length ? `<span class="trg">${f.triggers.map((t) => TRIG_LABEL[t]).join('')}</span>` : ''}</div>`;
+      return `<div class="side ${SIDE[k]}" style="background:${bg}" ${pick ? `data-a="pick-face" data-die="${i}" data-face="${k}" title="Die ${i + 1}, face ${k + 1}: ${esc(faceTip)}"` : ''}>${inner}${f.triggers.length && extraTrg(f) ? `<span class="trg">${extraTrg(f)}</span>` : ''}</div>`;
     }).join('');
     const final = TURN[SIDE[fi]];
     let cls = '';
@@ -980,16 +1099,115 @@ export class UI {
           <li>Try to touch different resources: the Boss tribute needs three different types.</li>
           <li>Each starting settlement gives you one card per hex next to it.</li><li>Spread out: settlements need two edges of distance between them.</li></ul>`)}`,
       foot: '<div class="hint">Click a pulsing dot on the board to place it.</div>',
+      sec: this.tutorialButton(),
     };
+  }
+
+  // Probability of each sum 2–12 for the two dice as they are (or with one face swapped), as fractions.
+  // Mirror faces copy the other die, a Blank face is counted as an even spread, the Robber's Face counts as a 7.
+  sumDist(swap) {
+    const g = this.game;
+    const probs = [0, 1].map((i) => g.faceProbs(i));
+    const faces = [0, 1].map((i) => g.dice[i].faces.map((f, k) => (swap && swap.die === i && swap.face === k ? swap.to : f)));
+    const out = Array(13).fill(0);
+    const vals = (f) => (f.setter === 'blank' ? [1, 2, 3, 4, 5, 6] : f.setter === 'mirror' ? ['m'] : [f.value]);
+    for (let a = 0; a < 6; a++) for (let b = 0; b < 6; b++) {
+      const pr = probs[0][a] * probs[1][b];
+      const fa = faces[0][a], fb = faces[1][b];
+      if (fa.setter === 'robber' || fb.setter === 'robber') { out[7] += pr; continue; }
+      const va = vals(fa), vb = vals(fb);
+      const w = pr / (va.length * vb.length);
+      for (const x of va) for (const y of vb) {
+        if (x === 'm' && y === 'm') continue; // two mirrors: the roll counts as 0
+        out[(x === 'm' ? y : x) + (y === 'm' ? x : y)] += w;
+      }
+    }
+    return out;
+  }
+
+  // The bell curve of the sum, before and (on hover) after the face change. Smooth path through the 11 points.
+  curvePath(dist, W, H, top) {
+    const pts = [];
+    for (let s = 2; s <= 12; s++) pts.push([10 + ((s - 2) / 10) * (W - 20), H - 16 - (dist[s] / top) * (H - 30)]);
+    let d = `M${pts[0][0].toFixed(1)} ${pts[0][1].toFixed(1)}`;
+    for (let i = 0; i < pts.length - 1; i++) {
+      const p0 = pts[i - 1] || pts[i], p1 = pts[i], p2 = pts[i + 1], p3 = pts[i + 2] || p2;
+      const c1 = [p1[0] + (p2[0] - p0[0]) / 6, p1[1] + (p2[1] - p0[1]) / 6];
+      const c2 = [p2[0] - (p3[0] - p1[0]) / 6, p2[1] - (p3[1] - p1[1]) / 6];
+      d += ` C${c1[0].toFixed(1)} ${c1[1].toFixed(1)} ${c2[0].toFixed(1)} ${c2[1].toFixed(1)} ${p2[0].toFixed(1)} ${p2[1].toFixed(1)}`;
+    }
+    return { d, area: `${d} L${pts[10][0].toFixed(1)} ${H - 16} L${pts[0][0].toFixed(1)} ${H - 16} Z` };
+  }
+
+  distStats(dist) {
+    const tot = dist.reduce((a, b) => a + b, 0) || 1;
+    let mean = 0;
+    for (let s = 2; s <= 12; s++) mean += (s * dist[s]) / tot;
+    return { p7: dist[7] / tot, mean, tot };
+  }
+
+  // What a face upgrade does to the face, as a face object (or a list of them when the result is random).
+  faceAfter(item, f) {
+    if (item.id === 'reforge') return [1, 2, 3, 4, 5, 6].filter((v) => v !== f.value).map((v) => ({ ...f, value: v, setter: null }));
+    if (item.id === 'raise') return [{ ...f, value: f.value === 6 ? 1 : f.value + 1, setter: null }];
+    if (item.id === 'lower') return [{ ...f, value: f.value === 1 ? 6 : f.value - 1, setter: null }];
+    const setter = { mirror: 'mirror', robberFace: 'robber', blank: 'blank' }[item.id];
+    return setter ? [{ ...f, setter }] : null;
+  }
+
+  pickChart(item) {
+    const g = this.game;
+    const W = 280, H = 92;
+    const before = this.sumDist();
+    const after = {};
+    let top = Math.max(...before);
+    for (const d of [0, 1]) for (let k = 0; k < 6; k++) {
+      const alts = this.faceAfter(item, g.dice[d].faces[k]);
+      const dists = alts.map((to) => this.sumDist({ die: d, face: k, to }));
+      const avg = before.map((_, s) => dists.reduce((a, x) => a + x[s], 0) / dists.length);
+      after[`${d}-${k}`] = { dist: avg, random: alts.length > 1 };
+      top = Math.max(top, ...avg);
+    }
+    top *= 1.1;
+    this._pick = { before, after, top, W, H };
+    const bp = this.curvePath(before, W, H, top);
+    const ticks = Array.from({ length: 11 }, (_, i) => `<text x="${(10 + (i / 10) * (W - 20)).toFixed(1)}" y="${H - 3}" text-anchor="middle" class="${i + 2 === 7 ? 'seven' : ''}">${i + 2}</text>`).join('');
+    const st = this.distStats(before);
+    return `<div class="pk-chart" aria-label="Chance of each roll total">
+      <div class="pk-title">Chance of each total</div>
+      <svg viewBox="0 0 ${W} ${H}" width="100%" role="img"><path d="${bp.area}" class="pk-before-fill"/><path id="pk-after-fill" class="pk-after-fill" d=""/><path d="${bp.d}" class="pk-before"/><path id="pk-after" class="pk-after" d=""/>${ticks}</svg>
+      <div id="pk-read" class="pk-read">Now: 7 comes up ${(st.p7 * 100).toFixed(1)}% · average total ${st.mean.toFixed(1)}. Hover a face to preview the change.</div></div>`;
+  }
+
+  pickPreview(key) {
+    const c = this._pick;
+    const path = document.querySelector('#pk-after');
+    if (!c || !path) return;
+    const fill = document.querySelector('#pk-after-fill');
+    const read = document.querySelector('#pk-read');
+    const bs = this.distStats(c.before);
+    const a = key ? c.after[key] : null;
+    if (!a) {
+      path.setAttribute('d', ''); fill.setAttribute('d', '');
+      read.textContent = `Now: 7 comes up ${(bs.p7 * 100).toFixed(1)}% · average total ${bs.mean.toFixed(1)}. Hover a face to preview the change.`;
+      return;
+    }
+    const p = this.curvePath(a.dist, c.W, c.H, c.top);
+    path.setAttribute('d', p.d); fill.setAttribute('d', p.area);
+    path.classList.toggle('random', a.random);
+    const as = this.distStats(a.dist);
+    read.textContent = `${a.random ? 'Expected (the new value is random): ' : 'After: '}7 comes up ${(as.p7 * 100).toFixed(1)}% (now ${(bs.p7 * 100).toFixed(1)}%) · average total ${as.mean.toFixed(1)} (now ${bs.mean.toFixed(1)}).`;
   }
 
   // Choosing the face of a face upgrade: spin the dice in the action card and click the face itself.
   viewPickFace() {
     const m = this.modal;
+    const item = ITEM_LIST.find((x) => x.cat === 'face' && x.kind === 'setter' && m.prompt.startsWith(`${x.name}:`));
     return {
       body: `<h2>${esc(m.prompt)}</h2>
-        <p class="small muted">Drag a die to spin it, then click the face to upgrade. Upgrades stay on the physical face. A new value-setter replaces the old one; triggers stack.</p>
-        ${this.diceStage('pick', m)}`,
+        <p class="small muted">Drag a die to spin it, then click the face to upgrade.</p>
+        ${this.diceStage('pick', m)}
+        ${item ? this.pickChart(item) : ''}`,
       foot: m.cancel ? '<button class="big center" data-a="cancel-modal">Cancel</button>' : '',
     };
   }
@@ -1003,7 +1221,7 @@ export class UI {
         ${this.hint('How a round works', `You have <b>${ROLLS_PER_ROUND} rolls</b>. Each roll pays every hex with that number to your buildings next to it (settlement 1, city 2). Between rolls you can build and trade. At the end you pay the tribute shown at the top of the board.`)}
         ${pre.length ? `<div class="callout"><b>Before rolling:</b> you can play ${pre.map((c) => ITEMS[c.id].name).join(', ')} from your hand below.</div>` : ''}`,
       foot: `<button class="primary big" data-a="roll" data-primary ${this.busy ? 'disabled' : ''}>Roll the dice${this.rollsLeft()}</button>`,
-      sec: `<button class="small ghost" data-a="end" ${this.busy ? 'disabled' : ''}>Skip all rolls (+${ROLLS_PER_ROUND} VP)</button>`,
+      sec: `<button class="small ghost" data-a="end" ${this.busy ? 'disabled' : ''}>Skip all rolls (+${ROLLS_PER_ROUND} VP)</button>${this.tutorialOffered() ? this.tutorialButton() : ''}`,
     };
   }
 
@@ -1014,9 +1232,9 @@ export class UI {
     const mods = g.modifiersAvailable();
     return {
       body: `<h2>You rolled ${v[0] || '?'} + ${v[1] || '?'}</h2>
-        <p class="lead">Your dice upgrades can change this roll before it pays out.</p>
-        <h3>Change the roll (optional)</h3>
-        <div class="tiles">${mods.map((m) => `<button class="tile-btn" data-a="mod" data-die="${m.die}" data-id="${m.id}" ${this.busy ? 'disabled' : ''}><span class="t-name">${MOD_INFO[m.id][0]} · die ${m.die + 1}</span><span class="t-desc">${MOD_INFO[m.id][1]}${m.id === 'twin' ? ` Other result: ${g.dice[m.die].faces[pr.alt[m.die]].value}.` : ''}</span></button>`).join('')}</div>`,
+        <p class="lead">${mods.length ? 'Your dice upgrades can change this roll before it pays out.' : 'Nothing left to change. Use this roll when you are ready.'}</p>
+        ${mods.length ? '<h3>Change the roll (optional)</h3>' : ''}
+        <div class="tiles">${mods.map((m) => `<button class="tile-btn" data-a="mod" data-die="${m.die}" data-id="${m.id}" ${this.busy ? 'disabled' : ''}><span class="t-name">${MOD_INFO[m.id][0]} · die ${m.die + 1}</span><span class="t-desc">${MOD_INFO[m.id][1]}</span></button>`).join('')}</div>`,
       foot: `<button class="primary big" data-a="resolve" data-primary ${this.busy ? 'disabled' : ''}>Use this roll (${v[0] + v[1] || '?'})</button>`,
     };
   }
@@ -1300,12 +1518,94 @@ export class UI {
       <section class="zone"><div class="zone-h">Hand <b>${total} card${total === 1 ? '' : 's'}${countable > 7 ? ' · <span class="bad">over 7: a 7 makes you discard</span>' : ' · safe from the robber up to 7'}</b></div><div class="res-row">${stacks}${storeBox}</div></section>
       <section class="zone"><div class="zone-h">Cards <b>${g.cards.length} of ${g.limits.handSlots}</b></div><div class="slots" style="--n:${g.limits.handSlots}">${cardSlots}</div></section>
       <section class="zone guilds"><div class="zone-h">Guilds <b>${g.guilds.length} of ${g.limits.guildSlots}</b></div><div class="slots" style="--n:${g.limits.guildSlots}">${guildSlots}</div></section>
+      ${this.statCards()}
       ${this.vpBig()}`;
     this.$stage.style.setProperty('--hand-h', `${this.$hand.offsetHeight}px`);
     const lz = this.$hand.firstElementChild;
     this.$stage.style.setProperty('--hand-l', `${lz ? lz.offsetHeight : 160}px`);
     if (this.view && this.$hand.offsetHeight !== this._handH) { this._handH = this.$hand.offsetHeight; this.view.fit(); }
     this.applyHighlights();
+  }
+
+  // ---------------------------------------------------------------- tutorial
+  // True until the first roll of the run has been made: that is when the tutorial button is offered on the card.
+  tutorialOffered() {
+    const g = this.game;
+    return !g.phase || g.phase === 'setup' || (g.ante === 1 && g.blind === 0 && g.rollsUsed === 0 && !g.lastRoll);
+  }
+
+  tutorialButton() {
+    return `<button class="small ghost tut-btn ${this.tutSeen ? '' : 'new'}" data-a="tutorial">▶ Play tutorial</button>`;
+  }
+
+  startTutorial() {
+    this.setMenu(false);
+    this.tut = { i: 0 };
+    this.renderTutorial();
+  }
+
+  endTutorial() {
+    this.tut = null;
+    this.tutSeen = true;
+    try { localStorage.setItem('hd-tutorial', 'seen'); } catch { /* ignore */ }
+    this.renderTutorial();
+    this.render();
+  }
+
+  tutStep(d) {
+    if (!this.tut) return;
+    const i = this.tut.i + d;
+    if (i >= TUTORIAL.length) return this.endTutorial();
+    this.tut.i = Math.max(0, i);
+    this.renderTutorial();
+  }
+
+  renderTutorial() {
+    let el = this.$tut;
+    if (!el) {
+      el = this.$tut = document.createElement('div');
+      el.id = 'tutorial';
+      document.body.appendChild(el);
+      addEventListener('resize', () => { if (this.tut) this.renderTutorial(); });
+    }
+    if (!this.tut) { el.hidden = true; el.innerHTML = ''; return; }
+    const s = TUTORIAL[this.tut.i];
+    const q = (sel) => (sel ? document.querySelector(sel) : null);
+    const target = q(s.sel) || q(s.fallback);
+    let box = null;
+    if (target) {
+      const r = target.getBoundingClientRect();
+      const r2 = s.alsoSel ? q(s.alsoSel)?.getBoundingClientRect() : null;
+      const l = Math.min(r.left, r2 ? r2.left : r.left), t = Math.min(r.top, r2 ? r2.top : r.top);
+      const rr = Math.max(r.right, r2 ? r2.right : r.right), b = Math.max(r.bottom, r2 ? r2.bottom : r.bottom);
+      const pad = s.pad ?? 8;
+      box = { l: l - pad, t: t - pad, w: rr - l + 2 * pad, h: b - t + 2 * pad };
+    }
+    const last = this.tut.i === TUTORIAL.length - 1;
+    const dots = TUTORIAL.map((_, k) => `<i class="${k === this.tut.i ? 'on' : k < this.tut.i ? 'done' : ''}"></i>`).join('');
+    el.hidden = false;
+    el.innerHTML = `${box ? `<div class="tut-spot" style="left:${box.l}px;top:${box.t}px;width:${box.w}px;height:${box.h}px"></div>` : '<div class="tut-dim"></div>'}
+      <div class="tut-card" role="dialog" aria-label="Tutorial"><div class="tut-step">Step ${this.tut.i + 1} of ${TUTORIAL.length}</div><h3>${s.title}</h3><p>${s.text}</p>
+        <div class="tut-dots">${dots}</div>
+        <div class="tut-nav"><button class="small ghost" data-a="tut-end">${last ? 'Close' : 'Skip'}</button><span class="sp"></span>${this.tut.i ? '<button class="small" data-a="tut-back">Back</button>' : ''}<button class="primary small" data-a="tut-next">${last ? 'Start playing' : 'Next'}</button></div></div>`;
+    // place the card beside the highlighted part, inside the window
+    const card = el.querySelector('.tut-card');
+    const cw = card.offsetWidth, ch = card.offsetHeight, m = 14;
+    let x = (innerWidth - cw) / 2, y = (innerHeight - ch) / 2;
+    if (box) {
+      const spots = [
+        [box.l + box.w + m, box.t + box.h / 2 - ch / 2],
+        [box.l - cw - m, box.t + box.h / 2 - ch / 2],
+        [box.l + box.w / 2 - cw / 2, box.t - ch - m],
+        [box.l + box.w / 2 - cw / 2, box.t + box.h + m],
+      ];
+      const fit = spots.find(([sx, sy]) => sx >= 8 && sy >= 8 && sx + cw <= innerWidth - 8 && sy + ch <= innerHeight - 8);
+      if (fit) [x, y] = fit;
+      else { x = Math.max(8, Math.min(innerWidth - cw - 8, box.l + 20)); y = Math.max(8, Math.min(innerHeight - ch - 8, box.t + 20)); }
+    }
+    card.style.left = `${Math.max(8, x)}px`;
+    card.style.top = `${Math.max(8, y)}px`;
+    card.querySelector('[data-a="tut-next"]').focus({ preventScroll: true });
   }
 
   // ---------------------------------------------------------------- drawer (log / dev tools)
