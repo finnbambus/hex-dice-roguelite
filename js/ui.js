@@ -6,9 +6,9 @@
 import { Game, COSTS, BLINDS } from './game.js';
 import { RES, TERRAIN_RES, pips } from './board.js';
 import { ITEMS, ITEM_LIST, BOSS_BY_ID, ROLLS_PER_ROUND, LOADING, START_SETTLEMENTS, ECHO_BREAK } from './content.js';
-import { BoardView } from './board-view.js?v=28';
-import { figure, faceBody, primaryTrigger } from './figures.js?v=28';
-import { Feel } from './feel.js?v=28';
+import { BoardView } from './board-view.js?v=29';
+import { figure, faceBody, primaryTrigger } from './figures.js?v=29';
+import { Feel } from './feel.js?v=29';
 
 const TERRAIN_COLOR = { hills: '#c8734a', forest: '#3f7d4a', pasture: '#9ccf6a', fields: '#e8c547', mountains: '#8e939c', desert: '#e3d3a4' };
 const RES_ICON = { brick: 'B', lumber: 'L', wool: 'W', grain: 'G', ore: 'O' };
@@ -1520,11 +1520,32 @@ export class UI {
       <section class="zone guilds"><div class="zone-h">Guilds <b>${g.guilds.length} of ${g.limits.guildSlots}</b></div><div class="slots" style="--n:${g.limits.guildSlots}">${guildSlots}</div></section>
       ${this.statCards()}
       ${this.vpBig()}`;
+    this.fitHand();
     this.$stage.style.setProperty('--hand-h', `${this.$hand.offsetHeight}px`);
     const lz = this.$hand.firstElementChild;
     this.$stage.style.setProperty('--hand-l', `${lz ? lz.offsetHeight : 160}px`);
     if (this.view && this.$hand.offsetHeight !== this._handH) { this._handH = this.$hand.offsetHeight; this.view.fit(); }
     this.applyHighlights();
+  }
+
+  // The bottom bar spans the whole stage width and scales (--hz) so that Hand, Cards, Guilds, titles and score fill it.
+  fitHand() {
+    const h = this.$hand;
+    if (!h) return;
+    if (window.innerWidth <= 900) { h.style.removeProperty('--hz'); this.$stage.classList.remove('hand-full'); return; }
+    // tall windows give the bar the full width (the right column rises above it); short ones keep it left of the column
+    this.$stage.classList.toggle('hand-full', window.innerHeight >= 840);
+    const kids = [...h.children];
+    if (!kids.length) return;
+    const gap = parseFloat(getComputedStyle(h).columnGap) || 0;
+    const width = (z) => { h.style.setProperty('--hz', z); return kids.reduce((a, k) => a + k.offsetWidth, 0) + gap * (kids.length - 1); };
+    const avail = h.clientWidth - 36;
+    const byH = (0.27 * window.innerHeight - 56) / 112; // the bar must not eat the board
+    let lo = 0.5, hi = Math.max(0.5, Math.min(1.6, byH));
+    if (width(hi) <= avail) lo = hi; // widest allowed already fits
+    else for (let i = 0; i < 8; i++) { const mid = (lo + hi) / 2; if (width(mid) <= avail) lo = mid; else hi = mid; }
+    const hz = lo;
+    h.style.setProperty('--hz', hz.toFixed(3));
   }
 
   // ---------------------------------------------------------------- tutorial
@@ -1566,7 +1587,7 @@ export class UI {
       el = this.$tut = document.createElement('div');
       el.id = 'tutorial';
       document.body.appendChild(el);
-      addEventListener('resize', () => { if (this.tut) this.renderTutorial(); });
+      addEventListener('resize', () => { this.fitHand(); this.$stage.style.setProperty('--hand-h', `${this.$hand.offsetHeight}px`); if (this.view) this.view.fit(); if (this.tut) this.renderTutorial(); });
     }
     if (!this.tut) { el.hidden = true; el.innerHTML = ''; return; }
     const s = TUTORIAL[this.tut.i];
