@@ -60,6 +60,10 @@ Open the game with `?dev` in the address (e.g. `index.html?dev`) and the menu ga
 
 The `.nojekyll` file stops GitHub from running Jekyll over the files. All paths are relative, so the game also works from a sub-path or a custom domain.
 
+### Looking at the board from the shop (v35)
+
+**View board** in the shop's footer hides the shop sheet so the island, tokens and ports can be inspected (hover works as usual). **Back to the shop** at the top of the board, or Esc, returns.
+
 ### Interface layer (v34)
 
 `css/v1.css` is the last stylesheet and holds the v1 interface pass: spacing, radius and type tokens, the fixed action-card frame, and the shop, pack, menu, title and game-over layouts. Board, dice and card rendering stay in `css/style.css`. The audit behind it is in `docs/ui-audit-v1.md`.

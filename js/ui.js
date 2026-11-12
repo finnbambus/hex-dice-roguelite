@@ -6,9 +6,9 @@
 import { Game, COSTS, BLINDS } from './game.js';
 import { RES, TERRAIN_RES, pips } from './board.js';
 import { ITEMS, ITEM_LIST, BOSS_BY_ID, ROLLS_PER_ROUND, LOADING, START_SETTLEMENTS, ECHO_BREAK } from './content.js';
-import { BoardView } from './board-view.js?v=34';
-import { figure, faceBody, primaryTrigger } from './figures.js?v=34';
-import { Feel } from './feel.js?v=34';
+import { BoardView } from './board-view.js?v=35';
+import { figure, faceBody, primaryTrigger } from './figures.js?v=35';
+import { Feel } from './feel.js?v=35';
 
 const TERRAIN_COLOR = { hills: '#c8734a', forest: '#3f7d4a', pasture: '#9ccf6a', fields: '#e8c547', mountains: '#8e939c', desert: '#e3d3a4' };
 const RES_ICON = { brick: 'B', lumber: 'L', wool: 'W', grain: 'G', ore: 'O' };
@@ -309,6 +309,7 @@ export class UI {
       }
       if (ev.key === 'Escape') {
         if (!document.getElementById('menu-pop').hidden) this.setMenu(false);
+        else if (this.peek) { this.peek = false; this.render(); }
         else if (this.selCard != null) { this.selCard = null; this.render(); }
         else if (this.tipsOpen) { this.tipsOpen = false; this.render(); }
         else if (this.dieSheet != null) { this.dieSheet = null; this.render(); }
@@ -412,7 +413,8 @@ export class UI {
       case 'buy': return this.run(() => g.buy(Number(d.i)));
       case 'reroll': g.rerollShop(); return;
       case 'reroll-boss': g.rerollBoss(); return;
-      case 'leave': g.leaveShop(); return;
+      case 'leave': this.peek = false; g.leaveShop(); return;
+      case 'peek': this.peek = !this.peek; return this.render();
       // game over
       case 'again': return this.newGame(g.seed);
       case 'fresh': return this.newGame(Math.floor(Math.random() * 1e9));
@@ -1405,8 +1407,12 @@ export class UI {
     const show = over || (g.phase === 'shop' && !this.boardReq && !(this.stamp && performance.now() < this.stamp.hold));
     this.$overlay.hidden = !show;
     this.$overlay.classList.toggle('over-mode', over);
+    if (g.phase !== 'shop') this.peek = false;
+    this.$overlay.classList.toggle('peek-mode', show && !over && !!this.peek);
     if (!show) { this.shopShown = false; return; }
     if (over) { this.$overlay.innerHTML = this.viewGameOver(); return; }
+    // Looking at the board from the shop: the sheet steps aside and leaves one way back.
+    if (this.peek) { this.$overlay.innerHTML = `<button class="peek-back" data-a="peek">Back to the shop<kbd>Esc</kbd></button>`; this.shopShown = false; return; }
     const offers = g.shop.map((s, i) => {
       const price = g.slotPrice(s);
       const afford = g.budget >= price;
@@ -1429,7 +1435,8 @@ export class UI {
         <div class="budget-box" title="${esc(sum)}"><div class="eyebrow">Budget</div><div class="budget">${g.budget}<small>VP</small></div></div></div>
       <div class="shop-grid" style="--n:${g.shop.length}">${offers}</div>
       <div class="shop-foot"><button data-a="reroll" ${g.budget >= g.rerollPrice ? '' : 'disabled'}>Reroll offers · ${g.rerollPrice} VP</button>
-        <span class="sf-note"><b>Unspent VP is lost when you leave.</b> Dice, field and port upgrades ask for their target after you buy.</span></div>
+        <span class="sf-note"><b>Unspent VP is lost when you leave.</b> Dice, field and port upgrades ask for their target after you buy.</span>
+        <button class="peek-btn" data-a="peek" title="Hide the shop and look at your island">View board</button></div>
 </div>`;
     const sh = this.$overlay.querySelector('.shop');
     if (sh && this.shopShown) sh.scrollTop = keep;

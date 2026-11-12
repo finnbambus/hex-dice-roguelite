@@ -396,3 +396,10 @@ input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); ou
   button:active:not(:disabled) { transform: none; }
   .offer:hover:not(.sold) .o-stage > * { transform: none; }
 }
+
+/* Shop: look at the board without leaving */
+.shop-foot .peek-btn { margin-left: auto; flex: none; }
+.stage-overlay.peek-mode { background: none; align-items: flex-start; padding-top: 16px; }
+.peek-back { pointer-events: auto; display: inline-flex; align-items: center; gap: 10px; height: 40px; padding: 0 16px; border-radius: 999px; background: #f2efe6; color: #141518; border: 0; font-weight: 600; box-shadow: 0 8px 24px -8px rgba(0, 0, 0, .8); }
+.peek-back:hover { background: #fff; }
+.peek-back kbd { font: var(--cap); padding: 2px 6px; border-radius: 4px; background: rgba(0, 0, 0, .12); }
