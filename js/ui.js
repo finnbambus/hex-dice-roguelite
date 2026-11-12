@@ -6,9 +6,9 @@
 import { Game, COSTS, BLINDS } from './game.js';
 import { RES, TERRAIN_RES, pips } from './board.js';
 import { ITEMS, ITEM_LIST, BOSS_BY_ID, ROLLS_PER_ROUND, LOADING, START_SETTLEMENTS, ECHO_BREAK } from './content.js';
-import { BoardView } from './board-view.js?v=45';
-import { figure, faceBody, primaryTrigger } from './figures.js?v=45';
-import { Feel } from './feel.js?v=45';
+import { BoardView } from './board-view.js?v=46';
+import { figure, faceBody, primaryTrigger } from './figures.js?v=46';
+import { Feel } from './feel.js?v=46';
 
 const TERRAIN_COLOR = { hills: '#c8734a', forest: '#3f7d4a', pasture: '#9ccf6a', fields: '#e8c547', mountains: '#8e939c', desert: '#e3d3a4' };
 const RES_ICON = { brick: 'B', lumber: 'L', wool: 'W', grain: 'G', ore: 'O' };
@@ -668,8 +668,14 @@ export class UI {
       const pct = Math.min(100, Math.round((Math.min(have, p.amount) / p.amount) * 100));
       return `<div class="tpart"><div class="t-row">${t ? resDot(t) : '<span class="res-dot any"></span>'}<span>${t ? cap(t) : 'Any type'}</span><span class="have">${Math.min(have, p.amount)}<span> / ${p.amount}</span></span></div><div class="bar ${pct >= 100 ? 'full' : ''}"><i style="width:${pct}%;--c:${t ? `var(--${t})` : 'var(--muted)'}"></i></div></div>`;
     }).join('');
-    const state = g.phase === 'setup' ? '' : ok ? '<b class="ok">Ready to pay</b>' : '<b class="no">Not yet</b>';
-    el.innerHTML = `${this.runHead()}${this.bossRow()}<div class="trib"><div class="trib-head" ${this.tipAttr('tribute', { kind: 'Tribute', title: 'Due at round end', desc: 'Each part needs a different resource type. Storehouse cards count first, then your hand.', lines })}><span class="eyebrow">Tribute · due at round end</span>${state}</div><div class="trib-parts">${parts}</div></div>`;
+    // While you can still roll or build, a payable tribute is paid from here: the counter is where you see that it is ready.
+    const step = this.step();
+    const left = ROLLS_PER_ROUND - g.rollsUsed;
+    const payHere = ok && g.phase === 'turn' && (step === 'roll' || step === 'build') && !this.modal && !this.boardReq;
+    const state = g.phase === 'setup' ? ''
+      : payHere ? `<button class="pay-now" data-a="end" ${this.busy ? 'disabled' : ''} title="End the round now and pay the tribute${left > 0 ? `. Each unused roll is worth 1 VP in the shop` : ''}">Pay now${left > 0 ? `<small>+${left} VP</small>` : ''}</button>`
+        : ok ? '<b class="ok">Ready to pay</b>' : '<b class="no">Not yet</b>';
+    el.innerHTML = `${this.runHead()}${this.bossRow()}<div class="trib"><div class="trib-head"><span class="eyebrow" ${this.tipAttr('tribute', { kind: 'Tribute', title: 'Due at round end', desc: 'Each part needs a different resource type. Storehouse cards count first, then your hand.', lines })}>Tribute · due at round end</span>${state}</div><div class="trib-parts">${parts}</div></div>`;
   }
 
   // The score: a big number at the far right of the hand row.
@@ -1269,7 +1275,7 @@ export class UI {
         ${this.hint('How a round works', `You have <b>${ROLLS_PER_ROUND} rolls</b>. Each roll pays every hex with that number to your buildings next to it (settlement 1, city 2). Between rolls you can build and trade. At the end you pay the tribute shown on the run card above.`)}
         ${pre.length ? `<div class="callout"><b>Before rolling:</b> you can play ${pre.map((c) => ITEMS[c.id].name).join(', ')} from your hand below.</div>` : ''}`,
       foot: `<button class="primary big" data-a="roll" data-primary ${this.busy ? 'disabled' : ''}>Roll the dice${this.rollsLeft()}</button>`,
-      sec: `<button class="small ghost" data-a="end" ${this.busy ? 'disabled' : ''}>Skip all rolls · +${ROLLS_PER_ROUND} VP</button>${this.tutorialOffered() ? this.tutorialButton() : ''}`,
+      sec: this.tutorialOffered() ? this.tutorialButton() : '',
     };
   }
 
@@ -1380,7 +1386,7 @@ export class UI {
       : rollsLeft > 0
         ? `<button class="primary big" data-a="roll" data-primary ${dis ? 'disabled' : ''}>Roll again${this.rollsLeft()}</button>`
         : `<button class="primary big" data-a="end" data-primary ${dis ? 'disabled' : ''}>Go to the tribute</button>`;
-    const secondary = rollsLeft > 0 || echo ? `<button class="small ghost" data-a="end" ${dis ? 'disabled' : ''}>End round now${rollsLeft > 0 ? ` · +${rollsLeft} VP` : ''}</button>` : '';
+    const secondary = ''; // ending the round early now lives on the tribute counter (Pay now)
     const fx = this.fxChips();
     return {
       body: `${fx}${this.hint('How building and trading work', `<p>${g.rollsUsed === 0 ? 'Before your first roll.' : `After roll ${g.rollsUsed} of ${ROLLS_PER_ROUND}.`} Do as much as you like between rolls. Hover an option to see the cards it uses. The run card above says whether you can pay the tribute now; anything you build comes out of the rest.</p><p><b>Trade</b> gives you one card of any type for ${Math.min(...RES.map(rate))} of another (less with ports). <b>Ship</b> sends cards to the Storehouse from a port; they count toward the tribute with a bonus.</p>`)}

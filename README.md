@@ -60,6 +60,10 @@ Open the game with `?dev` in the address (e.g. `index.html?dev`) and the menu ga
 
 The `.nojekyll` file stops GitHub from running Jekyll over the files. All paths are relative, so the game also works from a sub-path or a custom domain.
 
+### Pay now on the tribute counter (v46)
+
+Ending a round early moved from the action card to the run card: when the tribute is payable during the Roll or Build & trade step, the "Ready to pay" badge becomes a **Pay now · +N VP** button (N = unused rolls). "Skip all rolls" and "End round now" are gone from the action card. While the tribute is not payable there is no early end; once the rolls are used up the main button still leads to the tribute.
+
 ### Step line and tips button (v44)
 
 The Roll / Build & trade / Tribute line uses the same markers as the Small / Big / Boss track above it: caps, a dot per step (filled when done, ringed when current) and hairline joins. The **?** tips button is smaller (22 px) with a grey outline; until it has been opened once only the question mark is orange.

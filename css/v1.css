@@ -512,3 +512,15 @@ input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); ou
 .tip-btn:hover, .tip-btn.on { border-color: var(--ink); color: var(--ink); background: none; }
 /* Resource art keeps the proportions of the full card (its sprite cell), centred in the thumbnail */
 .got-row .rcard.sm .art, .gain .rcard.sm .art { left: 6%; right: 6%; top: 50%; height: auto; aspect-ratio: 689 / 605; translate: 0 -50%; }
+
+/* Pay now: on the tribute counter, where "ready" is shown */
+.trib-head { cursor: default; }
+.trib-head .eyebrow { cursor: help; }
+.pay-now { display: inline-flex; align-items: center; gap: 8px; height: 28px; padding: 0 12px; border-radius: 999px; border: 1px solid rgba(156, 199, 138, .55); background: rgba(156, 199, 138, .14); color: var(--good); font: 600 12px/1 var(--sans); white-space: nowrap; }
+.pay-now small { font: 600 11px/1 var(--mono); color: var(--good); opacity: .75; }
+.pay-now:hover:not(:disabled) { background: var(--good); border-color: var(--good); color: #0c0d0f; }
+.pay-now:hover:not(:disabled) small { color: #0c0d0f; }
+.pay-now:disabled { opacity: .5; }
+.rcol .tribute .trib-head { min-height: 28px; }
+.trib-head .eyebrow { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.trib-head > :last-child { flex: none; }
