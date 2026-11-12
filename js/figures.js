@@ -140,7 +140,7 @@ function build(id) {
       o = o || {};
       const h = Math.round(w * 1.32);
       // the art sheet's cells are 6:5, so the art box keeps that shape (it used to be stretched tall)
-      return { style: abs(x, y, w, h, 'box-sizing:border-box;border-radius:6px;background:' + (o.ghost ? 'rgba(236,235,230,0.06)' : '#1a1b1f') + ';border:' + (o.ghost ? '2px dashed rgba(236,235,230,0.4)' : '1.5px solid ' + (o.edge || '#5a5c63')) + ';box-shadow:' + (o.ghost ? 'none' : '0 1px 0 #8c8168,0 6px 8px rgba(0,0,0,0.5)') + ';transform:rotate(' + (rot || 0) + 'deg);z-index:' + (z || 6)), txt: '', kids: o.ghost ? [] : [{ style: abs(w * 0.08, h * 0.5 - w * 0.37, w * 0.84, w * 0.7, artBg(art)), txt: '', kids: [] }] };
+      return { style: abs(x, y, w, h, 'box-sizing:border-box;border-radius:6px;background:' + (o.ghost ? 'rgba(236,235,230,0.06)' : '#1a1b1f') + ';border:' + (o.ghost ? '2px dashed rgba(236,235,230,0.4)' : '1.5px solid ' + (o.edge || '#5a5c63')) + ';box-shadow:' + (o.ghost ? 'none' : '0 1px 0 #8c8168,0 6px 8px rgba(0,0,0,0.5)') + ';transform:rotate(' + (rot || 0) + 'deg);z-index:' + (z || 6)), txt: '', kids: o.ghost ? [] : (o.q ? [txt(0, h * 0.5 - w * 0.5, w, w, '?', Math.round(w * 0.78), '#ff4a1c', 'z-index:1')] : [{ style: abs(w * 0.08, h * 0.5 - w * 0.37, w * 0.84, w * 0.7, artBg(art)), txt: '', kids: [] }]) };
     };
 
     // ---------- shine by rarity ----------
@@ -368,7 +368,7 @@ function build(id) {
       const sea = SEA[t];
       R({ style: abs(0, 0, 140, 92, 'border-radius:12px;background:' + BONE + ';box-shadow:0 2px 0 #8c8168,0 12px 10px rgba(0,0,0,0.6);z-index:2'), txt: '', kids: [{ style: abs(8, 8, 124, 76, 'border-radius:7px;background-color:' + sea + ';background-image:' + dotsBg('rgba(0,0,0,0.22)', 1.25, 5)), txt: '', kids: [] }] });
       const rot = n === 3 ? [-9, -1, 8] : [-6, 6], step = n === 3 ? 17 : 31, cw = n === 3 ? 60 : 66;
-      for (let k = 0; k < n; k++) R(resCard(arts[k], (n === 3 ? -14 : -10) + k * step, -9 + (k === 1 && n === 3 ? 2 : 0), cw, rot[k], 3 + k));
+      for (let k = 0; k < n; k++) R(resCard(arts[k], (n === 3 ? -14 : -10) + k * step, -9 + (k === 1 && n === 3 ? 2 : 0), cw, rot[k], 3 + k, generic ? { q: true, edge: k === n - 1 ? '#ff4a1c' : undefined } : undefined)); // 3:1 ports show "?" cards, like the packs in the shop
       R(txt(78, 18, 62, 56, generic ? '3:1' : '2:1', 44, CREAM, 'text-shadow:0 2px 0 rgba(0,0,0,0.55),0 0 8px rgba(0,0,0,0.35);z-index:9'));
     };
     for (const t of ['generic', 'brick', 'lumber', 'wool', 'grain', 'ore']) E['port:' + t] = () => boardPort(t);
