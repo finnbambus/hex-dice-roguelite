@@ -418,3 +418,5 @@ input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); ou
 .lvl { display: inline-flex; align-items: center; gap: 3px; margin-left: 6px; }
 .lvl i { width: 5px; height: 5px; border-radius: 50%; background: rgba(230, 207, 140, .22); transform: none; }
 .lvl i.on { background: #e6cf8c; }
+.loaded-tag { display: inline-flex; align-items: center; line-height: 12px; padding: 5px 10px; }
+.loaded-tag .lvl { vertical-align: 0; position: relative; top: -.5px; }
