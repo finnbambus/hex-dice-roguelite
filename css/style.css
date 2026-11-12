@@ -260,11 +260,7 @@ select, input { font: inherit; color: var(--ink); background: var(--inset); bord
 .phit polygon { fill: transparent; stroke: none; }
 .phit.target { pointer-events: auto; cursor: pointer; }
 .phit.target polygon { fill: rgba(255, 74, 28, .22); stroke: var(--accent); stroke-width: 3; stroke-linejoin: round; pointer-events: all; }
-.tok.ptok { width: 48px; }
-.ptok .in { width: 48px; }
-.ptok small { position: absolute; left: 0; right: 0; top: 27px; text-align: center; font: 700 7.5px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: #3b3a36; }
-.ptok .n { font-size: 21px; line-height: 40px; transform: translateY(-6px); }
-.pup { position: absolute; transform: translateX(-50%); display: flex; gap: 3px; align-items: center; font: 600 8px/1 var(--mono); font-style: normal; letter-spacing: .08em; text-transform: uppercase; color: var(--bone); pointer-events: none; }
+.pup { position: absolute; transform: translateX(-50%); display: flex; gap: 3px; align-items: center; font: 600 8px/1 var(--mono); font-style: normal; letter-spacing: .08em; text-transform: uppercase; color: var(--bone); text-shadow: 0 1px 2px #000, 0 0 4px #000; pointer-events: none; }
 .pup u { text-decoration: none; box-sizing: border-box; width: 20px; height: 20px; border-radius: 50%; background: #a3271a; border: 2px solid var(--bone); color: #fff; font: 800 10px/1 var(--sans); display: flex; align-items: center; justify-content: center; box-shadow: 0 3px 6px rgba(0, 0, 0, .5); }
 .pup u.l3 { font-size: 8px; }
 
@@ -911,12 +907,10 @@ select, input { font: inherit; color: var(--ink); background: var(--inset); bord
 @keyframes tutPulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(255, 74, 28, 0); } 50% { box-shadow: 0 0 0 3px rgba(255, 74, 28, .35); } }
 .dice-stage.choosing .die-slot .die3d { margin: 14px 16px 18px; }
 
-/* ---- ports: the shore edge between the two intersections that use the port ---- */
-.portedge { position: absolute; height: 6px; border-radius: 3px; background: var(--pc, #e3dcc8); box-shadow: 0 0 0 1.5px rgba(12, 13, 15, .7); pointer-events: none; transform-origin: 50% 50%; opacity: .95; }
-.portdot { position: absolute; width: 12px; height: 12px; border-radius: 50%; background: var(--pc, #e3dcc8); border: 2px solid rgba(12, 13, 15, .85); box-sizing: border-box; pointer-events: none; }
-.portedge.brick, .portdot.brick { --pc: var(--brick); }
-.portedge.lumber, .portdot.lumber { --pc: #6fa868; }
-.portedge.wool, .portdot.wool { --pc: #b6d98a; }
-.portedge.grain, .portdot.grain { --pc: #e8c547; }
-.portedge.ore, .portdot.ore { --pc: #aab0ba; }
-.portedge.any, .portdot.any { --pc: #e3dcc8; }
+/* port cards and piers on the board */
+.pcard { position: absolute; pointer-events: none; transition: filter .2s; filter: brightness(1.45) saturate(1.1) drop-shadow(0 3px 3px rgba(0,0,0,.45)); }
+.pcard .portplate { position: relative; }
+.pcard.target { pointer-events: auto; cursor: pointer; filter: drop-shadow(0 0 2px var(--accent)) drop-shadow(0 0 7px rgba(255, 74, 28, .85)); }
+.pierend { position: absolute; border-radius: 50%; box-sizing: border-box; border: 3px solid var(--pc, #e3dcc8); background: rgba(12, 13, 15, .75); pointer-events: none; }
+.dock { position: absolute; height: 7px; transform-origin: 50% 50%; pointer-events: none; border-radius: 2px; background: repeating-linear-gradient(90deg, #b99a64 0 6px, #8a6d3f 6px 8px); box-shadow: 0 0 0 2px var(--pc, #e3dcc8), 0 0 0 3.5px rgba(12,13,15,.8), 0 2px 4px rgba(0,0,0,.5); }
+.dock.brick, .pierend.brick { --pc: var(--brick); } .dock.lumber, .pierend.lumber { --pc: #6fa868; } .dock.wool, .pierend.wool { --pc: #b6d98a; } .dock.grain, .pierend.grain { --pc: #e8c547; } .dock.ore, .pierend.ore { --pc: #aab0ba; } .dock.any, .pierend.any { --pc: #e3dcc8; }

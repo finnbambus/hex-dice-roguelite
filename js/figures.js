@@ -358,6 +358,19 @@ function build(id) {
       R(resCard(RES.lumber, 176, 96, 40, 10, 8), resCard(RES.grain, 192, 82, 40, -8, 9));
     };
 
+    // the port plate as it is drawn on the board: same harbour card as in the shop, sized 180 × 112 from (0, 0)
+    // board version: the sea panel takes the resource colour, and the cards are bigger and break out of the frame
+    const SEA = { generic: '#7b7a70', brick: '#a8503a', lumber: '#4f7b49', wool: '#8f9f5e', grain: '#c39a38', ore: '#6f7f9a' };
+    const boardPort = (t) => {
+      const generic = t === 'generic', n = generic ? 3 : 2;
+      const arts = generic ? [RES.brick, RES.wool, RES.ore] : [RES[t], RES[t]];
+      const sea = SEA[t];
+      R({ style: abs(0, 0, 180, 112, 'border-radius:12px;background:' + BONE + ';box-shadow:0 2px 0 #8c8168,0 12px 10px rgba(0,0,0,0.6);z-index:2'), txt: '', kids: [{ style: abs(8, 8, 164, 96, 'border-radius:7px;background-color:' + sea + ';background-image:' + dotsBg('rgba(0,0,0,0.22)', 1.25, 5)), txt: '', kids: [] }] });
+      const rot = n === 3 ? [-9, -1, 8] : [-6, 6], step = n === 3 ? 25 : 31;
+      for (let k = 0; k < n; k++) R(resCard(arts[k], -10 + k * step, -9 + (k === 1 && n === 3 ? 2 : 0), 66, rot[k], 3 + k));
+      R(txt(88, 26, 88, 60, generic ? '3:1' : '2:1', 50, CREAM, 'text-shadow:0 2px 0 rgba(0,0,0,0.55),0 0 8px rgba(0,0,0,0.35);z-index:9'));
+    };
+    for (const t of ['generic', 'brick', 'lumber', 'wool', 'grain', 'ore']) E['port:' + t] = () => boardPort(t);
     (E[id] || E.fertile)();
     if (rarity !== 'common') layers.unshift(halo(rarity));
     layers.forEach((l, i) => { if (l.style.indexOf('z-index') < 0) l.style += ';z-index:2'; });
@@ -405,4 +418,12 @@ export function figure(id, scale = 1) {
   const html = `<div class="figure" style="width:${240 * scale}px;height:${210 * scale}px"><div style="width:240px;height:210px;position:relative;overflow:visible;transform:scale(${scale});transform-origin:0 0">${inner}</div></div>`;
   cache.set(key, html);
   return html;
+}
+
+// A port plate for the board (the harbour card from the shop), `w` px wide. type: a resource or 'generic'.
+export function portPlate(type, w = 90) {
+  const k = w / 180;
+  const out = build('port:' + type);
+  const inner = out.layers.map(layerHtml).join('');
+  return `<div class="portplate" style="width:${w}px;height:${112 * k}px"><div style="width:180px;height:112px;position:relative;transform:scale(${k});transform-origin:0 0">${inner}</div></div>`;
 }
