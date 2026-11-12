@@ -510,3 +510,5 @@ input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); ou
 .tip-btn, .tip-btn.new { width: 22px; height: 22px; min-width: 0; padding: 0; border-radius: 50%; border: 1px solid var(--line2); background: none; color: var(--muted); font: 600 11px/1 var(--sans); box-shadow: none; animation: none; }
 .tip-btn.new { color: var(--accent); }
 .tip-btn:hover, .tip-btn.on { border-color: var(--ink); color: var(--ink); background: none; }
+/* Resource art keeps the proportions of the full card (its sprite cell), centred in the thumbnail */
+.got-row .rcard.sm .art, .gain .rcard.sm .art { left: 6%; right: 6%; top: 50%; height: auto; aspect-ratio: 689 / 605; translate: 0 -50%; }
