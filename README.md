@@ -60,6 +60,10 @@ Open the game with `?dev` in the address (e.g. `index.html?dev`) and the menu ga
 
 The `.nojekyll` file stops GitHub from running Jekyll over the files. All paths are relative, so the game also works from a sub-path or a custom domain.
 
+### Result step reworked (v43)
+
+The roll reads as one line at the top of the action card, in the adjust and Result steps: die + die = total (a 7 is red). Below it the Result step is one ledger: a row per resource with its art, where it came from (e.g. "Forest 5 ×2") and the amount; losses to the robber and Storehouse changes use the same rows. An empty roll shows why, with the dry-roll track. Everything else that fired is listed under **Also this roll**.
+
 ### Counted face on top (v41)
 
 Dice are seen from above. The face that counts lies on top and is the lightest; the side faces are shaded darker. While choosing a face for an upgrade the dice keep the earlier front view with even shading.

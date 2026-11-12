@@ -453,3 +453,46 @@ input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); ou
 .dice-area .die-val { margin: 0; line-height: 1; }
 .die-fx { margin: 0; padding: 3px 0; }
 .dice-area .faces-hint { display: none; }
+
+/* Roll read-out on top of the card: die + die = total, in the adjust and Result steps */
+.rcol .dice-area { border-top: 0; border-bottom: 1px solid var(--line); background: none; padding: 12px 16px; }
+.dice-area .dice2.sum { display: flex; align-items: center; justify-content: space-between; gap: 4px; }
+.dice-area .dice2.sum .die-box { flex: none; }
+.dice-area .dice2.sum .die-top { gap: 8px; }
+.dice-area .dice2.sum .op { font: 600 18px/1 var(--display); font-style: normal; color: var(--dim); }
+.die-total { display: flex; flex-direction: column; gap: 6px; align-items: flex-end; min-width: 44px; }
+.dice-area .die-total .die-val { font-size: 36px; line-height: .8; }
+.die-total.seven .die-val { color: var(--bad); }
+.dice-area .die-sheet { bottom: auto; top: calc(100% - 6px); }
+/* Result: one ledger */
+.res-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.blk.got h3 { display: flex; justify-content: space-between; align-items: baseline; }
+.got-sum { color: var(--good); }
+.got-list, .also { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.got-list { gap: 8px; }
+.got-row { display: flex; align-items: center; gap: 12px; padding: 8px 16px 8px 8px; border-radius: var(--r-md); background: var(--card); border: 1px solid var(--line); }
+.got-row .rcard.sm { flex: none; width: 40px; height: 54px; border-radius: 5px; box-shadow: none; }
+.got-row .rcard.sm .nm, .got-row .rcard.sm .dot { display: none; }
+.got-row .rcard.sm .art { top: 14%; height: 72%; }
+.gr-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.gr-main b { font: 600 14px/1.1 var(--sans); }
+.gr-main small { font-size: 12px; line-height: 1.3; color: var(--muted); }
+.gr-n { font: 800 28px/1 var(--display); font-variant-numeric: tabular-nums; }
+.got-row.good .gr-n { color: var(--good); }
+.got-row.bad .gr-n { color: var(--bad); }
+.got-row.bad .rcard { opacity: .6; }
+.got-none { display: flex; flex-direction: column; gap: 6px; padding: 16px; border-radius: var(--r-md); border: 1px dashed var(--line2); }
+.got-none b { font: 600 20px/1.1 var(--display); }
+.got-none > span { font-size: 13px; line-height: 1.4; color: var(--muted); }
+.got-none .dry { display: flex; align-items: center; gap: 8px; margin-top: 6px; font-size: 12px; color: var(--dim); }
+.dry-dots { display: inline-flex; gap: 4px; flex: none; }
+.dry-dots i { width: 7px; height: 7px; border-radius: 50%; border: 1px solid var(--dim); box-sizing: border-box; }
+.dry-dots i.on { background: var(--muted); border-color: var(--muted); }
+.also { gap: 6px; }
+.also li { position: relative; padding-left: 14px; font-size: 13px; line-height: 1.4; color: var(--muted); }
+.also li::before { content: ""; position: absolute; left: 0; top: .5em; width: 6px; height: 6px; border-radius: 50%; background: var(--dim); }
+.also li.good::before { background: var(--good); }
+.also li.bad::before { background: var(--bad); }
+.also li.bad { color: var(--bad); }
+.gr-main b { color: var(--ink); }
+@media (max-height: 800px) { .dice-area .die-sheet > p.small { display: none; } }

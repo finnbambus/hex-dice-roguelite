@@ -6,9 +6,9 @@
 import { Game, COSTS, BLINDS } from './game.js';
 import { RES, TERRAIN_RES, pips } from './board.js';
 import { ITEMS, ITEM_LIST, BOSS_BY_ID, ROLLS_PER_ROUND, LOADING, START_SETTLEMENTS, ECHO_BREAK } from './content.js';
-import { BoardView } from './board-view.js?v=42';
-import { figure, faceBody, primaryTrigger } from './figures.js?v=42';
-import { Feel } from './feel.js?v=42';
+import { BoardView } from './board-view.js?v=43';
+import { figure, faceBody, primaryTrigger } from './figures.js?v=43';
+import { Feel } from './feel.js?v=43';
 
 const TERRAIN_COLOR = { hills: '#c8734a', forest: '#3f7d4a', pasture: '#9ccf6a', fields: '#e8c547', mountains: '#8e939c', desert: '#e3d3a4' };
 const RES_ICON = { brick: 'B', lumber: 'L', wool: 'W', grain: 'G', ore: 'O' };
@@ -722,7 +722,7 @@ export class UI {
     if (g.bumper) fx.push(['Bumper ×2', 'good', 'Your next roll produces double.']);
     if (g.omen != null) fx.push([`Omen ${g.omen}`, 'good', 'If the next roll hits this number, production is tripled.']);
     if (g.fireSale) fx.push(['Fire Sale 2:1', 'good', 'Bank trades are 2:1 for the rest of the round.']);
-    if (g.phase === 'turn' && g.rollsUsed > 0 && g.roundProduced === 0 && !g.streakGiven) fx.push([`Dry ${g.rollsUsed}/${ROLLS_PER_ROUND}`, '', `Losing streak: no resources from ${g.rollsUsed} roll(s) so far. If all ${ROLLS_PER_ROUND} rolls come up empty, you get a free development card.`]);
+    if (g.phase === 'turn' && g.rollsUsed > 0 && g.roundProduced === 0 && !g.streakGiven && this.step() !== 'result') fx.push([`Dry ${g.rollsUsed}/${ROLLS_PER_ROUND}`, '', `Losing streak: no resources from ${g.rollsUsed} roll(s) so far. If all ${ROLLS_PER_ROUND} rolls come up empty, you get a free development card.`]);
     if (g.brokeGame) fx.push(['Game broken!', 'good', 'Echo chain of 10: this round\'s tribute counts as paid.']);
     return fx;
   }
@@ -854,7 +854,7 @@ export class UI {
     const footHtml = `${sec ? `<div class="foot-row">${sec}</div>` : ''}${view.foot || ''}`;
     this.$panel.hidden = step === 'gameover'; // the end of a run is shown as a summary over the board
     this.$panel.dataset.step = pickingFace ? 'pick' : step;
-    this.$panel.innerHTML = `${this.actHead(pickingFace ? 'pick' : step)}<div class="panel-body">${view.body}</div>${pickingFace ? '' : this.diceArea(step)}${footHtml ? `<div class="panel-foot">${footHtml}</div>` : ''}${tips}`;
+    this.$panel.innerHTML = `${this.actHead(pickingFace ? 'pick' : step)}${pickingFace ? '' : this.diceArea(step)}<div class="panel-body">${view.body}</div>${footHtml ? `<div class="panel-foot">${footHtml}</div>` : ''}${tips}`;
     if (this.lastStep === step) this.$panel.querySelector('.panel-body').scrollTop = scroll;
     for (const b of this.$panel.querySelectorAll('.panel-foot button.primary[data-primary]')) b.insertAdjacentHTML('beforeend', '<kbd>Space</kbd>');
     this.lastStep = step;
@@ -887,10 +887,14 @@ export class UI {
       const diff = values && values[i] !== shownNum;
       return `<div class="die-box ${this.dieSheet === i ? 'open' : ''}" role="button" tabindex="0" data-a="die-sheet" data-die="${i}" title="Click to see this die's six faces">
         <div class="die-top">${this.cube(i, fi, held, live)}
-          <div class="die-meta"><div class="die-lbl"><span>Die ${i + 1}${held ? ' · held' : ''}</span>${notes && notes.length ? `<span class="die-fx" ${this.tipAttr(`dfx:${i}`, { kind: `Die ${i + 1} · this roll`, title: notes.length === 1 ? '1 effect' : `${notes.length} effects`, lines: notes })} aria-label="${notes.length} effect${notes.length === 1 ? '' : 's'} on this die">${notes.slice(0, 5).map(() => '<i></i>').join('')}</span>` : ''}</div>${values ? `<div class="die-val ${diff ? 'changed' : ''}" title="${diff ? 'The face was changed by an upgrade' : ''}">${diff ? '= ' : ''}${values[i] || 0}</div>` : ''}<span class="faces-hint">faces ▴</span></div></div>
+          <div class="die-meta"><div class="die-lbl"><span>Die ${i + 1}${held ? ' · held' : ''}</span>${notes && notes.length ? `<span class="die-fx" ${this.tipAttr(`dfx:${i}`, { kind: `Die ${i + 1} · this roll`, title: notes.length === 1 ? '1 effect' : `${notes.length} effects`, lines: notes })} aria-label="${notes.length} effect${notes.length === 1 ? '' : 's'} on this die">${notes.slice(0, 5).map(() => '<i></i>').join('')}</span>` : ''}</div>${values ? `<div class="die-val ${diff ? 'changed' : ''}" title="${diff ? 'The face was changed by an upgrade' : ''}">${values[i] || 0}</div>` : ''}<span class="faces-hint">faces ▴</span></div></div>
       </div>`;
-    }).join('');
-    return `<div class="dice-area">${fxHtml}<div class="dice2">${dice}</div>${this.dieSheet != null ? this.faceSheet(this.dieSheet) : ''}</div>`;
+    }).join('<!--die-->');
+    const fin = step === 'result' ? g.report.final : null;
+    const total = fin ? (fin.zero ? 0 : fin.sum) : values ? (values[0] || 0) + (values[1] || 0) : null;
+    const boxes = dice.split('<!--die-->');
+    const sumHtml = total == null ? '' : `<i class="op">=</i><div class="die-total ${fin && fin.seven ? 'seven' : ''}"><div class="die-lbl"><span>Total</span></div><div class="die-val">${total}</div></div>`;
+    return `<div class="dice-area">${fxHtml}<div class="dice2 sum">${boxes[0]}<i class="op">+</i>${boxes[1]}${sumHtml}</div>${this.dieSheet != null ? this.faceSheet(this.dieSheet) : ''}</div>`;
   }
 
   // Running round effects as chips.
@@ -1275,7 +1279,7 @@ export class UI {
     const { v } = g.valuesOf(pr);
     const mods = g.modifiersAvailable();
     return {
-      body: `<h2>You rolled ${v[0] || '?'} + ${v[1] || '?'}</h2>
+      body: `<h2>Change the roll?</h2>
         <p class="lead">${mods.length ? 'Your dice upgrades can change this roll before it pays out.' : 'Nothing left to change. Use this roll when you are ready.'}</p>
         ${mods.length ? this.blk('Change the roll · optional', `<div class="tiles one">${mods.map((m) => `<button class="tile-btn ok" data-a="mod" data-die="${m.die}" data-id="${m.id}" ${this.busy ? 'disabled' : ''}><span class="t-name">${MOD_INFO[m.id][0]}<small>Die ${m.die + 1}</small></span><span class="t-desc">${MOD_INFO[m.id][1]}</span></button>`).join('')}</div>`) : ''}`,
       foot: `<button class="primary big" data-a="resolve" data-primary ${this.busy ? 'disabled' : ''}>Use this roll (${v[0] + v[1] || '?'})</button>`,
@@ -1297,27 +1301,38 @@ export class UI {
       return { cls: 'good', text: `Die ${f.die + 1} triggered: ${names.join(', ')}` };
     }).filter((c) => !c.text.endsWith(': '));
     const changes = [...fired, ...(rep.changes || []).filter((c) => c.delta !== 0 && !/^(hand|store):/.test(c.key))];
-    const head = f.zero ? 'Mirror vs Mirror: 0' : f.robberFace ? "Robber's Face: counts as 7" : `${f.values[0]} + ${f.values[1]} = ${f.sum}`;
     const tags = [];
+    if (f.zero) tags.push('<span class="pill bad">Mirror vs Mirror · counts as 0</span>');
+    if (f.robberFace) tags.push('<span class="pill bad">Robber\'s Face · counts as 7</span>');
+    else if (f.seven) tags.push('<span class="pill bad">7 · the robber strikes</span>');
     if (f.isDouble) tags.push('<span class="pill">Double</span>');
-    if (f.seven) tags.push('<span class="pill bad">7 · robber</span>');
     if (rep.echo) tags.push('<span class="pill">Echo roll</span>');
-    const nothingWhy = !f.seven && !f.zero
-      ? `No hex with a ${f.sum} touches your buildings${g.board.hexes.some((h) => h.token === f.sum && h.id === g.robber) ? ', or the robber blocks it' : ''}.`
-      : '';
-    const gain = (r, n, cls, note = '') => `<div class="gain ${cls}">${rcard(r, 'sm', '')}<span><b>${n > 0 ? '+' : '−'}${Math.abs(n)}</b>${cap(r)}${note}</span></div>`;
-    const gainCards = [
-      ...gains.map((r) => gain(r, rep.gains[r], 'good')),
-      ...losses.map((r) => gain(r, rep.gains[r], 'bad')),
-      ...store.map((r) => gain(r, rep.storeGains[r], rep.storeGains[r] > 0 ? 'good' : 'bad', ' <small>stored</small>')),
+    // Production lines say where each resource came from ("forest (5) → +2 lumber"); fold them into the rows.
+    const src = {}, other = [];
+    for (const l of lines) {
+      const m = /^(.+?) \((\d+|—)\) → \+(\d+) (\w+)(.*)$/.exec(l.msg);
+      if (m && RES.includes(m[4])) (src[m[4]] ||= []).push(`${cap(m[1])} ${m[2]}${m[5].includes('sister') ? ' (sister)' : ''}${Number(m[3]) > 1 ? ` ×${m[3]}` : ''}`);
+      else other.push(l);
+    }
+    const row = (r, n, cls, from) => `<li class="got-row ${cls}">${rcard(r, 'sm', '')}<span class="gr-main"><b>${cap(r)}</b><small>${esc(from)}</small></span><span class="gr-n">${n > 0 ? '+' : '−'}${Math.abs(n)}</span></li>`;
+    const rows = [
+      ...gains.map((r) => row(r, rep.gains[r], 'good', (src[r] || []).join(' · ') || 'To your hand')),
+      ...losses.map((r) => row(r, rep.gains[r], 'bad', f.seven ? 'Lost to the robber' : 'Left your hand')),
+      ...store.map((r) => row(r, rep.storeGains[r], rep.storeGains[r] > 0 ? 'good' : 'bad', 'Storehouse')),
     ].join('');
+    const net = gains.reduce((a, r) => a + rep.gains[r], 0);
+    const nothingWhy = f.zero ? 'Two Mirror faces met, so the roll counts as 0.'
+      : f.seven ? 'A 7 pays nothing.'
+        : `No hex with a ${f.sum} touches your buildings${g.board.hexes.some((h) => h.token === f.sum && h.id === g.robber) ? ', or the robber blocks it' : ''}.`;
+    const dry = g.roundProduced === 0 && !g.streakGiven;
+    const empty = `<div class="got-none"><b>Nothing this time</b><span>${nothingWhy}</span>${dry ? `<span class="dry"><span class="dry-dots">${Array.from({ length: ROLLS_PER_ROUND }, (_, k) => `<i class="${k < g.rollsUsed ? 'on' : ''}"></i>`).join('')}</span>${g.rollsUsed} of ${ROLLS_PER_ROUND} dry rolls · all ${ROLLS_PER_ROUND} dry gives a free development card</span>` : ''}</div>`;
+    const also = [...changes.map((c) => `<li class="${c.cls}">${esc(c.text)}</li>`), ...other.map((l) => `<li class="${l.cls}">${esc(cap(l.msg))}</li>`)].join('');
     const echoNext = g.echoQueue.length > 0;
     return {
-      body: `<div class="sum-line" ${this.revealStyle()}>${head} ${tags.join(' ')}</div>
+      body: `${tags.length ? `<div class="res-tags" ${this.revealStyle()}>${tags.join('')}</div>` : ''}
         <div class="blks" ${this.revealStyle(120)}>
-        ${changes.length ? this.blk('Changed by this roll', `<div class="changes">${changes.map((c) => `<span class="chg ${c.cls}">${esc(c.text)}</span>`).join('')}</div>`) : ''}
-        ${this.blk('You got', gainCards ? `<div class="gains">${gainCards}</div>` : `<p class="muted">Nothing this time. ${nothingWhy}</p>`)}
-        ${lines.length ? this.blk('What happened', `<ul class="events">${lines.map((l) => `<li class="${l.cls}">${esc(cap(l.msg))}</li>`).join('')}</ul>`) : ''}
+        <section class="blk got"><h3><span>${!gains.length && losses.length ? 'You lost' : 'You got'}</span>${net > 0 ? `<span class="got-sum">${net} card${net === 1 ? '' : 's'}</span>` : ''}</h3>${rows ? `<ul class="got-list">${rows}</ul>` : empty}</section>
+        ${also ? `<section class="blk"><h3>Also this roll</h3><ul class="also">${also}</ul></section>` : ''}
         </div>`,
       foot: `<button class="primary big" data-a="seen" data-primary>${echoNext ? 'Continue · free Echo roll waiting' : 'Continue to build & trade'}</button>`,
     };
