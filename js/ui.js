@@ -6,9 +6,9 @@
 import { Game, COSTS, BLINDS } from './game.js';
 import { RES, TERRAIN_RES, pips } from './board.js';
 import { ITEMS, ITEM_LIST, BOSS_BY_ID, ROLLS_PER_ROUND, LOADING, START_SETTLEMENTS, ECHO_BREAK } from './content.js';
-import { BoardView } from './board-view.js?v=38';
-import { figure, faceBody, primaryTrigger } from './figures.js?v=38';
-import { Feel } from './feel.js?v=38';
+import { BoardView } from './board-view.js?v=39';
+import { figure, faceBody, primaryTrigger } from './figures.js?v=39';
+import { Feel } from './feel.js?v=39';
 
 const TERRAIN_COLOR = { hills: '#c8734a', forest: '#3f7d4a', pasture: '#9ccf6a', fields: '#e8c547', mountains: '#8e939c', desert: '#e3d3a4' };
 const RES_ICON = { brick: 'B', lumber: 'L', wool: 'W', grain: 'G', ore: 'O' };
@@ -931,6 +931,7 @@ export class UI {
     const TONE = { front: '#e4dfd0', right: '#d6d0c0', top: '#efeadc', bottom: '#bdb7a7', left: '#d6d0c0', back: '#e4dfd0' };
     const PP = { 1: [[50, 50]], 2: [[28, 28], [72, 72]], 3: [[28, 28], [50, 50], [72, 72]], 4: [[28, 28], [72, 28], [28, 72], [72, 72]], 5: [[28, 28], [72, 28], [50, 50], [28, 72], [72, 72]], 6: [[28, 26], [72, 26], [28, 50], [72, 50], [28, 74], [72, 74]] };
     const u = (k) => `calc(var(--s, 56px) * ${k})`; // sizes scale with the cube
+    const DARK = '#24262b'; // dark faces stay a shade above the panel so the die keeps its outline
     const pipBg = (v, ink) => PP[v].map((q) => `radial-gradient(circle at ${q[0]}% ${q[1]}%, ${ink} 0 ${u(0.09)}, transparent ${u(0.105)})`).join(', ');
     const sides = d.faces.map((f, k) => {
       const loaded = d.loaded && d.loaded.face === k;
@@ -938,9 +939,9 @@ export class UI {
       let bg = `${pipBg(f.value, '#17181b')}, ${tone}`;
       let inner = '';
       if (f.triggers.length && !f.setter) bg = `${svgUrl(faceBody(f.value, f.triggers))} center/100% 100% no-repeat, ${tone}`;
-      if (f.setter === 'mirror') bg = `radial-gradient(circle at 50% 50%, #17181b 0 ${u(0.16)}, ${tone} ${u(0.18)} ${u(0.27)}, #17181b ${u(0.29)})`;
-      else if (f.setter === 'robber') { bg = '#17181b'; inner = '<span class="lbl lt">R</span>'; }
-      else if (f.setter === 'blank') { bg = '#17181b'; inner = '<span class="lbl lt">?</span>'; }
+      if (f.setter === 'mirror') bg = `radial-gradient(circle at 50% 50%, ${DARK} 0 ${u(0.16)}, ${tone} ${u(0.18)} ${u(0.27)}, ${DARK} ${u(0.29)})`;
+      else if (f.setter === 'robber') { bg = DARK; inner = '<span class="lbl lt">R</span>'; }
+      else if (f.setter === 'blank') { bg = DARK; inner = '<span class="lbl lt">?</span>'; }
       const faceTip = f.triggers.map((t) => ITEMS[t].name).join(', ') || (f.setter ? ITEMS[SETTER_ITEM[f.setter]].name : `Shows ${f.value}`);
       return `<div class="side ${SIDE[k]}" style="background:${bg}" ${pick ? `data-a="pick-face" data-die="${i}" data-face="${k}" title="Die ${i + 1}, face ${k + 1}: ${esc(faceTip)}"` : ''}>${inner}${f.triggers.length && extraTrg(f) ? `<span class="trg">${extraTrg(f)}</span>` : ''}</div>`;
     }).join('');
@@ -1001,7 +1002,7 @@ export class UI {
     const ups = g.dieUps(i);
     const lv = d.loaded ? d.loaded.level : 0;
     const meter = Array.from({ length: 10 }, (_, k) => `<i class="${k < lv ? 'on' : ''}"></i>`).join('');
-    const loaded = d.loaded ? `<span class="tag loaded-tag" ${this.tipAttr(`load:${i}`, this.loadedInfo(i))} data-hl="loaded:${i}">Loaded L${lv}<span class="lvl">${meter}</span></span>` : '';
+    const loaded = d.loaded ? `<span class="tag loaded-tag" ${this.tipAttr(`load:${i}`, this.loadedInfo(i))} data-hl="loaded:${i}">Loaded Lvl. ${lv}<span class="lvl">${meter}</span></span>` : '';
     const upTags = ups.map((u) => `<span class="tag" ${this.tipAttr(`up:${i}:${u}`, this.upgradeInfo(i, u))}>${ITEMS[u].name}${d.used[u] ? ' (used)' : ''}${!d.upgrades.includes(u) ? ' (copied)' : ''}</span>`).join('');
     return `<div class="tags">${loaded}${upTags}</div>`;
   }

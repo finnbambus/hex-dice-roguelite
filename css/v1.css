@@ -420,3 +420,9 @@ input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); ou
 .lvl i.on { background: #e6cf8c; }
 .loaded-tag { display: inline-flex; align-items: center; line-height: 12px; padding: 5px 10px; }
 .loaded-tag .lvl { vertical-align: 0; position: relative; top: -.5px; }
+
+/* Dice as solid objects: opaque edges that overlap at the seams, so no background shows between faces */
+.loaded-tag { padding: 5px 12px; }
+.side { border: 1px solid #6f6c63; box-shadow: 0 0 0 .5px #6f6c63; -webkit-backface-visibility: hidden; }
+.cube { backface-visibility: visible; }
+.die3d { perspective: calc(var(--s) * 9); }
