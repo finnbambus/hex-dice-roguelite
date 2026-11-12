@@ -360,14 +360,14 @@ function build(id) {
     };
 
     // the port plate as it is drawn on the board: same harbour card as in the shop, sized 180 × 112 from (0, 0)
-    // board version: no plate, just the stack of resource cards (3:1 ports show "?" cards, like the packs in the shop) with the rate centred above it
+    // board version: no plate, just the stack of resource cards (3:1 ports show "?" cards, like the packs in the shop) with the rate centred on a layer above it
     const boardPort = (t) => {
       const generic = t === 'generic', n = generic ? 3 : 2;
       const arts = generic ? [RES.brick, RES.wool, RES.ore] : [RES[t], RES[t]];
       const cw = 64, step = generic ? 24 : 30, rot = n === 3 ? [-8, -1, 7] : [-6, 6];
       const x0 = (140 - (cw + (n - 1) * step)) / 2;
-      R(txt(0, 0, 140, 40, generic ? '3:1' : '2:1', 38, CREAM, 'text-shadow:0 0 3px #000,0 0 6px #000,0 2px 0 #000;z-index:9'));
-      for (let k = 0; k < n; k++) R(resCard(arts[k], x0 + k * step, 42 + (k === 1 && n === 3 ? 2 : 0), cw, rot[k], 3 + k, generic ? { q: true, edge: k === n - 1 ? '#ff4a1c' : undefined } : undefined));
+      for (let k = 0; k < n; k++) R(resCard(arts[k], x0 + k * step, 1 + (k === 1 && n === 3 ? 2 : 0), cw, rot[k], 3 + k, generic ? { q: true, edge: k === n - 1 ? '#ff4a1c' : undefined } : undefined));
+      R(txt(0, 42 - 26, 140, 52, generic ? '3:1' : '2:1', 44, CREAM, 'text-shadow:0 0 3px #000,0 0 7px #000,0 3px 0 #000;z-index:20'));
     };
     for (const t of ['generic', 'brick', 'lumber', 'wool', 'grain', 'ore']) E['port:' + t] = () => boardPort(t);
     (E[id] || E.fertile)();
@@ -421,8 +421,8 @@ export function figure(id, scale = 1) {
 
 // The port figure for the board (the stack of resource cards with the rate above it), `w` px wide. type: a resource or 'generic'.
 export function portPlate(type, w = 90) {
-  const k = w / 140; // the board figure is 140 × 126; the card stack's centre sits 84 px down
+  const k = w / 140; // the board figure is 140 × 86; the card stack's centre sits 42 px down
   const out = build('port:' + type);
   const inner = out.layers.map(layerHtml).join('');
-  return `<div class="portplate" style="width:${w}px;height:${126 * k}px"><div style="width:140px;height:126px;position:relative;transform:scale(${k});transform-origin:0 0">${inner}</div></div>`;
+  return `<div class="portplate" style="width:${w}px;height:${86 * k}px"><div style="width:140px;height:86px;position:relative;transform:scale(${k});transform-origin:0 0">${inner}</div></div>`;
 }

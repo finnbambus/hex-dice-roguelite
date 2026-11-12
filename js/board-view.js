@@ -2,7 +2,7 @@
 // lying flat on an abstract halftone tabletop, and a pannable camera.
 // It only draws. All game rules stay in game.js; the UI passes in what to highlight.
 import { TERRAIN_RES, pips } from './board.js';
-import { portPlate } from './figures.js?v=32';
+import { portPlate } from './figures.js?v=33';
 import { PORT_ATLAS, PORT_SCALE, PORT_SHEET } from './ports-atlas.js?v=11';
 
 const SQ3 = Math.sqrt(3);
@@ -273,7 +273,7 @@ export class BoardView {
     const left = Mx + at.o[0] * c, top = My + at.o[1] * c;
     out.push(`<div class="pport${target ? ' target' : ''}" style="left:${f1(left)}px;top:${f1(top)}px;width:${f1(w * c)}px;height:${f1(h * c)}px;background-size:${f1(PORT_SHEET[0] * c)}px ${f1(PORT_SHEET[1] * c)}px;background-position:${f1(-sx * c)}px ${f1(-sy * c)}px;z-index:${z}"></div>`);
     const kind = generic ? 'any' : p.type;
-    const pw = 100, ph = (126 * pw) / 140, cy = (84 * pw) / 140; // the card stack's centre sits on the port point; the rate floats above it
+    const pw = 100, ph = (86 * pw) / 140, cy = (42 * pw) / 140; // the card stack's centre sits on the port point; the rate is laid over it
     // the port's cards, as in the shop; clickable while a port is being picked
     out.push(`<div class="portcard ${kind}${target ? ' target' : ''}" ${target ? `data-k="port" data-id="${p.id}"` : ''} title="${esc(title)}" style="left:${f1(tx - pw / 2)}px;top:${f1(ty - cy)}px;width:${pw}px;height:${f1(ph)}px;z-index:${z + 10}"><div>${portPlate(generic ? 'generic' : p.type, pw)}</div></div>`);
     if (up) out.push(`<em class="pup" style="left:${f1(tx)}px;top:${f1(ty - cy - 20)}px;z-index:${z + 11}">${up}</em>`);
