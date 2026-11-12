@@ -60,6 +60,10 @@ Open the game with `?dev` in the address (e.g. `index.html?dev`) and the menu ga
 
 The `.nojekyll` file stops GitHub from running Jekyll over the files. All paths are relative, so the game also works from a sub-path or a custom domain.
 
+### Counted face on top (v41)
+
+Dice are seen from above. The face that counts lies on top and is the lightest; the side faces are shaded darker. While choosing a face for an upgrade the dice keep the earlier front view with even shading.
+
 ### Die effects as markers (v40)
 
 In the adjust and Result steps, whatever touched a die on this roll (Loaded, Nudge, Recast, Echo hold…) shows as small orange dots beside its value, one per effect, so the dice row keeps its height. Hover the dots for the list; the die sheet lists the same under **This roll**. White marks on dark faces (Mirror ring, R, ?) glow.

@@ -435,3 +435,9 @@ input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); ou
 /* White marks on dark faces glow */
 .side .lbl.lt, .fa .lbl { text-shadow: 0 0 calc(var(--s, 40px) * .08) rgba(240, 234, 216, .75), 0 0 calc(var(--s, 40px) * .22) rgba(240, 234, 216, .4); }
 .ds-notes h3 { margin: 0; font: var(--cap); letter-spacing: .14em; text-transform: uppercase; color: var(--dim); }
+
+/* Dice seen from above: the counted face is the top one */
+.die3d .tilt { transform: rotateX(-52deg) rotateY(-24deg); }
+.dice-stage.choosing .die3d .tilt { transform: rotateX(-22deg) rotateY(28deg); }
+.die-slot .die3d { margin-top: calc(var(--s) * .42); margin-bottom: calc(var(--s) * .44); }
+.dice-stage.choosing .die-slot .die3d { margin-top: calc(var(--s) * .26); margin-bottom: calc(var(--s) * .32); }
