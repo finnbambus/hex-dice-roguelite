@@ -267,13 +267,13 @@ export class BoardView {
     const num = (t) => `<u class="pc${t.length >= 3 ? ' l3' : ''}">${t}</u>`;
     const up = [p.up.overflow ? 'overflow' : '', p.up.bigger ? num(`+${p.up.bigger}`) : '', p.up.smaller ? num(`−${p.up.smaller}`) : '', p.up.free ? 'free' : ''].filter(Boolean).join('');
     const title = generic ? 'Generic port: trade 3:1' : `${p.type} port: trade 2:1`;
-    const tx = Mx + nx * 0.7 * U, ty = My + ny * 0.7 * U * K; // the port card sits out in the sea, piers run back to the two intersections
+    const tx = Mx + nx * 0.62 * U, ty = My + ny * 0.62 * U * K; // the port card sits out in the sea, piers run back to the two intersections
     const c = PORT_SCALE;
     const [sx, sy, w, h] = at.s;
     const left = Mx + at.o[0] * c, top = My + at.o[1] * c;
     out.push(`<div class="pport${target ? ' target' : ''}" style="left:${f1(left)}px;top:${f1(top)}px;width:${f1(w * c)}px;height:${f1(h * c)}px;background-size:${f1(PORT_SHEET[0] * c)}px ${f1(PORT_SHEET[1] * c)}px;background-position:${f1(-sx * c)}px ${f1(-sy * c)}px;z-index:${z}"></div>`);
     const kind = generic ? 'any' : p.type;
-    const pw = 98, ph = (112 * pw) / 180;
+    const pw = 80, ph = (112 * pw) / 180;
     // the port card from the shop (bone frame, resource-coloured panel, fanned cards, ratio); clickable while a port is being picked
     out.push(`<div class="portcard ${kind}${target ? ' target' : ''}" ${target ? `data-k="port" data-id="${p.id}"` : ''} title="${esc(title)}" style="left:${f1(tx - pw / 2)}px;top:${f1(ty - ph / 2)}px;width:${pw}px;height:${f1(ph)}px;z-index:${z + 10}"><div>${portPlate(generic ? 'generic' : p.type, pw)}</div></div>`);
     if (up) out.push(`<em class="pup" style="left:${f1(tx)}px;top:${f1(ty - ph / 2 - 22)}px;z-index:${z + 11}">${up}</em>`);

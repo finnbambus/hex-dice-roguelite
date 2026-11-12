@@ -365,10 +365,10 @@ function build(id) {
       const generic = t === 'generic', n = generic ? 3 : 2;
       const arts = generic ? [RES.brick, RES.wool, RES.ore] : [RES[t], RES[t]];
       const sea = SEA[t];
-      R({ style: abs(0, 0, 180, 112, 'border-radius:12px;background:' + BONE + ';box-shadow:0 2px 0 #8c8168,0 12px 10px rgba(0,0,0,0.6);z-index:2'), txt: '', kids: [{ style: abs(8, 8, 164, 96, 'border-radius:7px;background-color:' + sea + ';background-image:' + dotsBg('rgba(0,0,0,0.22)', 1.25, 5)), txt: '', kids: [] }] });
-      const rot = n === 3 ? [-9, -1, 8] : [-6, 6], step = n === 3 ? 25 : 31;
-      for (let k = 0; k < n; k++) R(resCard(arts[k], -10 + k * step, -9 + (k === 1 && n === 3 ? 2 : 0), 66, rot[k], 3 + k));
-      R(txt(88, 26, 88, 60, generic ? '3:1' : '2:1', 50, CREAM, 'text-shadow:0 2px 0 rgba(0,0,0,0.55),0 0 8px rgba(0,0,0,0.35);z-index:9'));
+      R({ style: abs(0, 0, 140, 92, 'border-radius:12px;background:' + BONE + ';box-shadow:0 2px 0 #8c8168,0 12px 10px rgba(0,0,0,0.6);z-index:2'), txt: '', kids: [{ style: abs(8, 8, 124, 76, 'border-radius:7px;background-color:' + sea + ';background-image:' + dotsBg('rgba(0,0,0,0.22)', 1.25, 5)), txt: '', kids: [] }] });
+      const rot = n === 3 ? [-9, -1, 8] : [-6, 6], step = n === 3 ? 17 : 31, cw = n === 3 ? 60 : 66;
+      for (let k = 0; k < n; k++) R(resCard(arts[k], (n === 3 ? -14 : -10) + k * step, -9 + (k === 1 && n === 3 ? 2 : 0), cw, rot[k], 3 + k));
+      R(txt(78, 18, 62, 56, generic ? '3:1' : '2:1', 44, CREAM, 'text-shadow:0 2px 0 rgba(0,0,0,0.55),0 0 8px rgba(0,0,0,0.35);z-index:9'));
     };
     for (const t of ['generic', 'brick', 'lumber', 'wool', 'grain', 'ore']) E['port:' + t] = () => boardPort(t);
     (E[id] || E.fertile)();
@@ -422,8 +422,8 @@ export function figure(id, scale = 1) {
 
 // A port plate for the board (the harbour card from the shop), `w` px wide. type: a resource or 'generic'.
 export function portPlate(type, w = 90) {
-  const k = w / 180;
+  const k = w / 140; // the board plate is 140 × 92 (the shop's harbour card is bigger)
   const out = build('port:' + type);
   const inner = out.layers.map(layerHtml).join('');
-  return `<div class="portplate" style="width:${w}px;height:${112 * k}px"><div style="width:180px;height:112px;position:relative;transform:scale(${k});transform-origin:0 0">${inner}</div></div>`;
+  return `<div class="portplate" style="width:${w}px;height:${92 * k}px"><div style="width:140px;height:92px;position:relative;transform:scale(${k});transform-origin:0 0">${inner}</div></div>`;
 }
