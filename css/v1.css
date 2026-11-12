@@ -441,3 +441,15 @@ input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); ou
 .dice-stage.choosing .die3d .tilt { transform: rotateX(-22deg) rotateY(28deg); }
 .die-slot .die3d { margin-top: calc(var(--s) * .42); margin-bottom: calc(var(--s) * .44); }
 .dice-stage.choosing .die-slot .die3d { margin-top: calc(var(--s) * .26); margin-bottom: calc(var(--s) * .32); }
+
+/* Small dice (adjust and Result steps): die and read-out on one centre line; effect dots sit beside the label */
+.dice-area .dice2 { gap: 16px; }
+.dice-area .die-box, .rcol .dice-area .die-box { padding: 0; }
+.dice-area .die-top { display: flex; align-items: center; gap: 14px; }
+.dice-area .die-box .die3d, .rcol .dice-area .die-box .die3d { margin: calc(var(--s) * .34) calc(var(--s) * .22) calc(var(--s) * .34) calc(var(--s) * .26); }
+.die-meta { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.die-lbl { display: flex; align-items: center; gap: 8px; height: 12px; font: 500 12px/1 var(--sans); color: var(--muted); white-space: nowrap; }
+.die-box.open .die-lbl { color: var(--accent); }
+.dice-area .die-val { margin: 0; line-height: 1; }
+.die-fx { margin: 0; padding: 3px 0; }
+.dice-area .faces-hint { display: none; }

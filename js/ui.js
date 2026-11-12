@@ -6,9 +6,9 @@
 import { Game, COSTS, BLINDS } from './game.js';
 import { RES, TERRAIN_RES, pips } from './board.js';
 import { ITEMS, ITEM_LIST, BOSS_BY_ID, ROLLS_PER_ROUND, LOADING, START_SETTLEMENTS, ECHO_BREAK } from './content.js';
-import { BoardView } from './board-view.js?v=41';
-import { figure, faceBody, primaryTrigger } from './figures.js?v=41';
-import { Feel } from './feel.js?v=41';
+import { BoardView } from './board-view.js?v=42';
+import { figure, faceBody, primaryTrigger } from './figures.js?v=42';
+import { Feel } from './feel.js?v=42';
 
 const TERRAIN_COLOR = { hills: '#c8734a', forest: '#3f7d4a', pasture: '#9ccf6a', fields: '#e8c547', mountains: '#8e939c', desert: '#e3d3a4' };
 const RES_ICON = { brick: 'B', lumber: 'L', wool: 'W', grain: 'G', ore: 'O' };
@@ -887,7 +887,7 @@ export class UI {
       const diff = values && values[i] !== shownNum;
       return `<div class="die-box ${this.dieSheet === i ? 'open' : ''}" role="button" tabindex="0" data-a="die-sheet" data-die="${i}" title="Click to see this die's six faces">
         <div class="die-top">${this.cube(i, fi, held, live)}
-          <div class="small muted">Die ${i + 1}${held ? '<br>held from last roll' : ''}${values ? `<div class="die-val ${diff ? 'changed' : ''}" title="${diff ? 'The face was changed by an upgrade' : ''}">${diff ? '= ' : ''}${values[i] || 0}</div>` : ''}${notes && notes.length ? `<span class="die-fx" ${this.tipAttr(`dfx:${i}`, { kind: `Die ${i + 1} · this roll`, title: notes.length === 1 ? '1 effect' : `${notes.length} effects`, lines: notes })} aria-label="${notes.length} effect${notes.length === 1 ? '' : 's'} on this die">${notes.slice(0, 5).map(() => '<i></i>').join('')}</span>` : ''}<span class="faces-hint">faces ▴</span></div></div>
+          <div class="die-meta"><div class="die-lbl"><span>Die ${i + 1}${held ? ' · held' : ''}</span>${notes && notes.length ? `<span class="die-fx" ${this.tipAttr(`dfx:${i}`, { kind: `Die ${i + 1} · this roll`, title: notes.length === 1 ? '1 effect' : `${notes.length} effects`, lines: notes })} aria-label="${notes.length} effect${notes.length === 1 ? '' : 's'} on this die">${notes.slice(0, 5).map(() => '<i></i>').join('')}</span>` : ''}</div>${values ? `<div class="die-val ${diff ? 'changed' : ''}" title="${diff ? 'The face was changed by an upgrade' : ''}">${diff ? '= ' : ''}${values[i] || 0}</div>` : ''}<span class="faces-hint">faces ▴</span></div></div>
       </div>`;
     }).join('');
     return `<div class="dice-area">${fxHtml}<div class="dice2">${dice}</div>${this.dieSheet != null ? this.faceSheet(this.dieSheet) : ''}</div>`;
