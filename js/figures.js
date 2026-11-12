@@ -139,7 +139,8 @@ function build(id) {
     const resCard = (art, x, y, w, rot, z, o) => {
       o = o || {};
       const h = Math.round(w * 1.32);
-      return { style: abs(x, y, w, h, 'box-sizing:border-box;border-radius:6px;background:' + (o.ghost ? 'rgba(236,235,230,0.06)' : '#1a1b1f') + ';border:' + (o.ghost ? '2px dashed rgba(236,235,230,0.4)' : '1.5px solid ' + (o.edge || '#5a5c63')) + ';box-shadow:' + (o.ghost ? 'none' : '0 1px 0 #8c8168,0 6px 8px rgba(0,0,0,0.5)') + ';transform:rotate(' + (rot || 0) + 'deg);z-index:' + (z || 6)), txt: '', kids: o.ghost ? [] : [{ style: abs(w * 0.1, h * 0.14, w * 0.8, h * 0.72, artBg(art)), txt: '', kids: [] }] };
+      // the art sheet's cells are 6:5, so the art box keeps that shape (it used to be stretched tall)
+      return { style: abs(x, y, w, h, 'box-sizing:border-box;border-radius:6px;background:' + (o.ghost ? 'rgba(236,235,230,0.06)' : '#1a1b1f') + ';border:' + (o.ghost ? '2px dashed rgba(236,235,230,0.4)' : '1.5px solid ' + (o.edge || '#5a5c63')) + ';box-shadow:' + (o.ghost ? 'none' : '0 1px 0 #8c8168,0 6px 8px rgba(0,0,0,0.5)') + ';transform:rotate(' + (rot || 0) + 'deg);z-index:' + (z || 6)), txt: '', kids: o.ghost ? [] : [{ style: abs(w * 0.08, h * 0.5 - w * 0.37, w * 0.84, w * 0.7, artBg(art)), txt: '', kids: [] }] };
     };
 
     // ---------- shine by rarity ----------

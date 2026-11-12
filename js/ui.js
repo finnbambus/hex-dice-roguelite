@@ -6,9 +6,9 @@
 import { Game, COSTS, BLINDS } from './game.js';
 import { RES, TERRAIN_RES, pips } from './board.js';
 import { ITEMS, ITEM_LIST, BOSS_BY_ID, ROLLS_PER_ROUND, LOADING, START_SETTLEMENTS, ECHO_BREAK } from './content.js';
-import { BoardView } from './board-view.js?v=29';
-import { figure, faceBody, primaryTrigger } from './figures.js?v=29';
-import { Feel } from './feel.js?v=29';
+import { BoardView } from './board-view.js?v=30';
+import { figure, faceBody, primaryTrigger } from './figures.js?v=30';
+import { Feel } from './feel.js?v=30';
 
 const TERRAIN_COLOR = { hills: '#c8734a', forest: '#3f7d4a', pasture: '#9ccf6a', fields: '#e8c547', mountains: '#8e939c', desert: '#e3d3a4' };
 const RES_ICON = { brick: 'B', lumber: 'L', wool: 'W', grain: 'G', ore: 'O' };
@@ -103,6 +103,7 @@ export class UI {
     this.$overlay = document.getElementById('overlay');
     this.$panel = document.getElementById('panel');
     this.$hand = document.getElementById('hand');
+    this.$hud = document.getElementById('hud');
     this.$stage = document.getElementById('stage');
     this.$tribute = document.getElementById('tribute');
     this.feel = new Feel({ board: this.$board, lamp: this.$stage.querySelector('.lamp') });
@@ -1518,8 +1519,8 @@ export class UI {
       <section class="zone"><div class="zone-h">Hand <b>${total} card${total === 1 ? '' : 's'}${countable > 7 ? ' · <span class="bad">over 7: a 7 makes you discard</span>' : ' · safe from the robber up to 7'}</b></div><div class="res-row">${stacks}${storeBox}</div></section>
       <section class="zone"><div class="zone-h">Cards <b>${g.cards.length} of ${g.limits.handSlots}</b></div><div class="slots" style="--n:${g.limits.handSlots}">${cardSlots}</div></section>
       <section class="zone guilds"><div class="zone-h">Guilds <b>${g.guilds.length} of ${g.limits.guildSlots}</b></div><div class="slots" style="--n:${g.limits.guildSlots}">${guildSlots}</div></section>
-      ${this.statCards()}
-      ${this.vpBig()}`;
+      `;
+    this.renderHud();
     this.fitHand();
     this.$stage.style.setProperty('--hand-h', `${this.$hand.offsetHeight}px`);
     const lz = this.$hand.firstElementChild;
@@ -1528,13 +1529,16 @@ export class UI {
     this.applyHighlights();
   }
 
-  // The bottom bar spans the whole stage width and scales (--hz) so that Hand, Cards, Guilds, titles and score fill it.
+  // Score and titles (longest road, largest army) live in the top left corner, next to the menu button.
+  renderHud() {
+    if (this.$hud) this.$hud.innerHTML = `${this.vpBig()}${this.statCards()}`;
+  }
+
+  // The bottom bar scales (--hz) so that Hand, Cards and Guilds fill all the width left of the action card.
   fitHand() {
     const h = this.$hand;
     if (!h) return;
-    if (window.innerWidth <= 900) { h.style.removeProperty('--hz'); this.$stage.classList.remove('hand-full'); return; }
-    // tall windows give the bar the full width (the right column rises above it); short ones keep it left of the column
-    this.$stage.classList.toggle('hand-full', window.innerHeight >= 840);
+    if (window.innerWidth <= 900) { h.style.removeProperty('--hz'); return; }
     const kids = [...h.children];
     if (!kids.length) return;
     const gap = parseFloat(getComputedStyle(h).columnGap) || 0;

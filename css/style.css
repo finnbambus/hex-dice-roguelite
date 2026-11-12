@@ -543,7 +543,6 @@ select, input { font: inherit; color: var(--ink); background: var(--inset); bord
 .storebox small { color: var(--dim); font-size: 10px; font-weight: 500; }
 
 .hand { right: calc(var(--act-w) + 32px); }
-.stage.hand-full .hand { right: 0; }
 .stage-overlay { padding-right: calc(var(--act-w) + 40px); }
 .board-prompt { left: calc((100% - var(--act-w) - 16px) / 2); }
 
@@ -912,7 +911,18 @@ select, input { font: inherit; color: var(--ink); background: var(--inset); bord
 .portcard.target { pointer-events: auto; cursor: pointer; filter: drop-shadow(0 0 2px var(--accent)) drop-shadow(0 0 7px rgba(255, 74, 28, .85)); }
 .dock.brick, .pierend.brick { --pc: var(--brick); } .dock.lumber, .pierend.lumber { --pc: #6fa868; } .dock.wool, .pierend.wool { --pc: #b6d98a; } .dock.grain, .pierend.grain { --pc: #e8c547; } .dock.ore, .pierend.ore { --pc: #aab0ba; } .dock.any, .pierend.any { --pc: #e3dcc8; }
 
-/* tall windows: the bottom bar spans the full width and the right column sits above it; short windows: the bar stops at the right column */
-@media (min-width: 901px) { .stage.hand-full .rcol { bottom: calc(var(--hand-h, 160px) + 14px); } }
 /* headers grow with the bar, and leave room for the raised card stacks */
 .hand .zone-h { zoom: max(1, var(--hz)); margin-bottom: calc(4px + 6px * var(--hz)); }
+
+/* score and titles: top left corner, right of the menu button */
+.hud { position: absolute; left: 84px; top: 14px; z-index: 9; display: flex; align-items: center; gap: 16px; pointer-events: none; --ch: 58px; }
+.hud > * { pointer-events: auto; }
+.hud .zone-h { display: none; }
+.hud .vp-zone { padding: 0; align-self: center; }
+.hud .vp-body { height: 58px; align-items: center; }
+.hud .vp-body .num { font-size: 58px; line-height: .8; }
+.hud .vp-body.d3 .num { font-size: 50px; }
+.hud .vp-body.d4 .num { font-size: 40px; }
+.hud .stat-zone { margin: 0; align-self: center; }
+.hud .stats { height: 58px; flex-direction: row; gap: 8px; }
+.hud .stat { width: 92px; }
