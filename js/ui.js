@@ -6,9 +6,9 @@
 import { Game, COSTS, BLINDS } from './game.js';
 import { RES, TERRAIN_RES, pips } from './board.js';
 import { ITEMS, ITEM_LIST, BOSS_BY_ID, ROLLS_PER_ROUND, LOADING, START_SETTLEMENTS, ECHO_BREAK } from './content.js';
-import { BoardView } from './board-view.js?v=39';
-import { figure, faceBody, primaryTrigger } from './figures.js?v=39';
-import { Feel } from './feel.js?v=39';
+import { BoardView } from './board-view.js?v=40';
+import { figure, faceBody, primaryTrigger } from './figures.js?v=40';
+import { Feel } from './feel.js?v=40';
 
 const TERRAIN_COLOR = { hills: '#c8734a', forest: '#3f7d4a', pasture: '#9ccf6a', fields: '#e8c547', mountains: '#8e939c', desert: '#e3d3a4' };
 const RES_ICON = { brick: 'B', lumber: 'L', wool: 'W', grain: 'G', ore: 'O' };
@@ -62,7 +62,7 @@ const extraTrg = (f) => { const p = f.setter ? null : primaryTrigger(f.triggers)
 const faceArt = (f, loaded) => {
   const tone = loaded ? '#e6cf8c' : '#e9e4d6';
   let bg = tone, inner = '';
-  if (f.setter === 'mirror') bg = `${svgUrl("<circle cx='50' cy='50' r='27' fill='#e9e4d6'/><circle cx='50' cy='50' r='17' fill='#17181b'/>")} center/100% 100% no-repeat, #17181b`;
+  if (f.setter === 'mirror') bg = `${svgUrl("<circle cx='50' cy='50' r='22' fill='none' stroke='#f0ead8' stroke-opacity='.14' stroke-width='30'/><circle cx='50' cy='50' r='22' fill='none' stroke='#f0ead8' stroke-opacity='.3' stroke-width='17'/><circle cx='50' cy='50' r='27' fill='#e9e4d6'/><circle cx='50' cy='50' r='17' fill='#17181b'/>")} center/100% 100% no-repeat, #17181b`;
   else if (f.setter === 'robber') { bg = '#17181b'; inner = '<span class="lbl">R</span>'; }
   else if (f.setter === 'blank') { bg = '#17181b'; inner = '<span class="lbl">?</span>'; }
   else if (f.triggers.length) bg = `${svgUrl(faceBody(f.value, f.triggers))} center/100% 100% no-repeat, ${tone}`;
@@ -887,8 +887,7 @@ export class UI {
       const diff = values && values[i] !== shownNum;
       return `<div class="die-box ${this.dieSheet === i ? 'open' : ''}" role="button" tabindex="0" data-a="die-sheet" data-die="${i}" title="Click to see this die's six faces">
         <div class="die-top">${this.cube(i, fi, held, live)}
-          <div class="small muted">Die ${i + 1}${held ? '<br>held from last roll' : ''}${values ? `<div class="die-val ${diff ? 'changed' : ''}" title="${diff ? 'The face was changed by an upgrade' : ''}">${diff ? '= ' : ''}${values[i] || 0}</div>` : ''}<span class="faces-hint">faces ▴</span></div></div>
-        ${notes && notes.length ? `<ul class="notes">${notes.map((n) => `<li>${esc(n)}</li>`).join('')}</ul>` : ''}
+          <div class="small muted">Die ${i + 1}${held ? '<br>held from last roll' : ''}${values ? `<div class="die-val ${diff ? 'changed' : ''}" title="${diff ? 'The face was changed by an upgrade' : ''}">${diff ? '= ' : ''}${values[i] || 0}</div>` : ''}${notes && notes.length ? `<span class="die-fx" ${this.tipAttr(`dfx:${i}`, { kind: `Die ${i + 1} · this roll`, title: notes.length === 1 ? '1 effect' : `${notes.length} effects`, lines: notes })} aria-label="${notes.length} effect${notes.length === 1 ? '' : 's'} on this die">${notes.slice(0, 5).map(() => '<i></i>').join('')}</span>` : ''}<span class="faces-hint">faces ▴</span></div></div>
       </div>`;
     }).join('');
     return `<div class="dice-area">${fxHtml}<div class="dice2">${dice}</div>${this.dieSheet != null ? this.faceSheet(this.dieSheet) : ''}</div>`;
@@ -918,7 +917,7 @@ export class UI {
     const shown = g.lastRoll ? g.lastRoll.faces[i] : null;
     return `<div class="die-sheet"><div class="ds-head"><span class="ds-tabs">${[0, 1].map((k) => `<button class="${k === i ? 'on' : ''}" data-a="die-open" data-die="${k}">Die ${k + 1}</button>`).join('')}</span><button class="small" data-a="die-close">Close</button></div>
       ${this.facesHtml(i, shown)}${this.dieTags(i)}
-      ${this.oddsChart()}
+      ${this.rollNotes(i)}${this.oddsChart()}
       <p class="small muted">Hover a face for what it does${shown != null ? '. The outlined one showed last' : ''}. Face upgrades preview their effect on this curve when you place them.</p></div>`;
   }
 
@@ -939,7 +938,7 @@ export class UI {
       let bg = `${pipBg(f.value, '#17181b')}, ${tone}`;
       let inner = '';
       if (f.triggers.length && !f.setter) bg = `${svgUrl(faceBody(f.value, f.triggers))} center/100% 100% no-repeat, ${tone}`;
-      if (f.setter === 'mirror') bg = `radial-gradient(circle at 50% 50%, ${DARK} 0 ${u(0.16)}, ${tone} ${u(0.18)} ${u(0.27)}, ${DARK} ${u(0.29)})`;
+      if (f.setter === 'mirror') bg = `radial-gradient(circle at 50% 50%, ${DARK} 0 ${u(0.13)}, rgba(240, 234, 216, .45) ${u(0.17)}, ${tone} ${u(0.18)} ${u(0.27)}, rgba(240, 234, 216, .5) ${u(0.285)}, rgba(240, 234, 216, .12) ${u(0.36)}, ${DARK} ${u(0.45)})`;
       else if (f.setter === 'robber') { bg = DARK; inner = '<span class="lbl lt">R</span>'; }
       else if (f.setter === 'blank') { bg = DARK; inner = '<span class="lbl lt">?</span>'; }
       const faceTip = f.triggers.map((t) => ITEMS[t].name).join(', ') || (f.setter ? ITEMS[SETTER_ITEM[f.setter]].name : `Shows ${f.value}`);
@@ -1168,6 +1167,13 @@ export class UI {
     if (item.id === 'lower') return [{ ...f, value: f.value === 1 ? 6 : f.value - 1, setter: null }];
     const setter = { mirror: 'mirror', robberFace: 'robber', blank: 'blank' }[item.id];
     return setter ? [{ ...f, setter }] : null;
+  }
+
+  // What touched this die on the roll in front of you (Loaded, Nudge, Recast…), listed in its sheet.
+  rollNotes(i) {
+    const step = this.step();
+    const notes = (step === 'adjust' || step === 'result') && this.game.report ? this.game.report.dice[i].notes : [];
+    return notes.length ? `<div class="ds-notes"><h3>This roll</h3><ul>${notes.map((n) => `<li>${esc(n)}</li>`).join('')}</ul></div>` : '';
   }
 
   // The odds as the dice stand now (faces, Loaded weights, Mirror, Blank, Robber's Face): shown with a die's faces.

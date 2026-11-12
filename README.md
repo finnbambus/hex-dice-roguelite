@@ -60,6 +60,10 @@ Open the game with `?dev` in the address (e.g. `index.html?dev`) and the menu ga
 
 The `.nojekyll` file stops GitHub from running Jekyll over the files. All paths are relative, so the game also works from a sub-path or a custom domain.
 
+### Die effects as markers (v40)
+
+In the adjust and Result steps, whatever touched a die on this roll (Loaded, Nudge, Recast, Echo hold…) shows as small orange dots beside its value, one per effect, so the dice row keeps its height. Hover the dots for the list; the die sheet lists the same under **This roll**. White marks on dark faces (Mirror ring, R, ?) glow.
+
 ### Solid dice (v39)
 
 The six faces of a die have opaque edges that overlap slightly at the seams, and dark faces (Mirror, Robber's Face, Blank) are a shade lighter than the panel, so the die keeps a closed outline at every angle.

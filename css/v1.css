@@ -426,3 +426,12 @@ input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); ou
 .side { border: 1px solid #6f6c63; box-shadow: 0 0 0 .5px #6f6c63; -webkit-backface-visibility: hidden; }
 .cube { backface-visibility: visible; }
 .die3d { perspective: calc(var(--s) * 9); }
+
+/* Die effects: fixed-size markers beside the die; the detail is in the hover card and the die sheet */
+.die-fx { display: inline-flex; gap: 3px; margin-left: 6px; padding: 4px 2px; vertical-align: middle; cursor: help; }
+.die-fx i { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
+.ds-notes ul { margin: 6px 0 0; padding-left: 16px; font-size: 12px; line-height: 1.4; color: var(--muted); }
+.ds-notes li::marker { color: var(--accent); }
+/* White marks on dark faces glow */
+.side .lbl.lt, .fa .lbl { text-shadow: 0 0 calc(var(--s, 40px) * .08) rgba(240, 234, 216, .75), 0 0 calc(var(--s, 40px) * .22) rgba(240, 234, 216, .4); }
+.ds-notes h3 { margin: 0; font: var(--cap); letter-spacing: .14em; text-transform: uppercase; color: var(--dim); }
