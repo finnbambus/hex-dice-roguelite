@@ -496,3 +496,17 @@ input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); ou
 .also li.bad { color: var(--bad); }
 .gr-main b { color: var(--ink); }
 @media (max-height: 800px) { .dice-area .die-sheet > p.small { display: none; } }
+/* Step line in the same language as the round track: caps, dot markers, hairline joins */
+.steps { font: var(--cap); line-height: 1; letter-spacing: .12em; text-transform: uppercase; color: var(--dim); }
+.steps li { gap: 6px; }
+.steps li + li::before { content: none; }
+.steps li + li { margin-left: 8px; padding-left: 20px; background: linear-gradient(var(--line2), var(--line2)) left center / 12px 1px no-repeat; }
+.steps li i, .steps li:not(.on) i { display: block; width: 8px; height: 8px; border-radius: 50%; border: 1.5px solid currentColor; background: none; font-size: 0; line-height: 0; color: inherit; }
+.steps li.done { color: var(--muted); }
+.steps li.done i { background: currentColor; border-color: currentColor; }
+.steps li.on { color: var(--ink); font-weight: inherit; }
+.steps li.on i { background: var(--ink); border-color: var(--ink); box-shadow: 0 0 0 3px rgba(236, 235, 230, .16); }
+/* Tips button: small and quiet */
+.tip-btn, .tip-btn.new { width: 22px; height: 22px; min-width: 0; padding: 0; border-radius: 50%; border: 1px solid var(--line2); background: none; color: var(--muted); font: 600 11px/1 var(--sans); box-shadow: none; animation: none; }
+.tip-btn.new { color: var(--accent); }
+.tip-btn:hover, .tip-btn.on { border-color: var(--ink); color: var(--ink); background: none; }

@@ -60,6 +60,10 @@ Open the game with `?dev` in the address (e.g. `index.html?dev`) and the menu ga
 
 The `.nojekyll` file stops GitHub from running Jekyll over the files. All paths are relative, so the game also works from a sub-path or a custom domain.
 
+### Step line and tips button (v44)
+
+The Roll / Build & trade / Tribute line uses the same markers as the Small / Big / Boss track above it: caps, a dot per step (filled when done, ringed when current) and hairline joins. The **?** tips button is smaller (22 px) with a grey outline; until it has been opened once only the question mark is orange.
+
 ### Result step reworked (v43)
 
 The roll reads as one line at the top of the action card, in the adjust and Result steps: die + die = total (a 7 is red). Below it the Result step is one ledger: a row per resource with its art, where it came from (e.g. "Forest 5 ×2") and the amount; losses to the robber and Storehouse changes use the same rows. An empty roll shows why, with the dry-roll track. Everything else that fired is listed under **Also this roll**.
