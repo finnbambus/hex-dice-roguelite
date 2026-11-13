@@ -6,9 +6,9 @@
 import { Game, COSTS, BLINDS } from './game.js';
 import { RES, TERRAIN_RES, pips } from './board.js';
 import { ITEMS, ITEM_LIST, BOSS_BY_ID, ROLLS_PER_ROUND, LOADING, START_SETTLEMENTS, ECHO_BREAK } from './content.js';
-import { BoardView } from './board-view.js?v=53';
-import { figure, faceBody, primaryTrigger } from './figures.js?v=53';
-import { Feel } from './feel.js?v=53';
+import { BoardView } from './board-view.js?v=54';
+import { figure, faceBody, primaryTrigger } from './figures.js?v=54';
+import { Feel } from './feel.js?v=54';
 
 const TERRAIN_COLOR = { hills: '#c8734a', forest: '#3f7d4a', pasture: '#9ccf6a', fields: '#e8c547', mountains: '#8e939c', desert: '#e3d3a4' };
 const RES_ICON = { brick: 'B', lumber: 'L', wool: 'W', grain: 'G', ore: 'O' };
@@ -252,6 +252,8 @@ export class UI {
       const el = ev.target.closest?.('[data-res], [data-r]');
       const r = el && !el.closest('#board') ? (el.dataset.res || el.dataset.r) : null;
       if (r !== this.resHover) { this.resHover = RES.includes(r) ? r : null; this.applyResFocus(); }
+      const bp = !!ev.target.closest?.('.boss-row');
+      if (bp !== !!this.bossPreview) { this.bossPreview = bp; if (this.game?.board) { this.renderBoard(); this.applyResFocus(); } }
     });
     // Turn a die by hand: drag it. A drag never counts as a click, so it does not open the face sheet.
     document.addEventListener('pointerdown', (ev) => {
@@ -838,6 +840,7 @@ export class UI {
       paid,
       rolled,
       volcano: g.volcanoHex,
+      boss: this.bossFx(),
       replace: this.replaceMap(),
       hlEdges: this.hlRoad ? this.roadPath().edges : null,
       tip: (h) => {
@@ -849,6 +852,23 @@ export class UI {
         return this.tipAttr(`hx:${h.id}`, { kind: `${cap(h.terrain)} · ${parts.map((p) => CAT_LABEL[p.cat]).join(' + ')}`, title: parts.map((p) => p.name).join(' + '), desc: parts.map((p) => p.desc).join(' '), fig: parts.map((p) => p.id) });
       },
     });
+  }
+
+  // Where the boss acts on the island: live in the Boss round, as a preview while its card is hovered before that.
+  bossFx() {
+    const g = this.game;
+    if (!g.board || g.phase === 'setup' || g.phase === 'gameover') return null;
+    const live = g.blind === 2 && g.phase !== 'shop';
+    if (!live && !this.bossPreview) return null;
+    const id = g.phase === 'shop' && g.blind === 2 ? g.nextBossId : g.bossId;
+    const H = g.board.hexes;
+    const fx = { id, live, blocked: new Set(), fog: new Set(), volcano: null, ports: false };
+    if (id === 'doldrums') H.filter((h) => [2, 3, 11, 12].includes(h.token)).forEach((h) => fx.blocked.add(h.id));
+    if (id === 'flood') H.filter((h) => h.token && h.token % 2 === 1).forEach((h) => fx.blocked.add(h.id));
+    if (id === 'fog') (live && g.fogged ? g.fogged.map((f) => f.id) : g.bestHexes(3).map((h) => h.id)).forEach((x) => fx.fog.add(x));
+    if (id === 'volcano') fx.volcano = live ? g.volcanoHex : g.bestHexes(1)[0]?.id ?? null;
+    if (id === 'pirate') fx.ports = true;
+    return fx;
   }
 
   // ---------------------------------------------------------------- step panel

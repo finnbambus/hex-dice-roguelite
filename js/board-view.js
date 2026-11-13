@@ -2,7 +2,7 @@
 // lying flat on an abstract halftone tabletop, and a pannable camera.
 // It only draws. All game rules stay in game.js; the UI passes in what to highlight.
 import { TERRAIN_RES, pips } from './board.js';
-import { portPlate } from './figures.js?v=53';
+import { portPlate } from './figures.js?v=54';
 import { PORT_ATLAS, PORT_SCALE, PORT_SHEET } from './ports-atlas.js?v=11';
 
 const SQ3 = Math.sqrt(3);
@@ -132,6 +132,7 @@ export class BoardView {
   // ------------------------------------------------------------ everything that changes while playing
   // opts: { req, paid:Set, rolled, volcano, badge:{hex,token}, labels }
   render(g, opts) {
+    this.bossOpts = opts.boss || null;
     const B = g.board;
     const { req, paid, rolled } = opts;
     const isT = (k, id) => req && req.kind === k && req.ids.has(id);
@@ -207,7 +208,8 @@ export class BoardView {
       const dim = resultMode && !hit && !match;
       const n = pips(h.token);
       const dots = h.hidden ? '' : `<b class="pips">${'<i></i>'.repeat(n)}</b>`;
-      out.push(`<div class="tok${hot && !h.hidden ? ' hot' : ''}${hit || match ? ' lit' : ''}${dim ? ' dim' : ''}" data-hres="${TERRAIN_RES[h.terrain] || ''}" style="left:${f1(this.hx(h) - 20)}px;top:${f1(this.hy(h) - 20 * K)}px;height:${f1(40 * K)}px;z-index:${this.zRow(h) + 7}"><div class="in" style="transform:scaleY(${K}) rotate(${tilt(h.id + 3, 1.8)}deg)"><span class="n">${h.hidden ? '?' : h.token}</span>${dots}</div></div>`);
+      const blocked = opts.boss && opts.boss.blocked.has(h.id) ? ` blocked${opts.boss.live ? '' : ' preview'}` : '';
+      out.push(`<div class="tok${hot && !h.hidden ? ' hot' : ''}${hit || match ? ' lit' : ''}${dim ? ' dim' : ''}${blocked}" data-hres="${TERRAIN_RES[h.terrain] || ''}" style="left:${f1(this.hx(h) - 20)}px;top:${f1(this.hy(h) - 20 * K)}px;height:${f1(40 * K)}px;z-index:${this.zRow(h) + 7}"><div class="in" style="transform:scaleY(${K}) rotate(${tilt(h.id + 3, 1.8)}deg)"><span class="n">${h.hidden ? '?' : h.token}</span>${dots}</div></div>`);
     }
     // field upgrades: a finish and rim on the hex, a ring and a chip on the token (same palette as the upgrade figures)
     for (const h of B.hexes) {
@@ -231,6 +233,19 @@ export class BoardView {
       }
       if (opts.volcano === h.id) out.push(`<div class="fxchip wide" style="left:${f1(x - 30)}px;top:${f1(y + 26)}px;z-index:${z + 10}">Volcano</div>`);
       if (tip || h.hexEffect || h.tokenEffect) out.push(`<div class="hexhit info" ${tip} style="left:${f1(x - 40)}px;top:${f1(y - 30)}px;width:80px;height:60px;clip-path:none;z-index:${z + 11}"></div>`);
+    }
+    // the boss where it acts: hatched hexes that produce nothing, fog over hidden tokens, a burning volcano hex
+    const bf = opts.boss;
+    if (bf) for (const h of B.hexes) {
+      const x = this.hx(h), y = this.hy(h), z = this.zRow(h);
+      const pv = bf.live ? '' : ' preview';
+      const svg = (cls, inner) => `<svg class="bossfx ${cls}${pv}" aria-hidden="true" width="220" height="180" viewBox="-110 -90 220 180" style="left:${f1(x - 110)}px;top:${f1(y - 87)}px;z-index:${z + 4}">${inner}</svg>`;
+      if (bf.blocked.has(h.id)) out.push(svg('bad', `<defs><pattern id="bh${h.id}" width="12" height="12" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="5" height="12" fill="rgba(160, 40, 24, .45)"/></pattern></defs><polygon points="${hexPoints(0.93)}" fill="url(#bh${h.id})" stroke="#e8826b" stroke-width="2.5" stroke-dasharray="9 6"/>`));
+      if (bf.fog.has(h.id)) out.push(svg('fog', `<defs><radialGradient id="bf${h.id}"><stop offset="0" stop-color="#e9e6dc" stop-opacity=".85"/><stop offset=".65" stop-color="#d9d6cc" stop-opacity=".6"/><stop offset="1" stop-color="#cfccc2" stop-opacity=".15"/></radialGradient></defs><polygon points="${hexPoints(0.98)}" fill="url(#bf${h.id})"/>`));
+      if (bf.volcano === h.id) {
+        out.push(svg('hot', `<polygon points="${hexPoints(0.93)}" fill="rgba(255, 74, 28, .22)" stroke="#ff4a1c" stroke-width="3"/>`));
+        if (!bf.live) out.push(`<div class="fxchip wide bosschip" style="left:${f1(x - 30)}px;top:${f1(y + 26)}px;z-index:${z + 10}">Volcano</div>`);
+      }
     }
     // what a paying hex gave
     if (resultMode) {
@@ -275,7 +290,8 @@ export class BoardView {
     const kind = generic ? 'any' : p.type;
     const pw = 88, ph = (86 * pw) / 140, cy = (42 * pw) / 140; // the card stack's centre sits on the port point; the rate is laid over it
     // the port's cards, as in the shop; clickable while a port is being picked
-    out.push(`<div class="portcard ${kind}${target ? ' target' : ''}" ${target ? `data-k="port" data-id="${p.id}"` : ''} title="${esc(title)}" style="left:${f1(tx - pw / 2)}px;top:${f1(ty - cy)}px;width:${pw}px;height:${f1(ph)}px;z-index:${z + 10}"><div>${portPlate(generic ? 'generic' : p.type, pw)}</div></div>`);
+    const pirate = this.bossOpts && this.bossOpts.ports ? ` blocked${this.bossOpts.live ? '' : ' preview'}` : '';
+    out.push(`<div class="portcard ${kind}${target ? ' target' : ''}${pirate}" ${target ? `data-k="port" data-id="${p.id}"` : ''} title="${esc(title)}" style="left:${f1(tx - pw / 2)}px;top:${f1(ty - cy)}px;width:${pw}px;height:${f1(ph)}px;z-index:${z + 10}"><div>${portPlate(generic ? 'generic' : p.type, pw)}</div></div>`);
     if (up) out.push(`<em class="pup" style="left:${f1(tx)}px;top:${f1(ty - cy - 20)}px;z-index:${z + 11}">${up}</em>`);
     // piers: a short wooden dock from the card to each of the two intersections the port serves, ringed in the resource colour
     {
