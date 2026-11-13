@@ -620,3 +620,7 @@ input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); ou
 .bench .dice-stage.choosing.bench-dice .die-slot .die3d { --s: 104px; margin: 34px 30px 38px; }
 .bench .dice-stage.choosing .ds-hint { color: var(--muted); font-weight: 400; font-size: 13px; margin-top: 8px; }
 @media (max-height: 800px) { .bench .dice-stage.choosing.bench-dice .die-slot .die3d { --s: 80px; margin: 26px 24px 30px; } }
+
+/* Pieces with variety (assets/pieces2.webp, from tools/render/pieces.py) */
+.sprite.p2 { background-image: url(../assets/pieces2.webp); background-size: 300% 300%; }
+.sprite.p2.robber { width: 330px; height: 330px; }

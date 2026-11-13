@@ -2,7 +2,7 @@
 // lying flat on an abstract halftone tabletop, and a pannable camera.
 // It only draws. All game rules stay in game.js; the UI passes in what to highlight.
 import { TERRAIN_RES, pips } from './board.js';
-import { portPlate } from './figures.js?v=55';
+import { portPlate } from './figures.js?v=56';
 import { PORT_ATLAS, PORT_SCALE, PORT_SHEET } from './ports-atlas.js?v=11';
 
 const SQ3 = Math.sqrt(3);
@@ -39,6 +39,7 @@ const TOKEN_FX = {
   evergreen: { cls: 'green', chip: '+1' },
   doubleToken: { cls: 'silver', chip: '+' },
 };
+const cellPos3 = (i) => `${(i % 3) * 50}% ${Math.floor(i / 3) * 50}%`;
 const cellPos = (i) => `${((i % 4) * 100) / 3}% ${(Math.floor(i / 4) * 100) / 3}%`;
 const hexPoints = (k) => [0, 1, 2, 3, 4, 5].map((i) => { const a = (Math.PI / 180) * (60 * i - 30); return `${f1(k * U * Math.cos(a))},${f1(k * U * K * Math.sin(a))}`; }).join(' ');
 
@@ -192,13 +193,14 @@ export class BoardView {
     for (const v of B.vertices) {
       const b = g.buildings[v.id];
       const x = this.vx(v), y = this.vy(v);
-      if (b) out.push(`<div class="sprite bld ${b}" style="left:${f1(x - 187.5)}px;top:${f1(y - 187.5)}px;z-index:${this.zAt(y)};background-position:${cellPos(b === 'city' ? 8 : 7)}"></div>`);
+      // each building picks one of four turns, fixed per corner, so the island does not look stamped
+      if (b) out.push(`<div class="sprite p2 bld ${b}" style="left:${f1(x - 187.5)}px;top:${f1(y - 187.5)}px;z-index:${this.zAt(y)};background-position:${cellPos3((b === 'city' ? 4 : 0) + ((v.id * 7 + 3) % 4))}"></div>`);
       if (isT('vertex', v.id)) out.push(`<button class="spot vtx" data-k="vertex" data-id="${v.id}" aria-label="${b ? 'Upgrade to a city here' : 'Build a settlement here'}" style="left:${f1(x - 22)}px;top:${f1(y - 22)}px;z-index:740"><i></i></button>`);
     }
     // the robber
     const rh = B.hexes[g.robber];
     const rx = this.hx(rh) + 27, ry = this.hy(rh) + 7;
-    out.push(`<div class="sprite robber" style="left:${f1(rx - 187.5)}px;top:${f1(ry - 187.5)}px;z-index:${this.zAt(ry)};background-position:${cellPos(9)}"></div>`);
+    out.push(`<div class="sprite p2 robber" style="left:${f1(rx - 165)}px;top:${f1(ry - 165)}px;z-index:${this.zAt(ry)};background-position:${cellPos3(8)}"></div>`);
     // number tokens
     for (const h of B.hexes) {
       if (!h.token) continue;
