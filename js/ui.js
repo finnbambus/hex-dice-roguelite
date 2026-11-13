@@ -6,9 +6,9 @@
 import { Game, COSTS, BLINDS } from './game.js';
 import { RES, TERRAIN_RES, pips } from './board.js';
 import { ITEMS, ITEM_LIST, BOSS_BY_ID, ROLLS_PER_ROUND, LOADING, START_SETTLEMENTS, ECHO_BREAK } from './content.js';
-import { BoardView } from './board-view.js?v=48';
-import { figure, faceBody, primaryTrigger } from './figures.js?v=48';
-import { Feel } from './feel.js?v=48';
+import { BoardView } from './board-view.js?v=50';
+import { figure, faceBody, primaryTrigger } from './figures.js?v=50';
+import { Feel } from './feel.js?v=50';
 
 const TERRAIN_COLOR = { hills: '#c8734a', forest: '#3f7d4a', pasture: '#9ccf6a', fields: '#e8c547', mountains: '#8e939c', desert: '#e3d3a4' };
 const RES_ICON = { brick: 'B', lumber: 'L', wool: 'W', grain: 'G', ore: 'O' };
@@ -1584,8 +1584,9 @@ export class UI {
       else {
         const under = Math.min(n - 1, 4);
         const seed = hs(r);
-        for (let k = under; k >= 1; k--) cards += `<div class="rcard under" style="left:${(-3 * k + tilt(seed + k * 7, .9)).toFixed(1)}px;top:${(-3 * k + tilt(seed + k * 13, .7)).toFixed(1)}px;z-index:${5 - k};--rot:${tilt(seed + k * 3, 1.2)}deg"></div>`;
-        cards += rcard(r, need > 0 && n >= need ? 'need' : '', `z-index:10;--rot:${tilt(seed, .7)}deg;${wasEmpty ? `animation:cardIn .01s both;animation-delay:${Math.round(330 - el)}ms` : ''}`);
+        // Duplicates stack straight up, a few pixels per card, squared to the one in front.
+        for (let k = under; k >= 1; k--) cards += `<div class="rcard under" style="left:0;top:${-4 * k}px;z-index:${5 - k}"></div>`;
+        cards += rcard(r, need > 0 && n >= need ? 'need' : '', `z-index:10;${wasEmpty ? `animation:cardIn .01s both;animation-delay:${Math.round(330 - el)}ms` : ''}`);
       }
       for (let k = 0; k < drop; k++) {
         const side = k % 2 ? 1 : -1;
@@ -1636,9 +1637,9 @@ export class UI {
       return `<div class="slot-wrap">${pcard(it, nm, `guild:${gd.uid}`, info)}</div>`;
     }).join('');
     this.$hand.innerHTML = `
-      <section class="zone"><div class="zone-h">Hand <b title="Holding more than 7 cards when a 7 is rolled makes you discard half">${total} card${total === 1 ? '' : 's'}${countable > 7 ? ' · <span class="bad">a 7 discards half</span>' : ''}</b></div><div class="res-row">${stacks}${storeBox}</div></section>
-      <section class="zone"><div class="zone-h">Cards <b>${g.cards.length} of ${g.limits.handSlots}</b></div><div class="slots" style="--n:${g.limits.handSlots}">${cardSlots}</div></section>
-      <section class="zone guilds"><div class="zone-h">Guilds <b>${g.guilds.length} of ${g.limits.guildSlots}</b></div><div class="slots" style="--n:${g.limits.guildSlots}">${guildSlots}</div></section>
+      <section class="zone hz-res"><div class="zone-h">Hand <b title="Holding more than 7 cards when a 7 is rolled makes you discard half">${total} card${total === 1 ? '' : 's'}${countable > 7 ? ' · <span class="bad">a 7 discards half</span>' : ''}</b></div><div class="res-row">${stacks}${storeBox}</div></section>
+      <section class="zone hz-cards" style="--grow:${g.limits.handSlots}"><div class="zone-h">Cards <b>${g.cards.length} of ${g.limits.handSlots}</b></div><div class="slots" style="--n:${g.limits.handSlots}">${cardSlots}</div></section>
+      <section class="zone guilds" style="--grow:${g.limits.guildSlots}"><div class="zone-h">Guilds <b>${g.guilds.length} of ${g.limits.guildSlots}</b></div><div class="slots" style="--n:${g.limits.guildSlots}">${guildSlots}</div></section>
       `;
     this.renderHud();
     this.fitHand();
@@ -1662,6 +1663,7 @@ export class UI {
     const kids = [...h.children];
     if (!kids.length) return;
     const gap = parseFloat(getComputedStyle(h).columnGap) || 0;
+    h.classList.add('measuring'); // natural widths, before the zones stretch to fill the bar
     const width = (z) => { h.style.setProperty('--hz', z); return kids.reduce((a, k) => a + k.offsetWidth, 0) + gap * (kids.length - 1); };
     const avail = h.clientWidth - 36;
     const byH = (0.27 * window.innerHeight - 56) / 112; // the bar must not eat the board
@@ -1670,6 +1672,7 @@ export class UI {
     else for (let i = 0; i < 8; i++) { const mid = (lo + hi) / 2; if (width(mid) <= avail) lo = mid; else hi = mid; }
     const hz = lo;
     h.style.setProperty('--hz', hz.toFixed(3));
+    h.classList.remove('measuring');
   }
 
   // ---------------------------------------------------------------- tutorial

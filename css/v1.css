@@ -530,3 +530,39 @@ input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); ou
 .conv { font: 600 10px/1 var(--mono); font-style: normal; letter-spacing: .08em; text-transform: uppercase; color: #e6cf8c; padding: 3px 6px; border-radius: 999px; background: rgba(230, 207, 140, .14); }
 .pill.conv { font: 600 11px/1 var(--sans); letter-spacing: 0; text-transform: none; padding: 5px 10px; }
 .got-row.mono { border-color: rgba(230, 207, 140, .4); }
+
+/* Score corner: menu and VP on one row, the two titles stacked beneath as larger cards */
+.menu-btn { width: 48px; height: 48px; }
+.menu-btn i { width: 17px; }
+.menu-pop { top: 56px; }
+.hud { left: 16px; top: 16px; height: auto; display: grid; grid-template-columns: 48px auto; column-gap: 14px; row-gap: 12px; align-items: center; justify-items: start; }
+.hud .vp-zone { grid-column: 2; grid-row: 1; }
+.hud .vp-body { height: 48px; }
+.hud .vp-body .num { font-size: 51px; line-height: 48px; }
+.hud .vp-body.d3 .num { font-size: 44px; }
+.hud .vp-body.d4 .num { font-size: 35px; }
+.hud .vp-body .num small { font-size: 11px; }
+.hud .stat-zone { grid-column: 1 / 3; grid-row: 2; }
+.hud .stats { height: auto; flex-direction: column; gap: 8px; }
+.hud .stat { width: 196px; min-width: 0; height: 64px; padding: 0 16px 0 14px; column-gap: 14px; row-gap: 5px; }
+.hud .stat .s-n { font-size: 34px; min-width: 26px; }
+.hud .stat .s-k { font: 600 11px/1 var(--mono); letter-spacing: .14em; }
+.hud .stat .s-v { font-size: 13px; }
+:root { --hud-w: 156px; }
+@media (max-height: 800px) {
+  .hud { left: 12px; top: 12px; }
+  .hud .stat { height: 54px; width: 176px; }
+  .hud .stat .s-n { font-size: 28px; }
+}
+
+/* Hand bar: zones share the full width; cards inside a zone spread to its edges */
+.hand { justify-content: space-between; }
+.hand .zone { flex: var(--grow, 5) 1 auto; display: flex; flex-direction: column; }
+.hand .zone.hz-res { --grow: 5; }
+.hand .res-row { justify-content: space-between; }
+.hand .slots { justify-content: space-between; }
+.hand .rcard.under { rotate: 0deg; }
+.hand.measuring { justify-content: flex-start; }
+.hand.measuring .zone { flex: none; }
+.hand .stack { padding-top: 16px; }
+.hud .stat { flex: none; }
