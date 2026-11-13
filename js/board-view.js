@@ -2,7 +2,7 @@
 // lying flat on an abstract halftone tabletop, and a pannable camera.
 // It only draws. All game rules stay in game.js; the UI passes in what to highlight.
 import { TERRAIN_RES, pips } from './board.js';
-import { portPlate } from './figures.js?v=61';
+import { portPlate } from './figures.js?v=62';
 import { PORT_ATLAS, PORT_SCALE, PORT_SHEET } from './ports-atlas.js?v=11';
 
 const SQ3 = Math.sqrt(3);
@@ -84,6 +84,7 @@ export class BoardView {
     const tx = this.cx - CX * s + this.pan.x;
     const ty = this.cy - (CY + 8) * s + this.pan.y;
     this.world.style.transform = `translate(${f1(tx)}px, ${f1(ty)}px) scale(${s.toFixed(4)})`;
+    this.cam = { tx, ty, s };
   }
 
   bindPan() {
@@ -108,6 +109,19 @@ export class BoardView {
     window.addEventListener('pointercancel', end);
     // a drag must not count as a click on whatever was underneath
     this.el.addEventListener('click', (e) => { if (this.moved) { e.stopPropagation(); e.preventDefault(); this.moved = false; } }, true);
+  }
+
+  // The hex under a point on screen (or null), for clicking a field.
+  hexAt(B, clientX, clientY) {
+    if (!this.cam || !B) return null;
+    const r = this.el.getBoundingClientRect();
+    const wx = (clientX - r.left - this.cam.tx) / this.cam.s, wy = (clientY - r.top - this.cam.ty) / this.cam.s;
+    let best = null, bd = 0.92;
+    for (const h of B.hexes) {
+      const d = Math.hypot((wx - this.hx(h)) / U, (wy - this.hy(h)) / (U * K));
+      if (d < bd) { bd = d; best = h; }
+    }
+    return best;
   }
 
   // ------------------------------------------------------------ coordinates
@@ -194,8 +208,9 @@ export class BoardView {
       const b = g.buildings[v.id];
       const x = this.vx(v), y = this.vy(v);
       // each building picks one of four turns, fixed per corner, so the island does not look stamped
-      const touches = b ? [...new Set(B.hexes.filter((h) => h.vertices.includes(v.id)).map((h) => TERRAIN_RES[h.terrain]).filter(Boolean))].join(' ') : '';
-      if (b) out.push(`<div class="sprite p2 bld ${b}" data-hres="${touches}" style="left:${f1(x - 187.5)}px;top:${f1(y - 187.5)}px;z-index:${this.zAt(y)};background-position:${cellPos3((b === 'city' ? 4 : 0) + ((v.id * 7 + 3) % 4))}"></div>`);
+      const around = b ? B.hexes.filter((h) => h.vertices.includes(v.id)) : [];
+      const touches = [...new Set(around.map((h) => TERRAIN_RES[h.terrain]).filter(Boolean))].join(' ');
+      if (b) out.push(`<div class="sprite p2 bld ${b}" data-hres="${touches}" data-hx="${around.map((h) => h.id).join(' ')}" style="left:${f1(x - 187.5)}px;top:${f1(y - 187.5)}px;z-index:${this.zAt(y)};background-position:${cellPos3((b === 'city' ? 4 : 0) + ((v.id * 7 + 3) % 4))}"></div>`);
       if (isT('vertex', v.id)) out.push(`<button class="spot vtx" data-k="vertex" data-id="${v.id}" aria-label="${b ? 'Upgrade to a city here' : 'Build a settlement here'}" style="left:${f1(x - 22)}px;top:${f1(y - 22)}px;z-index:740"><i></i></button>`);
     }
     // the robber
@@ -212,7 +227,7 @@ export class BoardView {
       const n = pips(h.token);
       const dots = h.hidden ? '' : `<b class="pips">${'<i></i>'.repeat(n)}</b>`;
       const blocked = opts.boss && opts.boss.blocked.has(h.id) ? ` blocked${opts.boss.live ? '' : ' preview'}` : '';
-      out.push(`<div class="tok${hot && !h.hidden ? ' hot' : ''}${hit || match ? ' lit' : ''}${dim ? ' dim' : ''}${blocked}" data-hres="${TERRAIN_RES[h.terrain] || ''}" style="left:${f1(this.hx(h) - 20)}px;top:${f1(this.hy(h) - 20 * K)}px;height:${f1(40 * K)}px;z-index:${this.zRow(h) + 7}"><div class="in" style="transform:scaleY(${K}) rotate(${tilt(h.id + 3, 1.8)}deg)"><span class="n">${h.hidden ? '?' : h.token}</span>${dots}</div></div>`);
+      out.push(`<div class="tok${hot && !h.hidden ? ' hot' : ''}${hit || match ? ' lit' : ''}${dim ? ' dim' : ''}${blocked}" data-hres="${TERRAIN_RES[h.terrain] || ''}" data-hx="${h.id}" style="left:${f1(this.hx(h) - 20)}px;top:${f1(this.hy(h) - 20 * K)}px;height:${f1(40 * K)}px;z-index:${this.zRow(h) + 7}"><div class="in" style="transform:scaleY(${K}) rotate(${tilt(h.id + 3, 1.8)}deg)"><span class="n">${h.hidden ? '?' : h.token}</span>${dots}</div></div>`);
     }
     // field upgrades: a finish and rim on the hex, a ring and a chip on the token (same palette as the upgrade figures)
     for (const h of B.hexes) {
@@ -242,7 +257,7 @@ export class BoardView {
       const y = opts.yields(h);
       if (!y || !h.token || !TERRAIN_RES[h.terrain]) continue;
       const txt = y.note === 'robber' ? 'Robber' : y.n ? `+${y.n}` : 'No buildings';
-      out.push(`<div class="yieldchip${y.n ? '' : ' none'}" data-hres="${TERRAIN_RES[h.terrain]}" style="left:${f1(this.hx(h))}px;top:${f1(this.hy(h) + 26 * K)}px;z-index:${this.zRow(h) + 40}">${txt}${y.n ? `<i class="yc-dot">·</i>${y.p > 0 && y.p < 0.005 ? '&lt;1' : Math.round(y.p * 100)}%` : ''}</div>`);
+      out.push(`<div class="yieldchip${y.n ? '' : ' none'}" data-hres="${TERRAIN_RES[h.terrain]}" data-hx="${h.id}" style="left:${f1(this.hx(h))}px;top:${f1(this.hy(h) + 26 * K)}px;z-index:${this.zRow(h) + 40}">${txt}${y.n ? `<i class="yc-dot">·</i>${y.p > 0 && y.p < 0.005 ? '&lt;1' : Math.round(y.p * 100)}%` : ''}</div>`);
     }
     // the boss where it acts: hatched hexes that produce nothing, fog over hidden tokens, a burning volcano hex
     const bf = opts.boss;

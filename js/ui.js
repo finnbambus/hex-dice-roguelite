@@ -6,9 +6,9 @@
 import { Game, COSTS, BLINDS } from './game.js';
 import { RES, TERRAIN_RES, pips } from './board.js';
 import { ITEMS, ITEM_LIST, BOSS_BY_ID, ROLLS_PER_ROUND, LOADING, START_SETTLEMENTS, ECHO_BREAK } from './content.js';
-import { BoardView } from './board-view.js?v=61';
-import { figure, faceBody, primaryTrigger } from './figures.js?v=61';
-import { Feel } from './feel.js?v=61';
+import { BoardView } from './board-view.js?v=62';
+import { figure, faceBody, primaryTrigger } from './figures.js?v=62';
+import { Feel } from './feel.js?v=62';
 
 const TERRAIN_COLOR = { hills: '#c8734a', forest: '#3f7d4a', pasture: '#9ccf6a', fields: '#e8c547', mountains: '#8e939c', desert: '#e3d3a4' };
 const RES_ICON = { brick: 'B', lumber: 'L', wool: 'W', grain: 'G', ore: 'O' };
@@ -287,6 +287,14 @@ export class UI {
       const d = ev.target.closest?.('.die3d[data-cube]');
       if (d) { this.spin[Number(d.dataset.cube)] = null; this.render(); }
     });
+    // Clicking a field on the island focuses it (again, or empty sea, to let go). Not while the board is asking for a pick.
+    document.addEventListener('click', (ev) => {
+      if (!ev.target.closest?.('#board') || this.boardReq || ev.target.closest('[data-k], button')) return;
+      const h = this.view?.hexAt(this.game?.board, ev.clientX, ev.clientY);
+      const id = h ? h.id : null;
+      this.hexFocus = id === this.hexFocus ? null : id;
+      this.applyResFocus();
+    });
     // A picked card is put back when you click anywhere else.
     document.addEventListener('click', (ev) => {
       if (this.selCard != null && !ev.target.closest('.slot-wrap')) { this.selCard = null; this.render(); }
@@ -329,6 +337,7 @@ export class UI {
       if (ev.key === 'Escape') {
         if (!document.getElementById('menu-pop').hidden) this.setMenu(false);
         else if (this.peek) { this.peek = false; this.render(); }
+        else if (this.hexFocus != null) { this.hexFocus = null; this.applyResFocus(); }
         else if (this.selCard != null) { this.selCard = null; this.render(); }
         else if (this.tipsOpen) { this.tipsOpen = false; this.render(); }
         else if (this.dieSheet != null) { this.dieSheet = null; this.render(); }
@@ -1172,8 +1181,15 @@ export class UI {
     const r = this.resHover || (picked && (picked.dataset.r || picked.dataset.res)) || null;
     const world = document.querySelector('#board .world');
     if (!world) return;
-    world.classList.toggle('res-focus', !!r);
-    for (const el of world.querySelectorAll('[data-hres]')) el.classList.toggle('res-lit', !!r && el.dataset.hres.split(' ').includes(r));
+    // A clicked field shows the same: the hex, the buildings on it and what it pays (a resource being pointed at wins).
+    const hx = r || this.boardReq ? null : this.hexFocus;
+    const on = !!r || hx != null;
+    world.classList.toggle('res-focus', on);
+    for (const el of world.querySelectorAll('[data-hres], [data-hex]')) {
+      const lit = r ? (el.dataset.hres || '').split(' ').includes(r)
+        : hx != null ? (el.dataset.hx != null ? el.dataset.hx.split(' ').includes(String(hx)) : el.dataset.hex === String(hx)) : false;
+      el.classList.toggle('res-lit', on && lit);
+    }
   }
 
   // Steps without their own hint still get one, so the ? is always there.
