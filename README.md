@@ -68,7 +68,7 @@ The `.nojekyll` file stops GitHub from running Jekyll over the files. All paths 
 - **Score corner:** menu and VP on one row, Road and Army as larger cards below.
 - **Hand:** duplicates stack straight up; the bar always spans its full width. **Port cards** sit in one tidy row.
 - **Shop:** bought offers turn grey under a **Sold out** stamp; **Next round** sits at the right of the shop footer.
-- **Resource focus:** pointing at a resource (hand, tribute, trade, payment choices) lights the hexes that produce it, the settlements and cities that collect from them, and a chip on each hex with what it pays you on its number ("+3 · 11% chance of rolling", the chance of its number with your dice as they are; "Robber" when blocked, "No buildings" when nobody collects).
+- **Resource focus:** pointing at a resource (hand, tribute, trade, payment choices) lights the hexes that produce it, the settlements and cities that collect from them, and a chip on each hex with what it pays you on its number ("+3 · 11%": the amount, then the chance of its number with your dice as they are; "Robber" when blocked, "No buildings" when nobody collects).
 - **Boss on the board:** in the Boss round, hexes that produce nothing are hatched with a struck token (Doldrums, Flood), fog covers the hidden hexes, the volcano hex burns and Pirate ports are struck. Hover the boss on the run card to preview this earlier.
 - **Dice workbench:** in the shop, face, die and Loaded upgrades are placed on large 3D dice over the shop, with the odds before and after. Loaded asks for a face and a confirm.
 - **Pieces:** settlements and cities come in four turns each, and the robber is a smooth turned figure (`assets/pieces2.webp`, made by `tools/render/pieces.py` and `build_pieces.py`).
