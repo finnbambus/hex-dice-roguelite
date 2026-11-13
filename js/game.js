@@ -580,7 +580,7 @@ export class Game {
         else this.gain(r, amt);
         ctx.produced += amt;
         (ctx.paidHexes ||= new Set()).add(h.id);
-        this.log(`${h.terrain} (${h.token ?? '—'}) → +${amt} ${r}${fromSister ? ' (sister)' : ''}`, 'good');
+        this.log(`${h.terrain} (${h.token ?? '—'}) → +${amt} ${r}${fromSister ? ' (sister)' : ''}${this.monopoly && TERRAIN_RES[h.terrain] && TERRAIN_RES[h.terrain] !== r ? ` (monopoly from ${TERRAIN_RES[h.terrain]})` : ''}`, 'good');
       }
       if (h.hexEffect?.id === 'volcanic') {
         if (this.hasGuild('firePriests')) { ctx.gold += 1; this.log('Fire Priests: +1 resource of choice'); }

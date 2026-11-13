@@ -6,9 +6,9 @@
 import { Game, COSTS, BLINDS } from './game.js';
 import { RES, TERRAIN_RES, pips } from './board.js';
 import { ITEMS, ITEM_LIST, BOSS_BY_ID, ROLLS_PER_ROUND, LOADING, START_SETTLEMENTS, ECHO_BREAK } from './content.js';
-import { BoardView } from './board-view.js?v=46';
-import { figure, faceBody, primaryTrigger } from './figures.js?v=46';
-import { Feel } from './feel.js?v=46';
+import { BoardView } from './board-view.js?v=48';
+import { figure, faceBody, primaryTrigger } from './figures.js?v=48';
+import { Feel } from './feel.js?v=48';
 
 const TERRAIN_COLOR = { hills: '#c8734a', forest: '#3f7d4a', pasture: '#9ccf6a', fields: '#e8c547', mountains: '#8e939c', desert: '#e3d3a4' };
 const RES_ICON = { brick: 'B', lumber: 'L', wool: 'W', grain: 'G', ore: 'O' };
@@ -48,6 +48,9 @@ const tilt = (n, amp) => { const r = Math.sin(n * 127.1 + 311.7) * 43758.5453; r
 // Halftone art is printed straight onto the card stock: one cell of the 5 × 4 art sheet per subject.
 const ART_CELL = { brick: 13, lumber: 14, wool: 15, grain: 16, ore: 17 };
 const artPos = (i) => `${((i % 5) * 100) / 4}% ${(Math.floor(i / 5) * 100) / 3}%`;
+// A hand turn of a die happens in screen space; the cube sits inside the tilted view, so undo the tilt around it.
+const TILT = { normal: ['rotateY(24deg) rotateX(52deg)', 'rotateX(-52deg) rotateY(-24deg)'], choosing: ['rotateY(-28deg) rotateX(22deg)', 'rotateX(-22deg) rotateY(28deg)'] };
+const spunTransform = (m, choosing) => { const [inv, t] = TILT[choosing ? 'choosing' : 'normal']; return `${inv} ${m} ${t} `; };
 const rcard = (r, cls = '', style = '') => `<div class="rcard ${cls}" style="--c:var(--${r});${style}"><i class="dot"></i><span class="art" style="background-position:${artPos(ART_CELL[r])}"></span><span class="nm">${cap(r)}</span></div>`;
 // Art for the cards you hold, by item (falls back to the category).
 const CARD_ART = { knight: 5, marshal: 5, cartographer: 4, roadBuilding: 4, townCharter: 4, royalCharter: 3, vpCard: 3, forgery: 3, yearOfPlenty: 8, monopoly: 12, granary: 8, mathematicians: 0, twinFortune: 1, longShot: 0, firePriests: 9, squatters: 4, monoculture: 6, deepPockets: 3, guildExpansion: 3, highwayCharter: 4, lostFound: 3, taxCollector: 3, robbersFriend: 5, moneylender: 3, tradeConsul: 3 };
@@ -249,7 +252,7 @@ export class UI {
       const d = ev.target.closest?.('.die3d[data-cube]');
       if (!d || ev.button > 0) return;
       const i = Number(d.dataset.cube);
-      this.drag = { i, x: ev.clientX, y: ev.clientY, moved: false, rx: this.spin[i]?.[0] ?? 0, ry: this.spin[i]?.[1] ?? 0 };
+      this.drag = { i, x: ev.clientX, y: ev.clientY, moved: false, base: this.spin[i] ? new DOMMatrix(this.spin[i]) : new DOMMatrix() };
     });
     document.addEventListener('pointermove', (ev) => {
       const dr = this.drag;
@@ -257,9 +260,11 @@ export class UI {
       const dx = ev.clientX - dr.x, dy = ev.clientY - dr.y;
       if (!dr.moved && Math.hypot(dx, dy) < 5) return;
       dr.moved = true;
-      this.spin[dr.i] = [dr.rx - dy * 0.7, dr.ry + dx * 0.7];
+      // Turn in screen space, like a trackball: the side under the pointer follows it.
+      const ang = Math.hypot(dx, dy) * 0.7;
+      this.spin[dr.i] = new DOMMatrix().rotateAxisAngleSelf(-dy, dx, 0, ang).multiply(dr.base).toString();
       const cube = document.querySelector(`.die3d[data-cube="${dr.i}"] .cube`);
-      if (cube) { cube.style.transition = 'none'; cube.style.animation = 'none'; cube.style.transform = `rotateX(${this.spin[dr.i][0]}deg) rotateY(${this.spin[dr.i][1]}deg) ${cube.style.getPropertyValue('--final')}`; }
+      if (cube) { cube.style.transition = 'none'; cube.style.animation = 'none'; cube.style.transform = `${spunTransform(this.spin[dr.i], !!cube.closest('.choosing'))}${cube.style.getPropertyValue('--final')}`; }
     });
     const endDrag = () => { if (this.drag?.moved) { this.dragMoved = true; setTimeout(() => { this.dragMoved = false; }, 0); } this.drag = null; };
     document.addEventListener('pointerup', endDrag);
@@ -355,8 +360,8 @@ export class UI {
       const opt = m?.type === 'face' ? m.options.find((o) => o.die === Number(d.die) && o.face === Number(d.face)) : null;
       return opt ? this.resolveModal(opt) : undefined;
     }
-    if (a === 'die-sheet') { this.dieSheet = this.dieSheet === Number(d.die) ? null : Number(d.die); return this.render(); }
-    if (a === 'die-open') { this.dieSheet = Number(d.die); return this.render(); }
+    if (a === 'die-sheet') { this.dieSheet = this.dieSheet === Number(d.die) ? null : Number(d.die); this.render(); return this.revealSheet(); }
+    if (a === 'die-open') { this.dieSheet = Number(d.die); this.render(); return this.revealSheet(); }
     if (a === 'die-close') return this.render();
     const g = this.game;
     switch (a) {
@@ -854,6 +859,8 @@ export class UI {
       shop: () => this.viewShop(),
       gameover: () => ({ body: '' }), // shown as a summary over the board instead (renderOverlay)
     }[step]();
+    if (!this._tip) this._tip = this.defaultTip(pickingFace ? 'pick' : step);
+    if (this.boardReq) this._tip = { title: 'Choosing on the board', html: `<p>${esc(this.boardReq.prompt || 'Pick a spot on the board.')}</p><p>Marked spots are the legal choices. Drag the table to pan; Esc cancels when cancelling is allowed.</p>` };
     const scroll = this.$panel.querySelector('.panel-body')?.scrollTop || 0;
     const tips = this.tipsOpen && this._tip ? `<div class="tips-pop" role="dialog" aria-label="How this step works"><div class="eyebrow">${this._tip.title}</div><div class="tp-body">${this._tip.html}</div></div>` : '';
     const sec = view.sec || '';
@@ -959,7 +966,7 @@ export class UI {
     const final = pick ? TURN[SIDE[fi]] : `rotateX(90deg) ${TURN[SIDE[fi]]}`; // the rolled face ends up on top
     let cls = '';
     const sp = this.spin[i];
-    const spun = sp ? `rotateX(${sp[0].toFixed(1)}deg) rotateY(${sp[1].toFixed(1)}deg) ` : '';
+    const spun = sp ? spunTransform(sp, pick) : '';
     let style = `--final:${final};transform:${spun}${final};`;
     const el = live ? this.rollElapsed() : null;
     const toss = el != null && !held ? ` toss" style="--td:${-Math.round(el)}ms` : '';
@@ -1100,6 +1107,30 @@ export class UI {
 
   // The how-to text, folded away once you know it. The choice is remembered.
   // How-to text no longer sits in the card: it is kept for the ? button in the card's header.
+  // The big dice keep their size; the sheet opens below them and the card scrolls to it.
+  revealSheet() {
+    const sh = this.$panel.querySelector('.dice-stage .die-sheet');
+    const body = sh?.closest('.panel-body');
+    if (!sh || !body) return;
+    const top = sh.offsetTop - body.offsetTop, need = top + sh.offsetHeight - body.clientHeight;
+    if (need > body.scrollTop) body.scrollTo({ top: Math.min(need + 8, top - 8), behavior: 'smooth' });
+  }
+
+  // Steps without their own hint still get one, so the ? is always there.
+  defaultTip(step) {
+    const T = {
+      setup: ['Setting up', '<p>Place your starting settlements, each with a road. Pick corners touching good numbers: 6 and 8 come up most, 2 and 12 least.</p><p>Each settlement pays one card from every hex it touches when setup ends.</p>'],
+      adjust: ['Changing the roll', '<p>Your dice upgrades (Nudge, Recast and others) can change this roll before it pays out. Each can be used once per round.</p><p>Happy with the roll? Use it as it is.</p>'],
+      result: ['Reading the result', '<p>The top line is the roll: die + die = total. Below it, every resource the roll gave or took, with the hexes it came from.</p><p><b>Also this roll</b> lists everything else that fired. Continue to build and trade.</p>'],
+      pick: ['Choosing a face', '<p>Hover a face to preview how the upgrade changes it and how the chance of each total shifts. Click to apply.</p>'],
+      shop: ['How the shop works', '<p>Spend VP on upgrades. Unspent VP is lost when you leave.</p>'],
+      tribute: ['Paying the tribute', '<p>Each part needs its own resource type. Storehouse cards count first.</p>'],
+      gameover: ['Run over', '<p>Start a new run or replay this seed.</p>'],
+    };
+    const t = T[step] || ['How this step works', '<p>Follow the main button at the bottom of the card.</p>'];
+    return { title: t[0], html: t[1] };
+  }
+
   hint(title, html) {
     this._tip = { title, html };
     return '';
@@ -1314,13 +1345,15 @@ export class UI {
     if (f.isDouble) tags.push('<span class="pill">Double</span>');
     if (rep.echo) tags.push('<span class="pill">Echo roll</span>');
     // Production lines say where each resource came from ("forest (5) → +2 lumber"); fold them into the rows.
-    const src = {}, other = [];
+    const src = {}, other = [], monoRows = {};
     for (const l of lines) {
       const m = /^(.+?) \((\d+|—)\) → \+(\d+) (\w+)(.*)$/.exec(l.msg);
-      if (m && RES.includes(m[4])) (src[m[4]] ||= []).push(`${cap(m[1])} ${m[2]}${m[5].includes('sister') ? ' (sister)' : ''}${Number(m[3]) > 1 ? ` ×${m[3]}` : ''}`);
-      else other.push(l);
+      const mono = m && /monopoly from (\w+)/.exec(m[5]);
+      if (m && RES.includes(m[4])) (src[m[4]] ||= []).push(`${cap(m[1])} ${m[2]}${m[5].includes('sister') ? ' (sister)' : ''}${Number(m[3]) > 1 ? ` ×${m[3]}` : ''}${mono ? ` (${cap(mono[1])})` : ''}`);
+      if (mono) monoRows[m[4]] = true;
+      if (!(m && RES.includes(m[4]))) other.push(l);
     }
-    const row = (r, n, cls, from) => `<li class="got-row ${cls}">${rcard(r, 'sm', '')}<span class="gr-main"><b>${cap(r)}</b><small>${esc(from)}</small></span><span class="gr-n">${n > 0 ? '+' : '−'}${Math.abs(n)}</span></li>`;
+    const row = (r, n, cls, from) => `<li class="got-row ${cls}${monoRows[r] && n > 0 ? ' mono' : ''}">${rcard(r, 'sm', '')}<span class="gr-main"><b>${cap(r)}${monoRows[r] && n > 0 ? '<em class="conv">Monopoly</em>' : ''}</b><small>${esc(from)}</small></span><span class="gr-n">${n > 0 ? '+' : '−'}${Math.abs(n)}</span></li>`;
     const rows = [
       ...gains.map((r) => row(r, rep.gains[r], 'good', (src[r] || []).join(' · ') || 'To your hand')),
       ...losses.map((r) => row(r, rep.gains[r], 'bad', f.seven ? 'Lost to the robber' : 'Left your hand')),
