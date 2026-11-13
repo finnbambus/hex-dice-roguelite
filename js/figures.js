@@ -364,9 +364,10 @@ function build(id) {
     const boardPort = (t) => {
       const generic = t === 'generic', n = generic ? 3 : 2;
       const arts = generic ? [RES.brick, RES.wool, RES.ore] : [RES[t], RES[t]];
-      const cw = 64, step = generic ? 24 : 30, rot = n === 3 ? [-8, -1, 7] : [-6, 6];
+      // One clean row: upright cards on one baseline, each overlapping the one before it sideways only.
+      const cw = 64, step = generic ? 26 : 32;
       const x0 = (140 - (cw + (n - 1) * step)) / 2;
-      for (let k = 0; k < n; k++) R(resCard(arts[k], x0 + k * step, 1 + (k === 1 && n === 3 ? 2 : 0), cw, rot[k], 3 + k, generic ? { q: true, edge: k === n - 1 ? '#ff4a1c' : undefined } : undefined));
+      for (let k = 0; k < n; k++) R(resCard(arts[k], x0 + k * step, 1, cw, 0, 3 + k, generic ? { q: true, edge: k === n - 1 ? '#ff4a1c' : undefined } : undefined));
       R(txt(0, 42 - 26, 140, 52, generic ? '3:1' : '2:1', 44, CREAM, 'text-shadow:0 0 3px #000,0 0 7px #000,0 3px 0 #000;z-index:20'));
     };
     for (const t of ['generic', 'brick', 'lumber', 'wool', 'grain', 'ore']) E['port:' + t] = () => boardPort(t);
