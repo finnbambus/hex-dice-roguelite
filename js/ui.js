@@ -6,9 +6,9 @@
 import { Game, COSTS, BLINDS } from './game.js';
 import { RES, TERRAIN_RES, pips } from './board.js';
 import { ITEMS, ITEM_LIST, BOSS_BY_ID, ROLLS_PER_ROUND, LOADING, START_SETTLEMENTS, ECHO_BREAK } from './content.js';
-import { BoardView } from './board-view.js?v=56';
-import { figure, faceBody, primaryTrigger } from './figures.js?v=56';
-import { Feel } from './feel.js?v=56';
+import { BoardView } from './board-view.js?v=57';
+import { figure, faceBody, primaryTrigger } from './figures.js?v=57';
+import { Feel } from './feel.js?v=57';
 
 const TERRAIN_COLOR = { hills: '#c8734a', forest: '#3f7d4a', pasture: '#9ccf6a', fields: '#e8c547', mountains: '#8e939c', desert: '#e3d3a4' };
 const RES_ICON = { brick: 'B', lumber: 'L', wool: 'W', grain: 'G', ore: 'O' };
@@ -429,6 +429,7 @@ export class UI {
       case 'end': this.preBuild = false; this.tradeGive = null; g.endRound(); return;
       case 'build': this.hoverCost = null; return this.run(() => g.build(d.kind));
       case 'play': return this.run(() => g.playCard(Number(d.uid)));
+      case 'sell': this.selCard = null; return this.run(() => g.sellCard(Number(d.uid)));
       case 'give': this.tradeGive = this.tradeGive === d.r ? null : d.r; return this.render();
       case 'get': {
         if (!this.tradeGive) return;
@@ -1771,10 +1772,10 @@ export class UI {
         title: it.name,
         desc: it.desc,
         now: canPlay ? 'Playable now.' : 'Playable on your turn, when no roll is pending.',
-        lines: [`Rarity: ${it.rarity}`],
+        lines: [`Rarity: ${it.rarity}`, 'Or sell it for 1 resource of your choice: click the card, then Sell.'],
       };
       const picked = sel === c.uid;
-      return `<div class="slot-wrap ${picked ? 'picked' : ''}">${pcard(it, it.name, `card:${c.uid}`, info, '', `data-hl="card:${c.uid}" data-a="pick-card" data-uid="${c.uid}" role="button" tabindex="0"`, picked ? 'sel' : '')}${picked ? `<button class="small play ${canPlay ? 'primary' : ''}" data-a="play" data-uid="${c.uid}" ${canPlay ? '' : 'disabled'} title="${canPlay ? 'Play this card' : 'Cards can be played during your turn, when no roll is pending'}">Play</button>` : ''}</div>`;
+      return `<div class="slot-wrap ${picked ? 'picked' : ''}">${pcard(it, it.name, `card:${c.uid}`, info, '', `data-hl="card:${c.uid}" data-a="pick-card" data-uid="${c.uid}" role="button" tabindex="0"`, picked ? 'sel' : '')}${picked ? `<div class="card-acts"><button class="small play ${canPlay ? 'primary' : ''}" data-a="play" data-uid="${c.uid}" ${canPlay ? '' : 'disabled'} title="${canPlay ? 'Play this card' : 'Cards can be played during your turn, when no roll is pending'}">Play</button><button class="small sell" data-a="sell" data-uid="${c.uid}" ${canPlay ? '' : 'disabled'} title="Discard this card and take 1 resource of your choice">Sell · +1</button></div>` : ''}</div>`;
     }).join('');
     const guildSlots = Array.from({ length: g.limits.guildSlots }, (_, i) => {
       const gd = g.guilds[i];
@@ -1956,7 +1957,7 @@ export class UI {
         if (nums) return `<button data-a="opt" data-i="${i}" ${o.disabled ? 'disabled' : ''}>${esc(o.label)}</button>`;
         const [main, detail = ''] = String(o.label).split(' — ');
         const mt = main.match(/^(.*?)(?:\s+\(([^)]*)\))?$/);
-        return `<button data-a="opt" data-i="${i}" ${o.disabled ? 'disabled' : ''}><b>${esc(cap(mt[1]))}${mt[2] ? `<small>${esc(mt[2])}</small>` : ''}</b>${detail ? `<span>${esc(detail)}</span>` : ''}</button>`;
+        return `<button data-a="opt" data-i="${i}" ${RES.includes(o.value) ? `data-r="${o.value}"` : ''} ${o.disabled ? 'disabled' : ''}><b>${esc(cap(mt[1]))}${mt[2] ? `<small>${esc(mt[2])}</small>` : ''}</b>${detail ? `<span>${esc(detail)}</span>` : ''}</button>`;
       };
       return `<div class="modal" role="dialog" aria-modal="true">${this.promptHead(m.prompt)}<div class="opts ${nums ? 'nums' : ''}">${m.options.map(row).join('')}</div>${cancel ? `<div class="modal-foot">${cancel}</div>` : ''}</div>`;
     }

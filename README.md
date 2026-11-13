@@ -60,6 +60,20 @@ Open the game with `?dev` in the address (e.g. `index.html?dev`) and the menu ga
 
 The `.nojekyll` file stops GitHub from running Jekyll over the files. All paths are relative, so the game also works from a sub-path or a custom domain.
 
+### Interface pass 2 (v47–v57)
+
+- **Tips:** every step and board choice has a **?** with its own tip.
+- **Dice:** dragging a die turns it the way the pointer moves; clicking a big die opens its faces and odds below it at full size.
+- **Monopoly:** converted production is marked in the result rows ("Forest 5 (Lumber)").
+- **Score corner:** menu and VP on one row, Road and Army as larger cards below.
+- **Hand:** duplicates stack straight up; the bar always spans its full width. **Port cards** sit in one tidy row.
+- **Shop:** bought offers turn grey under a **Sold out** stamp; **Next round** sits at the right of the shop footer.
+- **Resource focus:** pointing at a resource (hand, tribute, trade, payment choices) lights the hexes that produce it.
+- **Boss on the board:** in the Boss round, hexes that produce nothing are hatched with a struck token (Doldrums, Flood), fog covers the hidden hexes, the volcano hex burns and Pirate ports are struck. Hover the boss on the run card to preview this earlier.
+- **Dice workbench:** in the shop, face, die and Loaded upgrades are placed on large 3D dice over the shop, with the odds before and after. Loaded asks for a face and a confirm.
+- **Pieces:** settlements and cities come in four turns each, and the robber is a smooth turned figure (`assets/pieces2.webp`, made by `tools/render/pieces.py` and `build_pieces.py`).
+- **Selling a card:** click a development card in your hand, then **Sell · +1** to discard it for 1 resource of your choice (during your turn, when no roll is pending).
+
 ### Pay now on the tribute counter (v46)
 
 Ending a round early moved from the action card to the run card: when the tribute is payable during the Roll or Build & trade step, the "Ready to pay" badge becomes a **Pay now · +N VP** button (N = unused rolls). "Skip all rolls" and "End round now" are gone from the action card. While the tribute is not payable there is no early end; once the rolls are used up the main button still leads to the tribute.

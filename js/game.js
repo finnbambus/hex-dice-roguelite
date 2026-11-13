@@ -938,6 +938,19 @@ export class Game {
     this.emit();
   }
 
+  // A development card you do not want can be sold back: it leaves your hand for 1 resource of your choice.
+  async sellCard(uid) {
+    if (!this.canAct()) return;
+    const card = this.cards.find((c) => c.uid === uid);
+    if (!card) return;
+    const r = await this.io.chooseOption(RES.map((x) => ({ label: x, value: x })), `Sell ${ITEMS[card.id].name}: take 1 resource`, { cancel: true });
+    if (r == null) return;
+    this.cards = this.cards.filter((c) => c.uid !== uid);
+    this.gain(r, 1);
+    this.log(`Sold ${ITEMS[card.id].name} for 1 ${r}.`);
+    this.emit();
+  }
+
   async cardEffect(id) {
     const io = this.io;
     switch (id) {

@@ -624,3 +624,8 @@ input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); ou
 /* Pieces with variety (assets/pieces2.webp, from tools/render/pieces.py) */
 .sprite.p2 { background-image: url(../assets/pieces2.webp); background-size: 300% 300%; }
 .sprite.p2.robber { width: 330px; height: 330px; }
+
+/* A picked card: Play, or sell it for one resource */
+.hand .slot-wrap .card-acts { position: absolute; left: 5px; right: 5px; bottom: 5px; z-index: 21; display: flex; flex-direction: column; gap: 4px; }
+.hand .slot-wrap .card-acts button { position: static; width: 100%; padding: 6px 4px; font-size: calc(11px / var(--hz, 1)); box-shadow: 0 6px 12px -6px rgba(0, 0, 0, .8); }
+.hand .slot-wrap .card-acts .sell { background: rgba(20, 21, 24, .92); }
