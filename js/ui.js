@@ -6,9 +6,9 @@
 import { Game, COSTS, BLINDS } from './game.js';
 import { RES, TERRAIN_RES, pips } from './board.js';
 import { ITEMS, ITEM_LIST, BOSS_BY_ID, ROLLS_PER_ROUND, LOADING, START_SETTLEMENTS, ECHO_BREAK } from './content.js';
-import { BoardView } from './board-view.js?v=57';
-import { figure, faceBody, primaryTrigger } from './figures.js?v=57';
-import { Feel } from './feel.js?v=57';
+import { BoardView } from './board-view.js?v=58';
+import { figure, faceBody, primaryTrigger } from './figures.js?v=58';
+import { Feel } from './feel.js?v=58';
 
 const TERRAIN_COLOR = { hills: '#c8734a', forest: '#3f7d4a', pasture: '#9ccf6a', fields: '#e8c547', mountains: '#8e939c', desert: '#e3d3a4' };
 const RES_ICON = { brick: 'B', lumber: 'L', wool: 'W', grain: 'G', ore: 'O' };
@@ -1950,6 +1950,13 @@ export class UI {
         return `<div class="modal pack-modal" role="dialog" aria-modal="true"><div class="eyebrow">Pack opened</div><h2>Keep one of three</h2>
           <div class="pack-grid">${m.options.map((o, i) => { const art = this.offerArt(ITEMS[o.item]); return `<button class="offer pick-offer ${art.cls}" data-a="opt" data-i="${i}">${art.html}<span class="take">Keep this</span></button>`; }).join('')}</div>
           <div class="modal-foot">${m.cancel ? '<button data-a="cancel-modal">Leave the pack</button>' : ''}</div></div>`;
+      }
+      // A choice of resource types: the resource cards themselves, as in the hand.
+      if (m.options.length && m.options.every((o) => RES.includes(o.value))) {
+        const have = (r) => this.game?.hand ? this.game.hand[r] : null;
+        return `<div class="modal res-modal" role="dialog" aria-modal="true">${this.promptHead(m.prompt)}
+          <div class="res-choice">${m.options.map((o, i) => `<button class="res-take" data-a="opt" data-i="${i}" data-r="${o.value}" ${o.disabled ? 'disabled' : ''} title="${esc(cap(o.value))}">${rcard(o.value, '', '')}${have(o.value) != null ? `<small>${have(o.value)} in hand</small>` : ''}</button>`).join('')}</div>
+          ${cancel ? `<div class="modal-foot">${cancel}</div>` : ''}</div>`;
       }
       // Plain numbers (a die value, a token number) become a row of keys; everything else a list with name and detail.
       const nums = m.options.every((o) => /^[+−-]?\d+$/.test(String(o.label)));

@@ -629,3 +629,28 @@ input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); ou
 .hand .slot-wrap .card-acts { position: absolute; left: 5px; right: 5px; bottom: 5px; z-index: 21; display: flex; flex-direction: column; gap: 4px; }
 .hand .slot-wrap .card-acts button { position: static; width: 100%; padding: 6px 4px; font-size: calc(11px / var(--hz, 1)); box-shadow: 0 6px 12px -6px rgba(0, 0, 0, .8); }
 .hand .slot-wrap .card-acts .sell { background: rgba(20, 21, 24, .92); }
+
+/* Choosing a resource type: the cards themselves */
+.res-modal { width: auto; max-width: calc(100vw - 48px); }
+.res-choice { display: flex; gap: 14px; justify-content: center; padding: 8px 0 4px; }
+.res-take { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 0; border: 0; background: none; box-shadow: none; cursor: pointer; }
+.res-take .rcard { position: relative; left: auto; top: auto; width: 96px; height: 131px; rotate: 0deg; transition: translate .15s, box-shadow .15s, border-color .15s; }
+.res-take .rcard .nm { font-size: 16px; bottom: 11px; }
+.res-take:hover:not(:disabled) .rcard, .res-take:focus-visible .rcard { translate: 0 -6px; border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent), 0 14px 22px -10px rgba(0, 0, 0, .9); }
+.res-take small { font: 500 12px/1 var(--sans); color: var(--muted); }
+.res-take:disabled { opacity: .4; cursor: default; }
+.res-take:hover { background: none; }
+
+/* Score corner, tightened: the title cards share the width of the menu + score row, the score is larger */
+.hud { justify-items: stretch; align-items: center; grid-template-columns: 48px max-content; }
+.hud .vp-zone { justify-self: start; }
+.hud .vp-body { height: 56px; }
+.hud .vp-body .num { font-size: 64px; line-height: 56px; }
+.hud .vp-body.d3 .num { font-size: 54px; }
+.hud .vp-body.d4 .num { font-size: 44px; }
+.hud .stat-zone { justify-self: stretch; width: auto; min-width: 0; }
+.hud .stats { align-items: stretch; }
+.hud .stat { width: auto; min-width: 0; }
+.menu { top: 24px; }  /* centred on the score digits, which sit low in their line */
+@media (max-height: 800px) { .menu { top: 20px; } }
+.modal .res-take, .modal .res-take:hover:not(:disabled), .modal .res-take:focus-visible { background: none; border: 0; box-shadow: none; outline: none; }
