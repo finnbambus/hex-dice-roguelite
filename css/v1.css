@@ -654,3 +654,13 @@ input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); ou
 .menu { top: 24px; }  /* centred on the score digits, which sit low in their line */
 @media (max-height: 800px) { .menu { top: 20px; } }
 .modal .res-take, .modal .res-take:hover:not(:disabled), .modal .res-take:focus-visible { background: none; border: 0; box-shadow: none; outline: none; }
+
+/* Resource focus also shows who collects: your buildings on those hexes, and what each hex pays on its number */
+.world .sprite.bld { transition: filter .18s; }
+.world.res-focus .sprite.bld:not(.res-lit) { filter: brightness(.4) saturate(.4); }
+.world.res-focus .sprite.bld.res-lit { filter: brightness(1.35) drop-shadow(0 0 2px #fff4d6) drop-shadow(0 0 10px rgba(255, 220, 150, .9)); }
+.yieldchip { position: absolute; translate: -50% 0; display: none; align-items: baseline; gap: 5px; padding: 4px 9px 4px 10px; border-radius: 999px; white-space: nowrap; pointer-events: none;
+  font: 800 17px/1 var(--display); color: #0c0d0f; background: #f2efe6; box-shadow: 0 0 0 2px rgba(12, 13, 15, .75), 0 6px 14px -4px rgba(0, 0, 0, .8); }
+.yieldchip small { font: 600 10px/1 var(--mono); letter-spacing: .06em; text-transform: uppercase; color: #55534d; }
+.yieldchip.none { font: 600 10px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); background: rgba(12, 13, 15, .85); box-shadow: 0 0 0 1px var(--line2); padding: 5px 8px; }
+.world.res-focus .yieldchip.res-lit { display: inline-flex; }

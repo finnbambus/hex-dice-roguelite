@@ -2,7 +2,7 @@
 // lying flat on an abstract halftone tabletop, and a pannable camera.
 // It only draws. All game rules stay in game.js; the UI passes in what to highlight.
 import { TERRAIN_RES, pips } from './board.js';
-import { portPlate } from './figures.js?v=58';
+import { portPlate } from './figures.js?v=59';
 import { PORT_ATLAS, PORT_SCALE, PORT_SHEET } from './ports-atlas.js?v=11';
 
 const SQ3 = Math.sqrt(3);
@@ -194,7 +194,8 @@ export class BoardView {
       const b = g.buildings[v.id];
       const x = this.vx(v), y = this.vy(v);
       // each building picks one of four turns, fixed per corner, so the island does not look stamped
-      if (b) out.push(`<div class="sprite p2 bld ${b}" style="left:${f1(x - 187.5)}px;top:${f1(y - 187.5)}px;z-index:${this.zAt(y)};background-position:${cellPos3((b === 'city' ? 4 : 0) + ((v.id * 7 + 3) % 4))}"></div>`);
+      const touches = b ? [...new Set(B.hexes.filter((h) => h.vertices.includes(v.id)).map((h) => TERRAIN_RES[h.terrain]).filter(Boolean))].join(' ') : '';
+      if (b) out.push(`<div class="sprite p2 bld ${b}" data-hres="${touches}" style="left:${f1(x - 187.5)}px;top:${f1(y - 187.5)}px;z-index:${this.zAt(y)};background-position:${cellPos3((b === 'city' ? 4 : 0) + ((v.id * 7 + 3) % 4))}"></div>`);
       if (isT('vertex', v.id)) out.push(`<button class="spot vtx" data-k="vertex" data-id="${v.id}" aria-label="${b ? 'Upgrade to a city here' : 'Build a settlement here'}" style="left:${f1(x - 22)}px;top:${f1(y - 22)}px;z-index:740"><i></i></button>`);
     }
     // the robber
@@ -235,6 +236,13 @@ export class BoardView {
       }
       if (opts.volcano === h.id) out.push(`<div class="fxchip wide" style="left:${f1(x - 30)}px;top:${f1(y + 26)}px;z-index:${z + 10}">Volcano</div>`);
       if (tip || h.hexEffect || h.tokenEffect) out.push(`<div class="hexhit info" ${tip} style="left:${f1(x - 40)}px;top:${f1(y - 30)}px;width:80px;height:60px;clip-path:none;z-index:${z + 11}"></div>`);
+    }
+    // what each hex pays you on a roll of its number: shown while its resource is in focus
+    if (opts.yields) for (const h of B.hexes) {
+      const y = opts.yields(h);
+      if (!y || !h.token || !TERRAIN_RES[h.terrain]) continue;
+      const txt = y.note === 'robber' ? 'Robber' : y.n ? `+${y.n}` : 'No buildings';
+      out.push(`<div class="yieldchip${y.n ? '' : ' none'}" data-hres="${TERRAIN_RES[h.terrain]}" style="left:${f1(this.hx(h))}px;top:${f1(this.hy(h) + 26 * K)}px;z-index:${this.zRow(h) + 40}">${txt}${y.n ? `<small>on a ${h.token}</small>` : ''}</div>`);
     }
     // the boss where it acts: hatched hexes that produce nothing, fog over hidden tokens, a burning volcano hex
     const bf = opts.boss;

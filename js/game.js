@@ -170,6 +170,23 @@ export class Game {
       .map((x) => x.h);
   }
 
+  // What a hex would pay you on a plain roll of its number (no face triggers, no one-off multipliers), and why.
+  expectedYield(h) {
+    const base = this.buildingYield(h);
+    if (!base) return { n: 0, base, note: '' };
+    if (this.robber === h.id && h.hexEffect?.id !== 'palisade' && h.hexEffect?.id !== 'haven') return { n: 0, base, note: 'robber' };
+    let n = base;
+    if (h.hexEffect?.id === 'fertile') n += 1;
+    if (this.hasGuild('mathematicians') && (h.token === 6 || h.token === 8)) n += 1;
+    const mono = this.guild('monoculture');
+    if (mono) n += h.terrain === mono.data.terrain ? 2 : -1;
+    n = Math.max(0, n);
+    let mult = 1;
+    if (h.hexEffect?.id === 'volcanic') mult *= 2;
+    if (h.hexEffect?.id === 'haven' && this.robber === h.id) mult *= 2;
+    return { n: n * mult, base, note: '' };
+  }
+
   buildingYield(h) {
     let n = 0;
     for (const v of h.vertices) {
