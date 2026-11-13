@@ -6,9 +6,9 @@
 import { Game, COSTS, BLINDS } from './game.js';
 import { RES, TERRAIN_RES, pips } from './board.js';
 import { ITEMS, ITEM_LIST, BOSS_BY_ID, ROLLS_PER_ROUND, LOADING, START_SETTLEMENTS, ECHO_BREAK } from './content.js';
-import { BoardView } from './board-view.js?v=52';
-import { figure, faceBody, primaryTrigger } from './figures.js?v=52';
-import { Feel } from './feel.js?v=52';
+import { BoardView } from './board-view.js?v=53';
+import { figure, faceBody, primaryTrigger } from './figures.js?v=53';
+import { Feel } from './feel.js?v=53';
 
 const TERRAIN_COLOR = { hills: '#c8734a', forest: '#3f7d4a', pasture: '#9ccf6a', fields: '#e8c547', mountains: '#8e939c', desert: '#e3d3a4' };
 const RES_ICON = { brick: 'B', lumber: 'L', wool: 'W', grain: 'G', ore: 'O' };
@@ -247,6 +247,12 @@ export class UI {
       const id = Number(el.dataset.id);
       if (el.dataset.k === this.boardReq.kind && this.boardReq.ids.has(id)) this.resolveBoard(id);
     });
+    // Pointing at a resource anywhere (hand, tribute, trade, pay choices) lights the hexes that produce it.
+    document.addEventListener('pointerover', (ev) => {
+      const el = ev.target.closest?.('[data-res], [data-r]');
+      const r = el && !el.closest('#board') ? (el.dataset.res || el.dataset.r) : null;
+      if (r !== this.resHover) { this.resHover = RES.includes(r) ? r : null; this.applyResFocus(); }
+    });
     // Turn a die by hand: drag it. A drag never counts as a click, so it does not open the face sheet.
     document.addEventListener('pointerdown', (ev) => {
       const d = ev.target.closest?.('.die3d[data-cube]');
@@ -456,6 +462,8 @@ export class UI {
     this.renderDrawer();
     this.renderModal();
     this.refreshTip();
+    if (!document.querySelector('[data-res]:hover, [data-r]:hover')) this.resHover = null; // the element under the pointer may have been replaced
+    this.applyResFocus();
   }
 
   // ---------------------------------------------------------------- moments (drops, counting, shake)
@@ -671,7 +679,7 @@ export class UI {
       lines.push(`${p.type ? cap(p.type) : 'Any type'}: ${p.amount} (${why.join(' ')})`);
       const have = t ? g.available(t) : Math.max(...RES.map((r) => g.available(r)));
       const pct = Math.min(100, Math.round((Math.min(have, p.amount) / p.amount) * 100));
-      return `<div class="tpart"><div class="t-row">${t ? resDot(t) : '<span class="res-dot any"></span>'}<span>${t ? cap(t) : 'Any type'}</span><span class="have">${Math.min(have, p.amount)}<span> / ${p.amount}</span></span></div><div class="bar ${pct >= 100 ? 'full' : ''}"><i style="width:${pct}%;--c:${t ? `var(--${t})` : 'var(--muted)'}"></i></div></div>`;
+      return `<div class="tpart" ${t ? `data-res="${t}"` : ''}><div class="t-row">${t ? resDot(t) : '<span class="res-dot any"></span>'}<span>${t ? cap(t) : 'Any type'}</span><span class="have">${Math.min(have, p.amount)}<span> / ${p.amount}</span></span></div><div class="bar ${pct >= 100 ? 'full' : ''}"><i style="width:${pct}%;--c:${t ? `var(--${t})` : 'var(--muted)'}"></i></div></div>`;
     }).join('');
     // While you can still roll or build, a payable tribute is paid from here: the counter is where you see that it is ready.
     const step = this.step();
@@ -1116,6 +1124,16 @@ export class UI {
     if (need > body.scrollTop) body.scrollTo({ top: Math.min(need + 8, top - 8), behavior: 'smooth' });
   }
 
+  // Light the hexes that produce the resource being pointed at, or the one picked in a trade or payment.
+  applyResFocus() {
+    const picked = document.querySelector('#panel [data-r].sel, #modal-root [data-r].sel, #hand .stack.sel[data-res]');
+    const r = this.resHover || (picked && (picked.dataset.r || picked.dataset.res)) || null;
+    const world = document.querySelector('#board .world');
+    if (!world) return;
+    world.classList.toggle('res-focus', !!r);
+    for (const el of world.querySelectorAll('[data-hres]')) el.classList.toggle('res-lit', !!r && el.dataset.hres === r);
+  }
+
   // Steps without their own hint still get one, so the ? is always there.
   defaultTip(step) {
     const T = {
@@ -1353,7 +1371,7 @@ export class UI {
       if (mono) monoRows[m[4]] = true;
       if (!(m && RES.includes(m[4]))) other.push(l);
     }
-    const row = (r, n, cls, from) => `<li class="got-row ${cls}${monoRows[r] && n > 0 ? ' mono' : ''}">${rcard(r, 'sm', '')}<span class="gr-main"><b>${cap(r)}${monoRows[r] && n > 0 ? '<em class="conv">Monopoly</em>' : ''}</b><small>${esc(from)}</small></span><span class="gr-n">${n > 0 ? '+' : '−'}${Math.abs(n)}</span></li>`;
+    const row = (r, n, cls, from) => `<li data-res="${r}" class="got-row ${cls}${monoRows[r] && n > 0 ? ' mono' : ''}">${rcard(r, 'sm', '')}<span class="gr-main"><b>${cap(r)}${monoRows[r] && n > 0 ? '<em class="conv">Monopoly</em>' : ''}</b><small>${esc(from)}</small></span><span class="gr-n">${n > 0 ? '+' : '−'}${Math.abs(n)}</span></li>`;
     const rows = [
       ...gains.map((r) => row(r, rep.gains[r], 'good', (src[r] || []).join(' · ') || 'To your hand')),
       ...losses.map((r) => row(r, rep.gains[r], 'bad', f.seven ? 'Lost to the robber' : 'Left your hand')),
@@ -1613,7 +1631,7 @@ export class UI {
         now: `${n} in hand${store ? ` · ${store} stored` : ''}`,
         lines: short ? [`Missing ${need - n} for the option you are hovering`] : [],
       };
-      return `<div class="stack ${short ? 'short' : ''}" ${this.tipAttr(`res:${r}`, info)} data-hl="hand:${r} store:${r}">
+      return `<div class="stack ${short ? 'short' : ''}" data-res="${r}" ${this.tipAttr(`res:${r}`, info)} data-hl="hand:${r} store:${r}">
         <div class="stack-cards">${cards}${n > 0 ? `<span class="count${n >= 100 ? ' l3' : ''}" data-ck="hand-${r}">${this.feel.value(`hand-${r}`, n)}</span>` : ''}</div>
         <span class="stack-label">${short ? `<b class="bad">need ${need - n} more</b>` : ''}${g.storehouse[r] ? ` <span class="store">+${g.storehouse[r]} stored</span>` : ''}&nbsp;</span></div>`;
     }).join('');

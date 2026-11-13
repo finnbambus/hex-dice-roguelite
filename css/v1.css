@@ -576,3 +576,11 @@ input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); ou
 /* Next round right where the mouse is */
 .shop-foot .peek-btn { margin-left: auto; }
 .shop-foot .next-btn { flex: none; }
+
+/* Resource focus: the hexes that produce it stay lit, the rest of the island steps back */
+.world .tile, .world .tok { transition: filter .18s; }
+.world.res-focus .tile:not(.res-lit) { filter: brightness(.38) saturate(.5); }
+.world.res-focus .tok:not(.res-lit) { filter: brightness(.5); }
+.world.res-focus .tile.res-lit { filter: brightness(1.12) saturate(1.1); }
+.world.res-focus .tok.res-lit { filter: drop-shadow(0 0 6px rgba(255, 236, 190, .9)); }
+.stack[data-res], .tpart[data-res], .got-row[data-res] { cursor: default; }

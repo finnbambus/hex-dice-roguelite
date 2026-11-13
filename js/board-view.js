@@ -2,7 +2,7 @@
 // lying flat on an abstract halftone tabletop, and a pannable camera.
 // It only draws. All game rules stay in game.js; the UI passes in what to highlight.
 import { TERRAIN_RES, pips } from './board.js';
-import { portPlate } from './figures.js?v=52';
+import { portPlate } from './figures.js?v=53';
 import { PORT_ATLAS, PORT_SCALE, PORT_SHEET } from './ports-atlas.js?v=11';
 
 const SQ3 = Math.sqrt(3);
@@ -125,7 +125,7 @@ export class BoardView {
     this.tileKey = key;
     this.tilesEl.innerHTML = B.hexes.map((h) => {
       const dim = dimSet && !dimSet.has(h.id) ? ' dim' : '';
-      return `<div class="tile${dim}" data-hex="${h.id}" style="left:${f1(this.hx(h) - S / 2)}px;top:${f1(this.hy(h) - S / 2)}px;z-index:${this.zRow(h)}"><i style="background-position:${cellPos(TERR[h.terrain])}"></i></div>`;
+      return `<div class="tile${dim}" data-hex="${h.id}" data-hres="${TERRAIN_RES[h.terrain] || ''}" style="left:${f1(this.hx(h) - S / 2)}px;top:${f1(this.hy(h) - S / 2)}px;z-index:${this.zRow(h)}"><i style="background-position:${cellPos(TERR[h.terrain])}"></i></div>`;
     }).join('');
   }
 
@@ -207,7 +207,7 @@ export class BoardView {
       const dim = resultMode && !hit && !match;
       const n = pips(h.token);
       const dots = h.hidden ? '' : `<b class="pips">${'<i></i>'.repeat(n)}</b>`;
-      out.push(`<div class="tok${hot && !h.hidden ? ' hot' : ''}${hit || match ? ' lit' : ''}${dim ? ' dim' : ''}" style="left:${f1(this.hx(h) - 20)}px;top:${f1(this.hy(h) - 20 * K)}px;height:${f1(40 * K)}px;z-index:${this.zRow(h) + 7}"><div class="in" style="transform:scaleY(${K}) rotate(${tilt(h.id + 3, 1.8)}deg)"><span class="n">${h.hidden ? '?' : h.token}</span>${dots}</div></div>`);
+      out.push(`<div class="tok${hot && !h.hidden ? ' hot' : ''}${hit || match ? ' lit' : ''}${dim ? ' dim' : ''}" data-hres="${TERRAIN_RES[h.terrain] || ''}" style="left:${f1(this.hx(h) - 20)}px;top:${f1(this.hy(h) - 20 * K)}px;height:${f1(40 * K)}px;z-index:${this.zRow(h) + 7}"><div class="in" style="transform:scaleY(${K}) rotate(${tilt(h.id + 3, 1.8)}deg)"><span class="n">${h.hidden ? '?' : h.token}</span>${dots}</div></div>`);
     }
     // field upgrades: a finish and rim on the hex, a ring and a chip on the token (same palette as the upgrade figures)
     for (const h of B.hexes) {
