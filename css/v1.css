@@ -566,3 +566,13 @@ input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); ou
 .hand.measuring .zone { flex: none; }
 .hand .stack { padding-top: 16px; }
 .hud .stat { flex: none; }
+
+/* Sold out: the offer greys out under a stamp in the style of the Paid stamp */
+.offer.sold { opacity: 1; position: relative; }
+.offer.sold > :not(.sold-stamp) { filter: grayscale(1) brightness(.55); opacity: .7; }
+.sold-stamp { position: absolute; left: 50%; top: 42%; z-index: 5; translate: -50% -50%; pointer-events: none; white-space: nowrap; font: 800 26px/1 var(--display); letter-spacing: .12em; text-transform: uppercase; color: var(--ink); border: 2px solid var(--ink); border-radius: 6px; padding: 5px 12px 3px; transform: rotate(-8deg); background: rgba(12, 13, 15, .55); }
+.sold-stamp.slam { animation: soldStamp .62s cubic-bezier(.2, .9, .25, 1) both; }
+@keyframes soldStamp { 0% { opacity: 0; transform: scale(2.7) rotate(-16deg); } 55% { opacity: 1; transform: scale(.92) rotate(-8deg); } 75% { transform: scale(1.06) rotate(-8deg); } 100% { opacity: 1; transform: scale(1) rotate(-8deg); } }
+/* Next round right where the mouse is */
+.shop-foot .peek-btn { margin-left: auto; }
+.shop-foot .next-btn { flex: none; }

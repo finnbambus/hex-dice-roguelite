@@ -6,9 +6,9 @@
 import { Game, COSTS, BLINDS } from './game.js';
 import { RES, TERRAIN_RES, pips } from './board.js';
 import { ITEMS, ITEM_LIST, BOSS_BY_ID, ROLLS_PER_ROUND, LOADING, START_SETTLEMENTS, ECHO_BREAK } from './content.js';
-import { BoardView } from './board-view.js?v=51';
-import { figure, faceBody, primaryTrigger } from './figures.js?v=51';
-import { Feel } from './feel.js?v=51';
+import { BoardView } from './board-view.js?v=52';
+import { figure, faceBody, primaryTrigger } from './figures.js?v=52';
+import { Feel } from './feel.js?v=52';
 
 const TERRAIN_COLOR = { hills: '#c8734a', forest: '#3f7d4a', pasture: '#9ccf6a', fields: '#e8c547', mountains: '#8e939c', desert: '#e3d3a4' };
 const RES_ICON = { brick: 'B', lumber: 'L', wool: 'W', grain: 'G', ore: 'O' };
@@ -1497,19 +1497,30 @@ export class UI {
     if (over) { this.$overlay.innerHTML = this.viewGameOver(); return; }
     // Looking at the board from the shop: the sheet steps aside and leaves one way back.
     if (this.peek) { this.$overlay.innerHTML = `<button class="peek-back" data-a="peek">Back to the shop<kbd>Esc</kbd></button>`; this.shopShown = false; return; }
+    // A bought offer greys out under a Sold out stamp; it slams down the moment it is bought.
+    const seen = this.soldSeen || (this.soldSeen = new Map());
+    if (!this.shopShown) seen.clear();
+    const now = performance.now();
+    const stamp = (s, i) => {
+      if (!s.sold) return '';
+      const key = `${i}:${s.item?.id ?? s.group}`;
+      if (!seen.has(key)) seen.set(key, this.shopShown ? now : -1e9);
+      const age = now - seen.get(key);
+      return `<b class="sold-stamp${age < 700 ? ' slam' : ''}" ${age < 700 ? `style="animation-delay:${-Math.round(age)}ms"` : ''}>Sold out</b>`;
+    };
     const offers = g.shop.map((s, i) => {
       const price = g.slotPrice(s);
       const afford = g.budget >= price;
       const can = !s.sold && afford && !this.busy;
       const cost = price === Infinity ? 'max level' : `${price} VP`;
-      const btn = `<button class="${can ? 'primary' : ''} buy" data-a="buy" data-i="${i}" ${can ? '' : 'disabled'}>${s.sold ? 'Bought' : afford ? `Buy · ${cost}` : `${cost}<small>need ${price - g.budget} more</small>`}</button>`;
+      const btn = `<button class="${can ? 'primary' : ''} buy" data-a="buy" data-i="${i}" ${can ? '' : 'disabled'}>${s.sold ? 'Sold out' : afford ? `Buy · ${cost}` : `${cost}<small>need ${price - g.budget} more</small>`}</button>`;
       if (s.kind === 'pack') {
         return `<div class="offer pack ${s.sold ? 'sold' : ''}"><div class="o-top"><span>Pack · ${esc(s.group)}</span><span>1 of 3</span></div>
           <div class="o-stage"><div class="sealed"><i></i><i></i><i><b>?</b></i></div></div>
-          <div class="o-name">A pack of three</div><div class="o-desc">Open it after you buy, then keep one.</div>${btn}</div>`;
+          <div class="o-name">A pack of three</div><div class="o-desc">Open it after you buy, then keep one.</div>${btn}${stamp(s, i)}</div>`;
       }
       const art = this.offerArt(s.item);
-      return `<div class="offer ${art.cls} ${s.sold ? 'sold' : ''}">${art.html}${btn}</div>`;
+      return `<div class="offer ${art.cls} ${s.sold ? 'sold' : ''}">${art.html}${btn}${stamp(s, i)}</div>`;
     }).join('');
     const e = g.earned;
     const sum = `Score ${g.vp} + unused rolls ${e.unusedRolls} + Storehouse ${e.storehouse}${e.river ? ` + River ${e.river}` : ''}${e.twinFortune ? ` + Twin Fortune ${e.twinFortune}` : ''}`;
@@ -1520,7 +1531,8 @@ export class UI {
       <div class="shop-grid" style="--n:${g.shop.length}">${offers}</div>
       <div class="shop-foot"><button data-a="reroll" ${g.budget >= g.rerollPrice ? '' : 'disabled'}>Reroll offers · ${g.rerollPrice} VP</button>
         <span class="sf-note"><b>Unspent VP is lost when you leave.</b> Dice, field and port upgrades ask for their target after you buy.</span>
-        <button class="peek-btn" data-a="peek" title="Hide the shop and look at your island">View board</button></div>
+        <button class="peek-btn" data-a="peek" title="Hide the shop and look at your island">View board</button>
+        <button class="primary next-btn" data-a="leave" ${this.busy ? 'disabled' : ''} title="Close the shop and start the next round">${g.blind === 2 ? 'Next ante' : `Next: ${BLINDS[g.blind + 1]} round`}</button></div>
 </div>`;
     const sh = this.$overlay.querySelector('.shop');
     if (sh && this.shopShown) sh.scrollTop = keep;
