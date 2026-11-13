@@ -595,3 +595,28 @@ input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); ou
 .portcard.blocked { filter: grayscale(1) brightness(.6) drop-shadow(0 3px 3px rgba(0, 0, 0, .5)); }
 .portcard.blocked::after { content: ""; position: absolute; left: 6%; right: 6%; top: 50%; height: 4px; margin-top: -2px; border-radius: 2px; background: #e8826b; transform: rotate(-28deg); box-shadow: 0 0 0 1.5px rgba(12, 13, 15, .7); }
 .boss-row { cursor: help; }
+
+/* Dice workbench over the shop: dice upgrades are placed on the big dice, with the odds beside them */
+.bench { pointer-events: auto; width: min(820px, calc(100% - 48px)); max-height: calc(100% - 48px); overflow: auto; display: flex; flex-direction: column; gap: 20px; padding: 24px; border-radius: var(--r-lg, 16px); background: #141518; border: 1px solid var(--line2); box-shadow: 0 30px 80px -20px rgba(0, 0, 0, .9); }
+.bench-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 24px; }
+.bench-head h2 { margin: 4px 0 0; font: 600 32px/1 var(--display); }
+.bench-head p { margin: 0; max-width: 340px; font-size: 13px; line-height: 1.4; color: var(--muted); }
+.bench-main { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 24px; align-items: center; }
+.bench-main:not(:has(.bench-odds)) { grid-template-columns: 1fr; }
+.bench-dice { --s: 96px; }
+.bench-dice .ds-row { justify-content: space-around; }
+.bench-dice .die-slot .die3d { --s: 96px; margin: 30px 26px 34px; }
+.bench-dice .die-cap { display: flex; flex-direction: column; align-items: center; gap: 4px; text-transform: none; letter-spacing: 0; }
+.bench-dice .die-cap b { font: var(--cap); letter-spacing: .14em; text-transform: uppercase; color: var(--ink); }
+.bench-dice .die-cap span { font-size: 12px; color: var(--muted); }
+.bench-dice .die-slot.off { opacity: .4; filter: grayscale(.6); }
+.bench-die { cursor: pointer; border-radius: var(--r-md); transition: background .15s; }
+.bench-die:hover { background: rgba(255, 255, 255, .04); }
+.bench-odds { padding: 16px; border-radius: var(--r-md); background: #101113; border: 1px solid var(--line); }
+.bench-odds .pk-chart { margin: 0; }
+.bench-foot { display: flex; justify-content: flex-end; gap: 12px; }
+.bench-foot button { min-height: 44px; padding: 0 20px; }
+.side.sel { outline: 3px solid var(--accent); outline-offset: -3px; box-shadow: inset 0 0 0 999px rgba(255, 74, 28, .16); }
+.bench .dice-stage.choosing.bench-dice .die-slot .die3d { --s: 104px; margin: 34px 30px 38px; }
+.bench .dice-stage.choosing .ds-hint { color: var(--muted); font-weight: 400; font-size: 13px; margin-top: 8px; }
+@media (max-height: 800px) { .bench .dice-stage.choosing.bench-dice .die-slot .die3d { --s: 80px; margin: 26px 24px 30px; } }

@@ -1302,13 +1302,21 @@ export class Game {
           const L = this.dice[d].loaded;
           const lv = L ? L.level : 0;
           const cost = free ? 0 : lv >= 10 ? Infinity : LOADING[lv][3];
-          return { label: L ? `Die ${d + 1}: level ${lv} → ${lv + 1} (${cost} VP)` : `Die ${d + 1}: start loading (${cost} VP)`, value: d, disabled: cost > maxPrice };
+          return { label: L ? `Die ${d + 1}: level ${lv} → ${lv + 1} (${cost} VP)` : `Die ${d + 1}: start loading (${cost} VP)`, value: d, die: d, level: lv, cost, face: L ? L.face : null, disabled: cost > maxPrice };
         });
-        const d = await io.chooseOption(opts, 'Loaded: choose a die', { cancel: true });
-        if (d == null) return null;
+        // A UI that can show the dice picks die and face in one go (and confirms it); otherwise ask in two steps.
+        let d, face = null;
+        if (io.chooseLoad) {
+          const pick = await io.chooseLoad(opts, 'Loaded: choose a face to favour', { cancel: true });
+          if (!pick) return null;
+          d = pick.die; face = pick.face;
+        } else {
+          d = await io.chooseOption(opts, 'Loaded: choose a die', { cancel: true });
+          if (d == null) return null;
+        }
         const die = this.dice[d];
         if (!die.loaded) {
-          const face = await io.chooseOption(die.faces.map((f, i) => ({ label: `Face ${i + 1} (shows ${f.setter ?? f.value})`, value: i })), 'Choose the face to favour', { cancel: true });
+          if (face == null) face = await io.chooseOption(die.faces.map((f, i) => ({ label: `Face ${i + 1} (shows ${f.setter ?? f.value})`, value: i })), 'Choose the face to favour', { cancel: true });
           if (face == null) return null;
           die.loaded = { face, level: 1 };
           return done(free ? 0 : LOADING[0][3]);
@@ -1318,7 +1326,7 @@ export class Game {
         return done(cost);
       }
       const opts = [0, 1].map((d) => ({ label: `Die ${d + 1}${this.dice[d].upgrades.includes(item.id) ? ' (already has it)' : ''}`, value: d, disabled: this.dice[d].upgrades.includes(item.id) }));
-      const d = await io.chooseOption(opts, `${item.name}: choose a die`, { cancel: true });
+      const d = io.chooseDie ? await io.chooseDie(opts, `${item.name}: choose a die`, { cancel: true }) : await io.chooseOption(opts, `${item.name}: choose a die`, { cancel: true });
       if (d == null) return null;
       this.dice[d].upgrades.push(item.id);
       return done();

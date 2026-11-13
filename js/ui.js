@@ -6,9 +6,9 @@
 import { Game, COSTS, BLINDS } from './game.js';
 import { RES, TERRAIN_RES, pips } from './board.js';
 import { ITEMS, ITEM_LIST, BOSS_BY_ID, ROLLS_PER_ROUND, LOADING, START_SETTLEMENTS, ECHO_BREAK } from './content.js';
-import { BoardView } from './board-view.js?v=54';
-import { figure, faceBody, primaryTrigger } from './figures.js?v=54';
-import { Feel } from './feel.js?v=54';
+import { BoardView } from './board-view.js?v=55';
+import { figure, faceBody, primaryTrigger } from './figures.js?v=55';
+import { Feel } from './feel.js?v=55';
 
 const TERRAIN_COLOR = { hills: '#c8734a', forest: '#3f7d4a', pasture: '#9ccf6a', fields: '#e8c547', mountains: '#8e939c', desert: '#e3d3a4' };
 const RES_ICON = { brick: 'B', lumber: 'L', wool: 'W', grain: 'G', ore: 'O' };
@@ -182,6 +182,12 @@ export class UI {
   }
   chooseOption(options, prompt, o = {}) { return this.openModal({ type: 'options', options, prompt, cancel: !!o.cancel }); }
   chooseFace(options, prompt, o = {}) { return this.openModal({ type: 'face', options, prompt, cancel: !!o.cancel }); }
+  // In the shop, Loaded and die upgrades are placed on the dice in a workbench over the shop.
+  chooseLoad(options, prompt, o = {}) { return this.openModal({ type: 'load', options, prompt, cancel: !!o.cancel, sel: null }); }
+  chooseDie(options, prompt, o = {}) {
+    if (this.game?.phase !== 'shop') return this.chooseOption(options, prompt, o);
+    return this.openModal({ type: 'die', options, prompt, cancel: !!o.cancel });
+  }
   chooseResources(n, prompt, o = {}) {
     return this.openModal({ type: 'resources', n, prompt, cancel: !!o.cancel, max: o.max || null, counts: Object.fromEntries(RES.map((r) => [r, 0])) });
   }
@@ -260,7 +266,7 @@ export class UI {
       const d = ev.target.closest?.('.die3d[data-cube]');
       if (!d || ev.button > 0) return;
       const i = Number(d.dataset.cube);
-      this.drag = { i, x: ev.clientX, y: ev.clientY, moved: false, base: this.spin[i] ? new DOMMatrix(this.spin[i]) : new DOMMatrix() };
+      this.drag = { i, el: d, x: ev.clientX, y: ev.clientY, moved: false, base: this.spin[i] ? new DOMMatrix(this.spin[i]) : new DOMMatrix() };
     });
     document.addEventListener('pointermove', (ev) => {
       const dr = this.drag;
@@ -271,7 +277,7 @@ export class UI {
       // Turn in screen space, like a trackball: the side under the pointer follows it.
       const ang = Math.hypot(dx, dy) * 0.7;
       this.spin[dr.i] = new DOMMatrix().rotateAxisAngleSelf(-dy, dx, 0, ang).multiply(dr.base).toString();
-      const cube = document.querySelector(`.die3d[data-cube="${dr.i}"] .cube`);
+      const cube = dr.el.querySelector('.cube');
       if (cube) { cube.style.transition = 'none'; cube.style.animation = 'none'; cube.style.transform = `${spunTransform(this.spin[dr.i], !!cube.closest('.choosing'))}${cube.style.getPropertyValue('--final')}`; }
     });
     const endDrag = () => { if (this.drag?.moved) { this.dragMoved = true; setTimeout(() => { this.dragMoved = false; }, 0); } this.drag = null; };
@@ -363,6 +369,20 @@ export class UI {
     this.tipsOpen = false;
     if (a !== 'die-sheet' && a !== 'die-open') this.dieSheet = null;
     if ((a === 'die-sheet' || a === 'pick-face') && this.dragMoved) return;
+    if (a === 'pick-face' && this.modal?.type === 'load') {
+      const m = this.modal;
+      const o = m.options.find((x) => x.die === Number(d.die));
+      if (!o || o.disabled) return;
+      const L = this.game.dice[o.die].loaded;
+      m.sel = { die: o.die, face: L ? L.face : Number(d.face) };
+      return this.render();
+    }
+    if (a === 'load-confirm') { const m = this.modal; return m?.sel ? this.resolveModal({ ...m.sel }) : undefined; }
+    if (a === 'bench-die') {
+      const m = this.modal;
+      const o = m?.options.find((x) => x.value === Number(d.die));
+      return o && !o.disabled ? this.resolveModal(o.value) : undefined;
+    }
     if (a === 'pick-face') {
       const m = this.modal;
       const opt = m?.type === 'face' ? m.options.find((o) => o.die === Number(d.die) && o.face === Number(d.face)) : null;
@@ -876,7 +896,7 @@ export class UI {
     const step = this.step();
     if (this.lastStep !== step) this.tipsOpen = false;
     this._tip = null;
-    const pickingFace = this.modal?.type === 'face';
+    const pickingFace = this.modal?.type === 'face' && !this.benchOpen();
     const view = pickingFace ? this.viewPickFace() : {
       setup: () => this.viewSetup(),
       roll: () => this.viewRoll(),
@@ -1200,9 +1220,9 @@ export class UI {
 
   // Probability of each sum 2–12 for the two dice as they are (or with one face swapped), as fractions.
   // Mirror faces copy the other die, a Blank face is counted as an even spread, the Robber's Face counts as a 7.
-  sumDist(swap) {
+  sumDist(swap, load) {
     const g = this.game;
-    const probs = [0, 1].map((i) => g.faceProbs(i));
+    const probs = [0, 1].map((i) => (load && load.die === i ? load.probs : g.faceProbs(i)));
     const faces = [0, 1].map((i) => g.dice[i].faces.map((f, k) => (swap && swap.die === i && swap.face === k ? swap.to : f)));
     const out = Array(13).fill(0);
     const vals = (f) => (f.setter === 'blank' ? [1, 2, 3, 4, 5, 6] : f.setter === 'mirror' ? ['m'] : [f.value]);
@@ -1308,6 +1328,7 @@ export class UI {
     const fill = document.querySelector('#pk-after-fill');
     const read = document.querySelector('#pk-read');
     const bs = this.distStats(c.before);
+    if (!key && this.modal?.type === 'load' && this.modal.sel) key = `${this.modal.sel.die}-${this.modal.sel.face}`;
     const a = key ? c.after[key] : null;
     if (!a) {
       path.setAttribute('d', ''); fill.setAttribute('d', '');
@@ -1319,6 +1340,83 @@ export class UI {
     path.classList.toggle('random', a.random);
     const as = this.distStats(a.dist);
     read.textContent = `${a.random ? 'Expected (the new value is random): ' : 'After: '}7 comes up ${(as.p7 * 100).toFixed(1)}% (now ${(bs.p7 * 100).toFixed(1)}%) · average total ${as.mean.toFixed(1)} (now ${bs.mean.toFixed(1)}).`;
+  }
+
+  benchOpen() { return this.game?.phase === 'shop' && ['face', 'load', 'die'].includes(this.modal?.type); }
+
+  // The odds with a load placed on a face (Loaded: a new load, or the next level of an existing one).
+  loadChart(m) {
+    const g = this.game;
+    const W = 320, H = 104;
+    const before = this.sumDist();
+    const after = {};
+    let top = Math.max(...before);
+    for (const o of m.options) {
+      if (o.disabled) continue;
+      const L = g.dice[o.die].loaded;
+      const lv = L ? L.level + 1 : 1;
+      for (let k = 0; k < 6; k++) {
+        const face = L ? L.face : k;
+        const [fav, opp, side] = LOADING[lv - 1];
+        const probs = [0, 1, 2, 3, 4, 5].map((j) => (j === face ? fav : j === 5 - face ? opp : side));
+        const dist = this.sumDist(null, { die: o.die, probs });
+        after[`${o.die}-${k}`] = { dist, random: false };
+        top = Math.max(top, ...dist);
+      }
+    }
+    top *= 1.1;
+    this._pick = { before, after, top, W, H };
+    return this.chartShell(before, top, W, H);
+  }
+
+  chartShell(before, top, W, H) {
+    const bp = this.curvePath(before, W, H, top);
+    const ticks = Array.from({ length: 11 }, (_, i) => `<text x="${(10 + (i / 10) * (W - 20)).toFixed(1)}" y="${H - 3}" text-anchor="middle" class="${i + 2 === 7 ? 'seven' : ''}">${i + 2}</text>`).join('');
+    const st = this.distStats(before);
+    return `<div class="pk-chart" aria-label="Chance of each roll total">
+      <div class="pk-title">Chance of each total · now and after</div>
+      <svg viewBox="0 0 ${W} ${H}" width="100%" role="img"><path d="${bp.area}" class="pk-before-fill"/><path id="pk-after-fill" class="pk-after-fill" d=""/><path d="${bp.d}" class="pk-before"/><path id="pk-after" class="pk-after" d=""/>${ticks}</svg>
+      <div id="pk-read" class="pk-read">Now: 7 comes up ${(st.p7 * 100).toFixed(1)}% · average total ${st.mean.toFixed(1)}. Hover a face to preview the change.</div></div>`;
+  }
+
+  // The workbench over the shop: both dice large, the odds beside them, and the one choice the upgrade needs.
+  viewBench() {
+    const g = this.game, m = this.modal;
+    const name = m.prompt.split(':')[0];
+    const item = ITEM_LIST.find((x) => x.name === name);
+    const mode = m.type;
+    const lead = mode === 'face' ? 'Drag a die to turn it. Hover a face to preview the odds, click it to apply.'
+      : mode === 'load' ? 'Pick the face to favour, check the odds, then confirm. A loaded die raises its level on the face it already favours.'
+        : 'Click the die that gets the upgrade.';
+    const dice = [0, 1].map((i) => {
+      const o = mode === 'face' ? null : m.options.find((x) => (mode === 'load' ? x.die : x.value) === i);
+      const off = o && o.disabled;
+      let cap = `Die ${i + 1}`;
+      if (mode === 'load') {
+        const L = g.dice[i].loaded;
+        cap = `<b>Die ${i + 1}</b><span>${L ? `Lvl. ${L.level} → ${L.level + 1}` : 'Not loaded yet'} · ${o.cost === Infinity ? 'max level' : `${o.cost} VP`}</span>`;
+      } else if (mode === 'die') cap = `<b>Die ${i + 1}</b><span>${off ? 'Already has it' : 'Click to choose'}</span>`;
+      const cube = this.cube(i, 0, false, false, mode !== 'die' && !off);
+      return mode === 'die'
+        ? `<div class="die-slot bench-die ${off ? 'off' : ''}" ${off ? '' : `data-a="bench-die" data-die="${i}" role="button" tabindex="0"`}>${cube}<span class="die-cap">${cap}</span></div>`
+        : `<div class="die-slot picking ${off ? 'off' : ''}">${cube}<span class="die-cap">${cap}</span></div>`;
+    }).join('');
+    const chart = mode === 'load' ? this.loadChart(m) : mode === 'face' && item && item.kind === 'setter' ? this.pickChart(item) : '';
+    const sel = m.sel;
+    const so = sel && m.options.find((x) => x.die === sel.die);
+    const confirm = mode === 'load' ? `<button class="primary" data-a="load-confirm" ${sel ? '' : 'disabled'}>${sel ? `Load Die ${sel.die + 1} on face ${sel.face + 1} · ${so.cost} VP` : 'Pick a face first'}</button>` : '';
+    return `<div class="bench" role="dialog" aria-label="${esc(name)}">
+      <div class="bench-head"><div><div class="eyebrow">Shop · apply your upgrade</div><h2>${esc(name)}</h2></div>${item ? `<p>${esc(item.desc)}</p>` : ''}</div>
+      <div class="bench-main"><div class="dice-stage choosing bench-dice"><div class="ds-row">${dice}</div><div class="ds-hint">${lead}</div></div>${chart ? `<div class="bench-odds">${chart}</div>` : ''}</div>
+      <div class="bench-foot">${m.cancel ? '<button data-a="cancel-modal">Cancel</button>' : ''}${confirm}</div></div>`;
+  }
+
+  afterBench() {
+    const m = this.modal;
+    if (m?.type !== 'load' || !m.sel) return;
+    const L = this.game.dice[m.sel.die].loaded;
+    for (const el of this.$overlay.querySelectorAll(`.side[data-die="${m.sel.die}"]`)) el.classList.toggle('sel', Number(el.dataset.face) === (L ? L.face : m.sel.face));
+    this.pickPreview(null);
   }
 
   // Choosing the face of a face upgrade: spin the dice in the action card and click the face itself.
@@ -1533,6 +1631,7 @@ export class UI {
     this.$overlay.classList.toggle('peek-mode', show && !over && !!this.peek);
     if (!show) { this.shopShown = false; return; }
     if (over) { this.$overlay.innerHTML = this.viewGameOver(); return; }
+    if (this.benchOpen()) { this.$overlay.innerHTML = this.viewBench(); this.afterBench(); return; }
     // Looking at the board from the shop: the sheet steps aside and leaves one way back.
     if (this.peek) { this.$overlay.innerHTML = `<button class="peek-back" data-a="peek">Back to the shop<kbd>Esc</kbd></button>`; this.shopShown = false; return; }
     // A bought offer greys out under a Sold out stamp; it slams down the moment it is bought.
@@ -1861,7 +1960,7 @@ export class UI {
       };
       return `<div class="modal" role="dialog" aria-modal="true">${this.promptHead(m.prompt)}<div class="opts ${nums ? 'nums' : ''}">${m.options.map(row).join('')}</div>${cancel ? `<div class="modal-foot">${cancel}</div>` : ''}</div>`;
     }
-    if (m.type === 'face') return ''; // chosen on the dice in the action card
+    if (m.type === 'face' || m.type === 'load' || m.type === 'die') return ''; // chosen on the dice: in the action card, or on the workbench over the shop
     if (m.type === 'resources') {
       const total = RES.reduce((s, r) => s + m.counts[r], 0);
       const full = (r) => total >= m.n || (m.max && m.counts[r] >= m.max[r]);
