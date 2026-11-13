@@ -2,7 +2,7 @@
 // lying flat on an abstract halftone tabletop, and a pannable camera.
 // It only draws. All game rules stay in game.js; the UI passes in what to highlight.
 import { TERRAIN_RES, pips } from './board.js';
-import { portPlate } from './figures.js?v=59';
+import { portPlate } from './figures.js?v=60';
 import { PORT_ATLAS, PORT_SCALE, PORT_SHEET } from './ports-atlas.js?v=11';
 
 const SQ3 = Math.sqrt(3);
@@ -242,7 +242,7 @@ export class BoardView {
       const y = opts.yields(h);
       if (!y || !h.token || !TERRAIN_RES[h.terrain]) continue;
       const txt = y.note === 'robber' ? 'Robber' : y.n ? `+${y.n}` : 'No buildings';
-      out.push(`<div class="yieldchip${y.n ? '' : ' none'}" data-hres="${TERRAIN_RES[h.terrain]}" style="left:${f1(this.hx(h))}px;top:${f1(this.hy(h) + 26 * K)}px;z-index:${this.zRow(h) + 40}">${txt}${y.n ? `<small>on a ${h.token}</small>` : ''}</div>`);
+      out.push(`<div class="yieldchip${y.n ? '' : ' none'}" data-hres="${TERRAIN_RES[h.terrain]}" style="left:${f1(this.hx(h))}px;top:${f1(this.hy(h) + 26 * K)}px;z-index:${this.zRow(h) + 40}">${txt}${y.n ? `<small>${y.p > 0 && y.p < 0.005 ? '<1' : Math.round(y.p * 100)}% chance of rolling</small>` : ''}</div>`);
     }
     // the boss where it acts: hatched hexes that produce nothing, fog over hidden tokens, a burning volcano hex
     const bf = opts.boss;

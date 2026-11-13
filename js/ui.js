@@ -6,9 +6,9 @@
 import { Game, COSTS, BLINDS } from './game.js';
 import { RES, TERRAIN_RES, pips } from './board.js';
 import { ITEMS, ITEM_LIST, BOSS_BY_ID, ROLLS_PER_ROUND, LOADING, START_SETTLEMENTS, ECHO_BREAK } from './content.js';
-import { BoardView } from './board-view.js?v=59';
-import { figure, faceBody, primaryTrigger } from './figures.js?v=59';
-import { Feel } from './feel.js?v=59';
+import { BoardView } from './board-view.js?v=60';
+import { figure, faceBody, primaryTrigger } from './figures.js?v=60';
+import { Feel } from './feel.js?v=60';
 
 const TERRAIN_COLOR = { hills: '#c8734a', forest: '#3f7d4a', pasture: '#9ccf6a', fields: '#e8c547', mountains: '#8e939c', desert: '#e3d3a4' };
 const RES_ICON = { brick: 'B', lumber: 'L', wool: 'W', grain: 'G', ore: 'O' };
@@ -862,7 +862,7 @@ export class UI {
       rolled,
       volcano: g.volcanoHex,
       boss: this.bossFx(),
-      yields: (h) => g.expectedYield(h),
+      yields: (() => { const dist = this.sumDist(); const tot = dist.reduce((x, y) => x + y, 0) || 1; return (h) => ({ ...g.expectedYield(h), p: h.token ? dist[h.token] / tot : 0 }); })(),
       replace: this.replaceMap(),
       hlEdges: this.hlRoad ? this.roadPath().edges : null,
       tip: (h) => {
